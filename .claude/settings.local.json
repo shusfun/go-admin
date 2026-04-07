@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(go build:*)",
+      "Bash(go mod:*)",
+      "Bash(pnpm --filter @suiyuan/admin-web typecheck)",
+      "Bash(pnpm install:*)"
+    ]
+  }
+}

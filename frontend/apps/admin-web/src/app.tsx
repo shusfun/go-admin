@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
-import { createApiClient, ApiError } from "@suiyuan/api";
+import { createApiClient, ApiError, createSetupApi } from "@suiyuan/api";
 import { createSessionManager } from "@suiyuan/auth";
 import { adaptMenuTree, deriveTenantCode, findMenuByPath } from "@suiyuan/core";
 import { AdminShell, BrandBlock, IdentityCard, SectionCard, TreeNav } from "@suiyuan/ui-admin";
@@ -31,8 +31,11 @@ import { SetConfigPage } from "./pages/set-config-page";
 import { SwaggerPage } from "./pages/swagger-page";
 import { UsersPage } from "./pages/users-page";
 
+import { SetupWizardPage } from "./pages/setup-wizard-page";
+
 const tenant = deriveTenantCode(window.location.hostname, import.meta.env.VITE_TENANT_CODE || "local");
 const sessionManager = createSessionManager("admin");
+const setupApi = createSetupApi(import.meta.env.VITE_API_BASE_URL || "");
 
 function useAdminApi(setAuthenticated: (value: boolean) => void) {
   return createApiClient({
@@ -189,8 +192,21 @@ function ShellContent({
 }
 
 export function App() {
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [authenticated, setAuthenticated] = useState(Boolean(sessionManager.read()?.token));
   const api = useAdminApi(setAuthenticated);
+  const checkedRef = useRef(false);
+
+  // 启动时检测后端是否处于 Setup Wizard 模式
+  useEffect(() => {
+    if (checkedRef.current) return;
+    checkedRef.current = true;
+
+    setupApi
+      .getStatus()
+      .then((status) => setNeedsSetup(status.needs_setup))
+      .catch(() => setNeedsSetup(false)); // 接口不可用时视为已安装
+  }, []);
 
   async function handleLogin(payload: { username: string; password: string; code?: string; uuid?: string }) {
     const result = await api.auth.login(payload);
@@ -213,6 +229,17 @@ export function App() {
     }
   }
 
+  // 阶段 1：正在检测后端状态
+  if (needsSetup === null) {
+    return <LoadingScreen />;
+  }
+
+  // 阶段 2：需要初始化安装
+  if (needsSetup) {
+    return <SetupWizardPage setupApi={setupApi} onComplete={() => setNeedsSetup(false)} />;
+  }
+
+  // 阶段 3：未登录
   if (!authenticated) {
     return (
       <LoginPage
@@ -238,5 +265,6 @@ export function App() {
     );
   }
 
+  // 阶段 4：已登录，进入管理后台
   return <AdminWorkbench api={api} onLogout={handleLogout} />;
 }

@@ -1,7 +1,7 @@
 package migration
 
 import (
-	"log"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -33,7 +33,10 @@ func (e *Migration) SetVersion(k string, f func(db *gorm.DB, version string) err
 	e.version[k] = f
 }
 
-func (e *Migration) Migrate() {
+func (e *Migration) Migrate() error {
+	if e.db == nil {
+		return fmt.Errorf("migration db is nil")
+	}
 	versions := make([]string, 0)
 	for k := range e.version {
 		versions = append(versions, k)
@@ -46,18 +49,18 @@ func (e *Migration) Migrate() {
 	for _, v := range versions {
 		err = e.db.Table("sys_migration").Where("version = ?", v).Count(&count).Error
 		if err != nil {
-			log.Fatalln(err)
+			return err
 		}
 		if count > 0 {
-			log.Println(count)
 			count = 0
 			continue
 		}
 		err = (e.version[v])(e.db.Debug(), v)
 		if err != nil {
-			log.Fatalln(err)
+			return err
 		}
 	}
+	return nil
 }
 
 func GetFilename(s string) string {

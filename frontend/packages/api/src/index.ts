@@ -564,3 +564,76 @@ export function createApiClient(options: ClientOptions) {
     },
   };
 }
+
+// ─── Setup Wizard API（不需要认证） ───
+
+type SetupStatus = {
+  needs_setup: boolean;
+  step: string;
+};
+
+type TestDBPayload = {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  dbname: string;
+  sslmode: string;
+};
+
+type TestRedisPayload = {
+  host: string;
+  port: number;
+  password: string;
+  db: number;
+};
+
+type InstallPayload = {
+  database: TestDBPayload;
+  redis: TestRedisPayload;
+  admin: {
+    username: string;
+    password: string;
+    email: string;
+    phone: string;
+  };
+};
+
+export function createSetupApi(baseURL: string) {
+  const instance = axios.create({
+    baseURL,
+    timeout: 30000,
+  });
+
+  async function unwrap<T>(request: () => Promise<AxiosResponse<ApiEnvelope<T>>>): Promise<T> {
+    const response = await request();
+    const body = response.data;
+    if (body.code !== 200) {
+      throw new ApiError(body.msg || "请求失败", body.code);
+    }
+    return body.data;
+  }
+
+  return {
+    async getStatus() {
+      return unwrap<SetupStatus>(() => instance.get<ApiEnvelope<SetupStatus>>("/api/v1/setup/status"));
+    },
+    async testDatabase(payload: TestDBPayload) {
+      return unwrap<{ message: string }>(() =>
+        instance.post<ApiEnvelope<{ message: string }>>("/api/v1/setup/test-db", payload),
+      );
+    },
+    async testRedis(payload: TestRedisPayload) {
+      return unwrap<{ message: string }>(() =>
+        instance.post<ApiEnvelope<{ message: string }>>("/api/v1/setup/test-redis", payload),
+      );
+    },
+    async install(payload: InstallPayload) {
+      return unwrap<{ message: string; restart: boolean }>(() =>
+        instance.post<ApiEnvelope<{ message: string; restart: boolean }>>("/api/v1/setup/install", payload),
+      );
+    },
+  };
+}
+
+export type SetupApi = ReturnType<typeof createSetupApi>;

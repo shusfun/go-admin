@@ -107,6 +107,14 @@ antd体验：[https://antd.go-admin.pro](https://antd.go-admin.pro/)
 
 ## 📦 本地开发
 
+## Setup Wizard 说明
+
+- Setup Wizard 只提供后端 API，不会在 Go 服务内托管管理端页面。
+- 首次安装时，请先独立部署或启动 `frontend/apps/admin-web`，并确保 `VITE_API_BASE_URL` 指向当前后端服务。
+- 安装状态仅由配置目录下的 `.installed` 锁文件决定；仓库自带的 `config/settings.yml` 示例文件不会跳过安装流程。
+- 容器部署时请持久化配置目录，安装完成后生成的 `settings.yml` 与 `.installed` 都会写入该目录。
+- 旧部署如果只有真实配置文件但没有 `.installed`，升级到当前版本后会被视为“未安装”，需要人工补齐锁文件或重新初始化。
+
 ### 环境要求
 
 go 1.18

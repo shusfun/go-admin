@@ -11,6 +11,7 @@ RUN apk add --no-cache tzdata
 ENV TZ Asia/Shanghai
 
 COPY ./main /main
+# settings.yml 仅作为容器内示例配置；真正的安装完成标志是同目录下的 .installed。
 COPY ./config/settings.demo.yml /config/settings.yml
 COPY ./go-admin-db.db /go-admin-db.db
 EXPOSE 8000

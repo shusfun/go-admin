@@ -27,6 +27,7 @@ import (
 	"go-admin/common/global"
 	common "go-admin/common/middleware"
 	"go-admin/common/middleware/handler"
+	setupPkg "go-admin/common/setup"
 	"go-admin/common/storage"
 	ext "go-admin/config"
 )
@@ -40,9 +41,20 @@ var (
 		Example:      "go-admin server -c config/settings.yml",
 		SilenceUsage: true,
 		PreRun: func(cmd *cobra.Command, args []string) {
+			// 同步配置路径到 setup 包
+			setupPkg.SetConfigPath(configYml)
+
+			// 两阶段启动：检测是否需要初始化安装
+			if setupPkg.NeedsSetup() {
+				log.Info("System not configured, entering Setup Wizard mode...")
+				return // 不执行正常初始化
+			}
 			setup()
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if setupPkg.NeedsSetup() {
+				return runSetupMode()
+			}
 			return run()
 		},
 	}
@@ -192,5 +204,83 @@ func initRouter() {
 		Use(api.SetRequestLogger)
 
 	common.InitMiddleware(r)
+	setupPkg.RegisterStatusRoute(r)
 
+}
+
+// runSetupMode 以 Setup Wizard 模式启动，只注册 /api/v1/setup/* 路由
+// 不连接数据库、不初始化业务路由
+func runSetupMode() error {
+	gin.SetMode(gin.ReleaseMode)
+
+	r := gin.New()
+	r.Use(gin.Recovery()).
+		Use(common.NoCache).
+		Use(common.Options).
+		Use(common.Secure).
+		Use(common.RequestId(pkg.TrafficKey)).
+		Use(api.SetRequestLogger)
+
+	// 注册 setup 路由
+	setupPkg.RegisterRoutes(r)
+
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status": "setup_mode",
+			"msg":    "Setup API is ready. Please open the separately deployed admin-web application to complete installation.",
+		})
+	})
+
+	// 健康检查
+	r.GET("/info", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status":          "setup_mode",
+			"msg":             "Setup API is ready",
+			"frontend_needed": true,
+		})
+	})
+
+	// 默认端口 8000（和 settings.yml 中的默认值一致）
+	port := 8000
+	addr := fmt.Sprintf("0.0.0.0:%d", port)
+
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      r,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 60 * time.Second,
+	}
+
+	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		fmt.Println(pkg.Red(string(global.LogoContent)))
+		fmt.Println()
+		fmt.Println(pkg.Yellow("╔═══════════════════════════════════════════╗"))
+		fmt.Println(pkg.Yellow("║       Setup Wizard Mode (初始化模式)       ║"))
+		fmt.Println(pkg.Yellow("╚═══════════════════════════════════════════╝"))
+		fmt.Println()
+		fmt.Printf("%s Setup API running at:\n", pkg.Green("→"))
+		fmt.Printf("  -  Local:   http://localhost:%d/api/v1/setup/status\n", port)
+		fmt.Printf("  -  Network: http://%s:%d/api/v1/setup/status\n", pkg.GetLocalHost(), port)
+		fmt.Println()
+		fmt.Println(pkg.Yellow("请访问已独立部署的 admin-web 页面完成初始化，并确保其 VITE_API_BASE_URL 指向本服务。"))
+		fmt.Printf("%s Enter Control + C to cancel\n", pkg.GetCurrentTimeStr())
+
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal("Setup server listen error: ", err)
+		}
+	}()
+
+	<-rootCtx.Done()
+	log.Info("Shutting down setup server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal("Setup server shutdown error: ", err)
+	}
+	log.Info("Setup server exited")
+	return nil
 }

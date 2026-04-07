@@ -33,3 +33,9 @@ pnpm build
 - `VITE_TENANT_CODE`：本地开发时的租户回退值，默认 `local`
 
 生产环境推荐按域名或子域部署，由前端自动识别租户编码。
+
+## Setup Wizard
+
+- Setup Wizard 依赖独立部署的 `apps/admin-web`，后端在 setup 模式下只暴露 `/api/v1/setup/*` API。
+- 首次安装前，请确认 `VITE_API_BASE_URL` 指向目标后端服务，否则前端无法驱动初始化流程。
+- 后端是否进入 setup 模式只由配置目录中的 `.installed` 决定，不再根据示例 `settings.yml` 自动跳过。

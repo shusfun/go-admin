@@ -13,11 +13,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/go-admin-team/go-admin-core/sdk/config"
-	"go-admin/cmd/migrate/migration"
 	_ "go-admin/cmd/migrate/migration/version"
 	_ "go-admin/cmd/migrate/migration/version-local"
+	"go-admin/common/bootstrap"
 	"go-admin/common/database"
-	"go-admin/common/models"
 )
 
 var (
@@ -75,17 +74,12 @@ func migrateModel() error {
 	if db == nil {
 		return fmt.Errorf("未找到数据库配置")
 	}
+	workingDB := db.Debug()
 	if config.DatabasesConfig[host].Driver == "mysql" {
 		//初始化数据库时候用
-		db.Set("gorm:table_options", "ENGINE=InnoDB CHARSET=utf8mb4")
+		workingDB = workingDB.Set("gorm:table_options", "ENGINE=InnoDB CHARSET=utf8mb4")
 	}
-	err := db.Debug().AutoMigrate(&models.Migration{})
-	if err != nil {
-		return err
-	}
-	migration.Migrate.SetDb(db.Debug())
-	migration.Migrate.Migrate()
-	return err
+	return bootstrap.RunDatabaseBootstrap(workingDB)
 }
 func initDB() {
 	//3. 初始化数据库链接

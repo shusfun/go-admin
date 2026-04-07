@@ -105,6 +105,14 @@ At the same time, a series of tutorials including videos and documents are provi
 
 ## 📦 Local development
 
+## Setup Wizard
+
+- Setup Wizard only exposes backend APIs; the Go service does not host the admin UI in setup mode.
+- Deploy or start `frontend/apps/admin-web` separately for first-time installation, and point `VITE_API_BASE_URL` to the backend service.
+- Installation mode is decided only by the `.installed` lock file in the config directory. The sample `config/settings.yml` shipped with the repo does not skip setup.
+- In containers, keep the config directory persistent so both the generated `settings.yml` and `.installed` survive restarts.
+- Existing deployments that have a real config file but no `.installed` lock are treated as "not installed" after upgrading to this behavior.
+
 ### Environmental requirements
 
 go 1.18
