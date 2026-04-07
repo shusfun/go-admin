@@ -9,7 +9,7 @@ settings:
     # 端口号
     port: 8000 # 服务端口号
     readtimeout: 1
-    writertimeout: 2
+    writertimeout: 300
     # 数据权限功能开关
     enabledp: false
   ssl:
@@ -56,3 +56,54 @@ settings:
   extend: # 扩展项使用说明
     demo:
       name: data
+    ops:
+      taskTimeoutSeconds: 900
+      environments:
+        - key: dev
+          name: 开发环境
+          enabled: true
+          domain: https://dev.example.com
+          confirmName: false
+          taskTimeoutSeconds: 900
+          backend:
+            repoDir: /data/projects/backend-dev
+            composeFile: /data/projects/backend-dev/docker-compose.yml
+            serviceName: backend
+            healthURL: http://127.0.0.1:8001/api/v1/health
+          frontend:
+            repoDir: /data/projects/frontend-dev
+            distDir: dist
+            publishDir: /data/www/dev
+            reloadNginx: true
+        - key: test
+          name: 测试环境
+          enabled: true
+          domain: https://test.example.com
+          confirmName: false
+          taskTimeoutSeconds: 900
+          backend:
+            repoDir: /data/projects/backend-test
+            composeFile: /data/projects/backend-test/docker-compose.yml
+            serviceName: backend
+            healthURL: http://127.0.0.1:8002/api/v1/health
+          frontend:
+            repoDir: /data/projects/frontend-test
+            distDir: dist
+            publishDir: /data/www/test
+            reloadNginx: true
+        - key: prod
+          name: 生产环境
+          enabled: true
+          domain: https://www.example.com
+          confirmName: true
+          taskTimeoutSeconds: 1200
+          backend:
+            repoDir: /data/projects/backend-prod
+            composeFile: /data/projects/backend-prod/docker-compose.yml
+            serviceName: backend
+            healthURL: http://127.0.0.1:8000/api/v1/health
+          frontend:
+            repoDir: /data/projects/frontend-prod
+            distDir: dist
+            publishDir: /data/www/prod
+            reloadNginx: true

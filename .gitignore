@@ -24,5 +24,7 @@ config/settings.deva.yml
 .ace-tool/
 node_modules/
 .pnpm-store/
+.tmp/
+upstream/
 dist/
 frontend/**/dist/
