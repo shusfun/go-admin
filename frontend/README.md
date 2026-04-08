@@ -16,9 +16,11 @@
 在仓库根目录执行：
 
 ```bash
-pnpm install --store-dir ./.pnpm-store
-pnpm dev:admin
-pnpm dev:mobile
+make init
+make infra-up
+make dev-backend
+make dev-admin
+make dev-mobile
 pnpm typecheck
 pnpm test
 pnpm build
@@ -31,6 +33,19 @@ pnpm build
 - `VITE_API_BASE_URL`：正式 API 地址，留空时走同源
 - `VITE_PROXY_TARGET`：本地开发代理地址，默认 `http://127.0.0.1:18123`
 - `VITE_TENANT_CODE`：本地开发时的租户回退值，默认 `local`
+
+本地开发推荐先执行：
+
+```bash
+make infra-up
+make dev-backend
+make dev-admin
+```
+
+- Docker 项目前缀默认取仓库根 `package.json.name`，当前仓库默认值为 `go-admin`
+- `make infra-up`、`make reinit` 等命令都会读取同一个前缀
+- 如需覆盖，可在执行命令前设置 `PROJECT_PREFIX=你的前缀`
+- 如需回到全新安装状态，再执行 `make reinit`
 
 生产环境推荐按域名或子域部署，由前端自动识别租户编码。
 

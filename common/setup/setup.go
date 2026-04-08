@@ -39,6 +39,50 @@ func GetConfigPath() string {
 	return configPath
 }
 
+// ReadCurrentSettings 读取当前配置文件内容，供 setup 模式和状态接口复用。
+func ReadCurrentSettings() (map[string]interface{}, error) {
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var settings map[string]interface{}
+	if err := yaml.Unmarshal(content, &settings); err != nil {
+		return nil, err
+	}
+
+	return settings, nil
+}
+
+// ReadApplicationPort 读取配置中的应用端口；读取失败时返回默认值。
+func ReadApplicationPort(defaultPort int) int {
+	settings, err := ReadCurrentSettings()
+	if err != nil {
+		return defaultPort
+	}
+
+	settingsMap, ok := settings["settings"].(map[string]interface{})
+	if !ok {
+		return defaultPort
+	}
+
+	applicationMap, ok := settingsMap["application"].(map[string]interface{})
+	if !ok {
+		return defaultPort
+	}
+
+	switch value := applicationMap["port"].(type) {
+	case int:
+		return value
+	case int64:
+		return int(value)
+	case float64:
+		return int(value)
+	default:
+		return defaultPort
+	}
+}
+
 // getInstallLockPath 返回锁文件路径（和配置文件同目录）
 func getInstallLockPath() string {
 	dir := "."
@@ -287,13 +331,14 @@ func writeSettingsYml(cfg *SetupConfig) error {
 	}
 
 	// 构建和现有 settings.yml 格式一致的结构
+	port := ReadApplicationPort(18123)
 	settings := map[string]interface{}{
 		"settings": map[string]interface{}{
 			"application": map[string]interface{}{
 				"mode":          "prod",
 				"host":          "0.0.0.0",
 				"name":          "go-admin",
-				"port":          8000,
+				"port":          port,
 				"readtimeout":   1,
 				"writertimeout": 300,
 				"enabledp":      false,

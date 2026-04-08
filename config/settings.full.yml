@@ -7,14 +7,14 @@ settings:
     # 服务名称
     name: testApp
     # 端口号
-    port: 8000 # 服务端口号
+    port: 18123 # 服务端口号
     readtimeout: 1
     writertimeout: 300
     # 数据权限功能开关
     enabledp: false
   ssl:
     # https对应的域名
-    domain: localhost:8000
+    domain: localhost:18123
     # https开关
     enable: false
     # ssl 证书key
@@ -101,7 +101,7 @@ settings:
             repoDir: /data/projects/backend-prod
             composeFile: /data/projects/backend-prod/docker-compose.yml
             serviceName: backend
-            healthURL: http://127.0.0.1:8000/api/v1/health
+            healthURL: http://127.0.0.1:18123/api/v1/health
           frontend:
             repoDir: /data/projects/frontend-prod
             distDir: dist

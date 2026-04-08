@@ -10,7 +10,7 @@ settings:
     # 服务名称
     name: go-admin   
     # 服务端口
-    port: 8000   
+    port: 18123   
     readtimeout: 1   
     writertimeout: 2 
   log:

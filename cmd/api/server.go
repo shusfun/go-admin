@@ -240,8 +240,8 @@ func runSetupMode() error {
 		})
 	})
 
-	// 默认端口 8000（和 settings.yml 中的默认值一致）
-	port := 8000
+	// Setup 模式优先沿用当前 settings.yml 中的端口，读取失败时回退到默认开发端口。
+	port := setupPkg.ReadApplicationPort(18123)
 	addr := fmt.Sprintf("0.0.0.0:%d", port)
 
 	srv := &http.Server{

@@ -86,33 +86,48 @@ git clone https://github.com/go-admin-team/go-admin.git
 cd go-admin
 ```
 
-### 2. 启动后端
+### 2. 初始化依赖与 OpenAPI 产物
 
 ```bash
-go mod tidy
-go build -o go-admin .
-
-# 首次启动，后端自动进入 Setup Wizard 模式
-./go-admin server -c config/settings.yml
+make init
 ```
 
-> Windows 下使用 `go-admin.exe server -c config/settings.yml`
+### 3. 启动开发基础设施
+
+```bash
+make infra-up
+```
+
+默认会启动：
+
+- PostgreSQL：`127.0.0.1:15432`
+- Redis：`127.0.0.1:16379`
+
+Docker 项目前缀默认取仓库根 `package.json.name`，当前仓库默认值为 `go-admin`。如果需要自定义容器前缀，可覆盖：
+
+```bash
+PROJECT_PREFIX=my-local-env make infra-up
+```
+
+### 4. 启动后端
+
+```bash
+make dev-backend
+```
+
+`make dev-backend` 默认读取 `config/settings.pg.yml`，与本地 PostgreSQL / Redis 开发基础设施配套。
 
 首次启动时，后端检测到系统未安装，会进入 **Setup Wizard 模式**：仅暴露 `/api/v1/setup/*` 路由，不连接数据库，等待前端引导完成初始化配置。
 
-### 3. 启动前端
+### 5. 启动前端
 
 ```bash
-# 安装依赖
-pnpm install
-
-# 启动 PC 端管理后台开发服务器
-pnpm dev:admin
+make dev-admin
 ```
 
 打开浏览器访问前端地址，系统会自动检测后端状态并显示 **Setup Wizard** 界面。
 
-### 4. 完成安装向导
+### 6. 完成安装向导
 
 安装向导分为三个步骤：
 
@@ -128,6 +143,25 @@ pnpm dev:admin
 - 自动重启服务
 
 重启完成后，前端自动跳转到登录页面，使用刚才设置的管理员账号登录即可。
+
+### 7. 重置环境
+
+```bash
+make reinit
+```
+
+该命令会同时清理：
+
+- 应用 compose 栈
+- PostgreSQL / Redis 开发容器与数据卷
+- `config/.installed`
+- 本地构建产物与日志
+
+如果前面使用过自定义前缀，重置时也要使用同一个前缀：
+
+```bash
+PROJECT_PREFIX=my-local-env make reinit
+```
 
 ## Setup Wizard 说明
 
@@ -163,13 +197,16 @@ pnpm dev:admin
 ### 后端
 
 ```bash
-# 构建
-make build                                        # CGO_ENABLED=0，输出 ./go-admin
+# 开发
+make infra-up                                     # 启动 PostgreSQL + Redis 开发基础设施
+make dev-backend                                  # 启动 API 服务（默认使用 config/settings.pg.yml）
+make dev-admin                                    # 启动 admin-web 开发服务器
+make reinit                                       # 重置应用栈、PG/Redis 数据卷与安装态
 
-# 运行
-./go-admin server -c config/settings.yml          # 启动 API 服务（默认端口 8000）
+# 构建 / 迁移
+make build                                        # CGO_ENABLED=0，输出 ./go-admin
 ./go-admin server -c config/settings.yml -a true  # 启动并自动同步 sys_api 记录
-./go-admin migrate -c config/settings.yml         # 数据库迁移
+./go-admin migrate -c config/settings.pg.yml      # 数据库迁移
 
 # 工具
 go test ./...                                     # 运行全部测试
@@ -180,9 +217,10 @@ go generate                                       # 重新生成 Swagger 文档
 ### 前端
 
 ```bash
-pnpm install              # 安装全部工作区依赖
-pnpm dev:admin            # 启动 admin-web 开发服务器
-pnpm dev:mobile           # 启动 mobile-h5 开发服务器
+make init                 # 初始化 Go / pnpm 依赖，并生成 OpenAPI 产物
+make dev-admin            # 启动 admin-web 开发服务器
+make dev-mobile           # 启动 mobile-h5 开发服务器
+make openapi              # 生成 Swagger，并同步前端 client + types
 pnpm build                # 构建所有包和应用
 pnpm test                 # 运行全部测试 (vitest)
 pnpm typecheck            # 全工作区 TypeScript 类型检查
@@ -194,14 +232,19 @@ pnpm typecheck            # 全工作区 TypeScript 类型检查
 # 构建镜像
 docker build -t go-admin:latest .
 
-# 使用 docker-compose 启动
-docker-compose up -d
+# 启动开发基础设施
+make infra-up
 
-# 停止服务
-docker-compose down
+# 启动应用容器
+make docker-up
+
+# 停止应用容器
+make docker-down
 ```
 
 容器首次启动时同样会进入 Setup Wizard 模式，通过浏览器完成安装即可。
+
+`make infra-up`、`make docker-up`、`make docker-down`、`make reinit` 都会读取同一个 `PROJECT_PREFIX`。默认值来自仓库根 `package.json.name`，当前仓库默认值为 `go-admin`，也可以在命令前覆盖。
 
 ### 交叉编译
 

@@ -45,7 +45,7 @@ settings:
       environments: []
   cache:
 #    redis:
-#      addr: 127.0.0.1:6379
+#      addr: 127.0.0.1:16379
 #      password: xxxxxx
 #      db: 2
     # key存在即可
@@ -54,7 +54,7 @@ settings:
     memory:
       poolSize: 100
 #    redis:
-#      addr: 127.0.0.1:6379
+#      addr: 127.0.0.1:16379
 #      password: xxxxxx
 #      producer:
 #        streamMaxLength: 100

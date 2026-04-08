@@ -179,7 +179,7 @@ INSERT INTO sys_dict_type VALUES (9, '操作类型', 'sys_oper_type', '2', '操�
 INSERT INTO sys_dict_type VALUES (10, '通知状态', 'sys_notice_status', '2', '通知状态列表', 1, 1, '2021-05-13 19:56:37.914', '2021-05-13 19:56:37.914', NULL);
 INSERT INTO sys_dict_type VALUES (11, '内容状态', 'sys_content_status', '2', '', 1, 1, '2021-05-13 19:56:40.813', '2021-05-13 19:56:40.813', NULL);
 
-INSERT INTO sys_job VALUES (1, '接口测试', 'DEFAULT', 1, '0/5 * * * * ', 'http://localhost:8000', '', 1, 1, 1, 0, '2021-05-13 19:56:37.914', '2021-06-14 20:59:55.417', NULL, 1, 1);
+INSERT INTO sys_job VALUES (1, '接口测试', 'DEFAULT', 1, '0/5 * * * * ', 'http://localhost:18123', '', 1, 1, 1, 0, '2021-05-13 19:56:37.914', '2021-06-14 20:59:55.417', NULL, 1, 1);
 INSERT INTO sys_job VALUES (2, '函数测试', 'DEFAULT', 2, '0/5 * * * * ', 'ExamplesOne', '参数', 1, 1, 1, 0, '2021-05-13 19:56:37.914', '2021-05-31 23:55:37.221', NULL, 1, 1);
 
 INSERT INTO sys_menu VALUES (2, 'Admin', '系统管理', 'api-server', '/admin', '/0/2', 'M', '无', '', 0, true, '', 'Layout', 10, '0', '1', 0, 1, '2021-05-20 21:58:45.679', '2021-06-17 11:48:40.703', NULL);

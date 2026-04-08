@@ -170,14 +170,10 @@ definitions:
     type: object
   dto.SysDictDataDeleteReq:
     properties:
-      createBy:
-        type: integer
       ids:
         items:
           type: integer
         type: array
-      updateBy:
-        type: integer
     type: object
   dto.SysDictDataGetAllResp:
     properties:
@@ -357,7 +353,7 @@ definitions:
         type: integer
       sysApi:
         items:
-          $ref: '#/definitions/models.SysApi'
+          $ref: '#/definitions/go-admin_app_admin_models.SysApi'
         type: array
       title:
         description: 显示名称
@@ -420,7 +416,7 @@ definitions:
         type: integer
       sysApi:
         items:
-          $ref: '#/definitions/models.SysApi'
+          $ref: '#/definitions/go-admin_app_admin_models.SysApi'
         type: array
       title:
         description: 显示名称
@@ -533,11 +529,11 @@ definitions:
         type: string
       sysDept:
         items:
-          $ref: '#/definitions/models.SysDept'
+          $ref: '#/definitions/go-admin_app_admin_models.SysDept'
         type: array
       sysMenu:
         items:
-          $ref: '#/definitions/models.SysMenu'
+          $ref: '#/definitions/go-admin_app_admin_models.SysMenu'
         type: array
       updateBy:
         type: integer
@@ -581,11 +577,11 @@ definitions:
         type: string
       sysDept:
         items:
-          $ref: '#/definitions/models.SysDept'
+          $ref: '#/definitions/go-admin_app_admin_models.SysDept'
         type: array
       sysMenu:
         items:
-          $ref: '#/definitions/models.SysMenu'
+          $ref: '#/definitions/go-admin_app_admin_models.SysMenu'
         type: array
       updateBy:
         type: integer
@@ -683,23 +679,7 @@ definitions:
         description: 用户ID
         type: integer
     type: object
-  handler.Login:
-    properties:
-      code:
-        type: string
-      password:
-        type: string
-      username:
-        type: string
-      uuid:
-        type: string
-    required:
-    - code
-    - password
-    - username
-    - uuid
-    type: object
-  models.SysApi:
+  go-admin_app_admin_models.SysApi:
     properties:
       action:
         type: string
@@ -722,7 +702,7 @@ definitions:
       updatedAt:
         type: string
     type: object
-  models.SysConfig:
+  go-admin_app_admin_models.SysConfig:
     properties:
       configKey:
         type: string
@@ -747,11 +727,11 @@ definitions:
       updatedAt:
         type: string
     type: object
-  models.SysDept:
+  go-admin_app_admin_models.SysDept:
     properties:
       children:
         items:
-          $ref: '#/definitions/models.SysDept'
+          $ref: '#/definitions/go-admin_app_admin_models.SysDept'
         type: array
       createBy:
         type: integer
@@ -792,7 +772,7 @@ definitions:
       updatedAt:
         type: string
     type: object
-  models.SysMenu:
+  go-admin_app_admin_models.SysMenu:
     properties:
       action:
         type: string
@@ -804,7 +784,7 @@ definitions:
         type: string
       children:
         items:
-          $ref: '#/definitions/models.SysMenu'
+          $ref: '#/definitions/go-admin_app_admin_models.SysMenu'
         type: array
       component:
         type: string
@@ -844,7 +824,7 @@ definitions:
         type: integer
       sysApi:
         items:
-          $ref: '#/definitions/models.SysApi'
+          $ref: '#/definitions/go-admin_app_admin_models.SysApi'
         type: array
       title:
         type: string
@@ -854,6 +834,22 @@ definitions:
         type: string
       visible:
         type: string
+    type: object
+  handler.Login:
+    properties:
+      code:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+      uuid:
+        type: string
+    required:
+    - code
+    - password
+    - username
+    - uuid
     type: object
   response.Page:
     properties:
@@ -898,8 +894,6 @@ definitions:
       createBy:
         type: integer
       createdAt:
-        type: string
-      deletedAt:
         type: string
       dictType:
         type: string
@@ -988,8 +982,6 @@ definitions:
       crud:
         type: boolean
       dataScope:
-        type: string
-      deletedAt:
         type: string
       functionAuthor:
         description: 功能作者
@@ -1990,19 +1982,6 @@ paths:
       summary: 修改用户角色
       tags:
       - 角色/Role
-  /api/v1/server-monitor:
-    get:
-      description: 获取JSON
-      responses:
-        "200":
-          description: '{"code": 200, "data": [...]}'
-          schema:
-            $ref: '#/definitions/response.Response'
-      security:
-      - Bearer: []
-      summary: 系统信息
-      tags:
-      - 系统信息
   /api/v1/set-config:
     get:
       consumes:
@@ -2107,7 +2086,7 @@ paths:
                   - properties:
                       list:
                         items:
-                          $ref: '#/definitions/models.SysApi'
+                          $ref: '#/definitions/go-admin_app_admin_models.SysApi'
                         type: array
                     type: object
               type: object
@@ -2132,7 +2111,7 @@ paths:
             - $ref: '#/definitions/response.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/models.SysApi'
+                  $ref: '#/definitions/go-admin_app_admin_models.SysApi'
               type: object
       security:
       - Bearer: []
@@ -2221,7 +2200,7 @@ paths:
                   - properties:
                       list:
                         items:
-                          $ref: '#/definitions/models.SysApi'
+                          $ref: '#/definitions/go-admin_app_admin_models.SysApi'
                         type: array
                     type: object
               type: object

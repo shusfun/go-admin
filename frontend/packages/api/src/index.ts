@@ -636,4 +636,7 @@ export function createSetupApi(baseURL: string) {
   };
 }
 
+export { configureGeneratedApiClient, resetGeneratedApiClient } from "./runtime/openapi";
+export * as generatedApi from "./generated/admin";
+
 export type SetupApi = ReturnType<typeof createSetupApi>;

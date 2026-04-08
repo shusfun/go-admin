@@ -1,11 +1,12 @@
 {
-  "name": "suiyuan-workspace",
+  "name": "go-admin",
   "private": true,
   "packageManager": "pnpm@10.32.1",
   "scripts": {
     "build": "pnpm -r --if-present build",
     "dev:admin": "pnpm --filter @suiyuan/admin-web dev",
     "dev:mobile": "pnpm --filter @suiyuan/mobile-h5 dev",
+    "openapi": "orval --config frontend/orval.config.cjs",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck"
   },
@@ -15,6 +16,7 @@
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.0.4",
     "jsdom": "^27.0.1",
+    "orval": "^7.11.2",
     "typescript": "^5.9.3",
     "vite": "^7.1.9",
     "vitest": "^3.2.4"

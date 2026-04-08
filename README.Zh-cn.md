@@ -73,186 +73,102 @@ antd体验：[https://antd.go-admin.pro](https://antd.go-admin.pro/)
 1. 内容管理：demo功能，下设分类管理、内容管理。可以参考使用方便快速入门。
 1. 定时任务：自动化任务，目前支持接口调用和函数调用。
 
-## 准备工作
-
-你需要在本地安装 [go] [gin] [node](http://nodejs.org/) 和 [git](https://git-scm.com/) 
-
-同时配套了系列教程包含视频和文档，如何从下载完成到熟练使用，强烈建议大家先看完这些教程再来实践本项目！！！
-
-### 轻松实现go-admin写出第一个应用 - 文档教程
-
-[步骤一 - 基础内容介绍](https://doc.zhangwj.com/guide/intro/tutorial01.html)
-
-[步骤二 - 实际应用 - 编写增删改查](https://doc.zhangwj.com/guide/intro/tutorial02.html)
-
-### 手把手教你从入门到放弃 - 视频教程
-
-[如何启动go-admin](https://www.bilibili.com/video/BV1z5411x7JG)
-
-[使用生成工具轻松实现业务](https://www.bilibili.com/video/BV1Dg4y1i79D)
-
-[v1.1.0版本代码生成工具-释放双手](https://www.bilibili.com/video/BV1N54y1i71P) [进阶]
-
-[多命令启动方式讲解以及IDE配置](https://www.bilibili.com/video/BV1Fg4y1q7ph)
-
-[go-admin菜单的配置说明](https://www.bilibili.com/video/BV1Wp4y1D715) [必看]
-
-[如何配置菜单信息以及接口信息](https://www.bilibili.com/video/BV1zv411B7nG) [必看]
-
-[go-admin权限配置使用说明](https://www.bilibili.com/video/BV1rt4y197d3) [必看]
-
-[go-admin数据权限使用说明](https://www.bilibili.com/video/BV1LK4y1s71e) [必看]
-
-**如有问题请先看上述使用文档和文章，若不能满足，欢迎 issue 和 pr ，视频教程和文档持续更新中**
-
 ## 📦 本地开发
-
-## Setup Wizard 说明
-
-- Setup Wizard 只提供后端 API，不会在 Go 服务内托管管理端页面。
-- 首次安装时，请先独立部署或启动 `frontend/apps/admin-web`，并确保 `VITE_API_BASE_URL` 指向当前后端服务。
-- 安装状态仅由配置目录下的 `.installed` 锁文件决定；仓库自带的 `config/settings.yml` 示例文件不会跳过安装流程。
-- 容器部署时请持久化配置目录，安装完成后生成的 `settings.yml` 与 `.installed` 都会写入该目录。
-- 旧部署如果只有真实配置文件但没有 `.installed`，升级到当前版本后会被视为“未安装”，需要人工补齐锁文件或重新初始化。
 
 ### 环境要求
 
-go 1.18
-
-node版本: v14.16.0
-
-npm版本: 6.14.11
-
-### 开发目录创建
-
-```bash
-
-# 创建开发目录
-mkdir goadmin
-cd goadmin
-```
+- Go 1.24+
+- Node.js 18+
+- pnpm 10+
+- Docker Engine + Docker Compose
 
 ### 获取代码
 
-> 重点注意：两个项目必须放在同一文件夹下；
-
 ```bash
-# 获取后端代码
 git clone https://github.com/go-admin-team/go-admin.git
-
-# 获取前端代码
-git clone https://github.com/go-admin-team/go-admin-ui.git
-
+cd go-admin
 ```
 
-### 启动说明
-
-#### 服务端启动说明
+### 推荐开发流
 
 ```bash
-# 进入 go-admin 后端项目
-cd ./go-admin
-
-# 更新整理依赖
-go mod tidy
-
-# 编译项目
-go build
-
-# 修改配置 
-# 文件路径  go-admin/config/settings.yml
-vi ./config/settings.yml
-
-# 1. 配置文件中修改数据库信息 
-# 注意: settings.database 下对应的配置数据
-# 2. 确认log路径
+make init
+make infra-up
+make dev-backend
+make dev-admin
 ```
 
-⚠️注意 在windows环境如果没有安装中CGO，会出现这个问题；
+这套流程默认使用以下端口：
+
+- 后端 API：`18123`
+- 管理端：`26173`
+- 移动端：`26174`
+- PostgreSQL：`15432`
+- Redis：`16379`
+
+如果只想看当前实际配置，可以执行：
 
 ```bash
-E:\go-admin>go build
-# github.com/mattn/go-sqlite3
-cgo: exec /missing-cc: exec: "/missing-cc": file does not exist
+make env-print
 ```
 
-or
+### 容器前缀规则
+
+- 所有 `docker compose` 相关命令都读取同一个 `PROJECT_PREFIX`
+- 默认值来自仓库根 `package.json.name`
+- 当前仓库默认值是 `go-admin`
+- 如需覆盖，可在命令前传入新的前缀
 
 ```bash
-D:\Code\go-admin>go build
-# github.com/mattn/go-sqlite3
-cgo: exec gcc: exec: "gcc": executable file not found in %PATH%
+PROJECT_PREFIX=my-local-env make infra-up
+PROJECT_PREFIX=my-local-env make reinit
 ```
 
-[解决cgo问题进入](https://doc.go-admin.dev/zh-CN/guide/faq#cgo-%E7%9A%84%E9%97%AE%E9%A2%98)
-
-
-#### 初始化数据库，以及服务启动
-
-``` bash
-# 首次配置需要初始化数据库资源信息
-# macOS or linux 下使用
-$ ./go-admin migrate -c config/settings.dev.yml
-
-# ⚠️注意:windows 下使用
-$ go-admin.exe migrate -c config/settings.dev.yml
-
-
-# 启动项目，也可以用IDE进行调试
-# macOS or linux 下使用
-$ ./go-admin server -c config/settings.yml
-
-
-# ⚠️注意:windows 下使用
-$ go-admin.exe server -c config/settings.yml
-```
-
-#### sys_api 表的数据如何添加
-
-在项目启动时，使用`-a true` 系统会自动添加缺少的接口数据
-```bash
-./go-admin server -c config/settings.yml -a true
-```
-
-#### 使用docker 编译启动
-
-```shell
-# 编译镜像
-docker build -t go-admin .
-
-# 启动容器，第一个go-admin是容器名字，第二个go-admin是镜像名称
-# -v 映射配置文件 本地路径：容器路径
-docker run --name go-admin -p 8000:8000 -v /config/settings.yml:/config/settings.yml -d go-admin-server
-```
-
-#### 文档生成
+### 四个核心命令
 
 ```bash
-go generate
+make infra-up
+make dev-backend
+make dev-admin
+make reinit
 ```
 
-#### 交叉编译
+- `make infra-up`：启动 PostgreSQL 和 Redis 开发容器
+- `make dev-backend`：启动后端，默认读取 `config/settings.pg.yml`
+- `make dev-admin`：启动管理端开发服务器
+- `make reinit`：按当前前缀清理应用栈、开发容器、工作区数据目录、安装锁和本地产物
+
+### Setup Wizard 说明
+
+- 首次执行 `make dev-backend` 时，如果 `config/.installed` 不存在，后端会进入 Setup Wizard 模式
+- Setup 模式下只暴露 `/api/v1/setup/*` 接口，不会托管前端静态资源
+- 启动 `make dev-admin` 后，前端会自动检测安装状态并引导初始化数据库、Redis 和管理员账号
+- 安装完成后会写入 `config/settings.yml` 与 `config/.installed`
+- 容器部署时请持久化 `config/` 目录，否则重启后会重新进入安装流程
+
+### OpenAPI 到前端类型
 
 ```bash
-# windows
-env GOOS=windows GOARCH=amd64 go build main.go
-
-# or
-# linux
-env GOOS=linux GOARCH=amd64 go build main.go
+make openapi
 ```
 
-### UI交互端启动说明
+该命令会完成以下工作：
+
+- 重新生成 `docs/admin/admin_swagger.json`
+- 同步 OpenAPI 文件到 `frontend/packages/api/openapi/admin.json`
+- 生成前端可直接使用的 API client 与类型定义
+- 自动执行 `pnpm typecheck`
+
+### 其他常用命令
 
 ```bash
-# 安装依赖
-npm install
-
-# 建议不要直接使用 cnpm 安装依赖，会有各种诡异的 bug。可以通过如下操作解决 npm 下载速度慢的问题
-npm install --registry=https://registry.npmmirror.com
-
-# 启动服务
-npm run dev
+make doctor
+make setup-status
+make build
+make db-migrate
+make dev-mobile
+make docker-up
+make docker-down
 ```
 
 ## 📨 互动

@@ -460,3 +460,5 @@ export interface OpsErrorEvent {
   errMsg: string;
   suggestion: string;
 }
+
+export * as generatedTypes from "./generated/model";
