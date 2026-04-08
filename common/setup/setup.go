@@ -332,12 +332,13 @@ func writeSettingsYml(cfg *SetupConfig) error {
 
 	// 构建和现有 settings.yml 格式一致的结构
 	port := ReadApplicationPort(18123)
+	projectName := readProjectName()
 	settings := map[string]interface{}{
 		"settings": map[string]interface{}{
 			"application": map[string]interface{}{
 				"mode":          "prod",
 				"host":          "0.0.0.0",
-				"name":          "go-admin",
+				"name":          projectName,
 				"port":          port,
 				"readtimeout":   1,
 				"writertimeout": 300,

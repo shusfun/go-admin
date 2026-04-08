@@ -10,10 +10,15 @@ PROJECT := go-admin
 ROOT_DIR := $(CURDIR)
 ROOT_PACKAGE_NAME := $(shell node -e "process.stdout.write(require('./package.json').name)")
 PROJECT_PREFIX ?= $(shell node -e "const name=require('./package.json').name;const normalized=name.toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$$/g,'');process.stdout.write(normalized)")
+PROJECT_DEV_NAME := $(shell node -e "const name=require('./package.json').name;const normalized=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$$/g,'');process.stdout.write(normalized + '-dev')")
+PROJECT_DB_PREFIX := $(shell node -e "const name=require('./package.json').name;const normalized=name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$$/g,'');process.stdout.write(normalized)")
 CONFIG_FILE ?= config/settings.pg.yml
 DEV_BACKEND_PORT ?= 18123
 DEV_ADMIN_PORT ?= 26173
 DEV_MOBILE_PORT ?= 26174
+DEV_POSTGRES_DB ?= $(PROJECT_DB_PREFIX)_dev
+DEV_POSTGRES_USER ?= $(PROJECT_DB_PREFIX)_dev
+DEV_POSTGRES_PASSWORD ?= $(PROJECT_DB_PREFIX)_dev
 
 GO_TMP_DIR := $(ROOT_DIR)/.tmp/go
 GO_BIN_DIR := $(ROOT_DIR)/.tmp/bin
@@ -27,12 +32,13 @@ SWAG := $(GO_BIN_DIR)/swag
 OPENAPI_SOURCE := docs/admin/admin_swagger.json
 OPENAPI_TARGET := frontend/packages/api/openapi/admin.json
 DOCKER_ENV_FILE := config/dev-ports.env
-DOCKER_COMPOSE := docker compose --project-name "$(PROJECT_PREFIX)" --env-file "$(DOCKER_ENV_FILE)"
+DOCKER_COMPOSE_ENV := DEV_POSTGRES_DB="$(DEV_POSTGRES_DB)" DEV_POSTGRES_USER="$(DEV_POSTGRES_USER)" DEV_POSTGRES_PASSWORD="$(DEV_POSTGRES_PASSWORD)"
+DOCKER_COMPOSE := $(DOCKER_COMPOSE_ENV) docker compose --project-name "$(PROJECT_PREFIX)" --env-file "$(DOCKER_ENV_FILE)"
 APP_COMPOSE := $(DOCKER_COMPOSE)
 INFRA_COMPOSE := $(DOCKER_COMPOSE) -f docker-compose.dev.yml
 INFRA_DATA_DIR := $(ROOT_DIR)/.tmp/docker
 
-.PHONY: help prepare-go-env init doctor setup-status env-print check-dev-ports infra-up reinit deps-backend deps-frontend dev-backend dev-admin dev-mobile build build-backend build-admin build-mobile build-frontend build-docker test-backend test-frontend test-all fmt typecheck db-migrate openapi docker-up docker-down deploy
+.PHONY: help prepare-go-env init doctor setup-status env-print check-dev-ports infra-up kill reinit deps-backend deps-frontend dev-backend dev-admin dev-mobile build build-backend build-admin build-mobile build-frontend build-docker test-backend test-frontend test-all fmt typecheck db-migrate openapi docker-up docker-down deploy
 
 help:
 	@printf "\n帮助\n\n"
@@ -43,6 +49,7 @@ help:
 	@printf "  %-22s %s\n" "make setup-status" "检查当前是否会进入 Setup Wizard"
 	@printf "  %-22s %s\n" "make env-print" "打印当前关键环境变量、端口与容器前缀"
 	@printf "  %-22s %s\n" "make infra-up" "启动 PostgreSQL + Redis 开发基础设施"
+	@printf "  %-22s %s\n" "make kill" "停止当前项目端口对应的本地进程和 compose 栈"
 	@printf "  %-22s %s\n" "make reinit" "重置应用栈、PG/Redis 数据卷与安装态，重新走 setup"
 	@printf "\n开发 (dev-*)\n\n"
 	@printf "  %-22s %s\n" "make dev-backend" "go run . server -c $(CONFIG_FILE)"
@@ -100,6 +107,8 @@ env-print:
 	@printf "%-18s %s\n" "根包名" "$(ROOT_PACKAGE_NAME)"
 	@printf "%-18s %s\n" "容器前缀" "$(PROJECT_PREFIX)"
 	@printf "%-18s %s\n" "前缀来源" "默认来自 package.json.name，可用 PROJECT_PREFIX 覆盖"
+	@printf "%-18s %s\n" "开发环境名" "$(PROJECT_DEV_NAME)"
+	@printf "%-18s %s\n" "开发库名前缀" "$(PROJECT_DB_PREFIX)"
 	@printf "%-18s %s\n" "配置文件" "$(CONFIG_FILE)"
 	@printf "%-18s %s\n" "开发端口配置" "$(DOCKER_ENV_FILE)"
 	@printf "%-18s %s\n" "基础设施数据目录" "$(INFRA_DATA_DIR)"
@@ -152,6 +161,83 @@ infra-up: check-dev-ports
 	mkdir -p "$(INFRA_DATA_DIR)/postgres" "$(INFRA_DATA_DIR)/redis"
 	$(INFRA_COMPOSE) up -d
 	echo "开发基础设施已启动：项目 $(PROJECT_PREFIX)，PostgreSQL $(DEV_POSTGRES_PORT)，Redis $(DEV_REDIS_PORT)"
+
+kill:
+	$(INFRA_COMPOSE) down --remove-orphans || true
+	$(APP_COMPOSE) down --remove-orphans || true
+	@kill_pid_set() { \
+		label="$$1"; \
+		signal="$$2"; \
+		shift 2; \
+		if [ "$$#" -eq 0 ]; then \
+			return; \
+		fi; \
+		echo "$$label 正在发送 $$signal: $$*"; \
+		kill "$$signal" "$$@" 2>/dev/null || true; \
+		pgids=($$(ps -o pgid= -p "$$@" 2>/dev/null | awk '{print $$1}' | sort -u)); \
+		if [ "$${#pgids[@]}" -gt 0 ]; then \
+			for pgid in "$${pgids[@]}"; do \
+				kill "$$signal" -- "-$$pgid" 2>/dev/null || true; \
+			done; \
+		fi; \
+	}; \
+	kill_pattern() { \
+		pattern="$$1"; \
+		label="$$2"; \
+		pids=($$(pgrep -f "$$pattern" 2>/dev/null)); \
+		if [ "$${#pids[@]}" -eq 0 ]; then \
+			echo "$$label 未发现匹配进程"; \
+			return; \
+		fi; \
+		kill_pid_set "$$label" -TERM "$${pids[@]}"; \
+		sleep 1; \
+		remaining=($$(pgrep -f "$$pattern" 2>/dev/null)); \
+		if [ "$${#remaining[@]}" -gt 0 ]; then \
+			echo "$$label 仍有残留进程"; \
+			kill_pid_set "$$label" -KILL "$${remaining[@]}"; \
+		fi; \
+	}; \
+	kill_local_port() { \
+		port="$$1"; \
+		label="$$2"; \
+		pids=($$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null)); \
+		if [ "$${#pids[@]}" -eq 0 ]; then \
+			echo "$$label 端口 $$port 未发现本地监听进程"; \
+			return; \
+		fi; \
+		kill_pid_set "$$label 端口 $$port" -TERM "$${pids[@]}"; \
+		sleep 1; \
+		remaining=($$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null)); \
+		if [ "$${#remaining[@]}" -gt 0 ]; then \
+			echo "$$label 端口 $$port 仍有残留进程"; \
+			kill_pid_set "$$label 端口 $$port" -KILL "$${remaining[@]}"; \
+		fi; \
+	}; \
+	kill_pattern "go run \\. server -c $(CONFIG_FILE)" "后端父进程"; \
+	kill_pattern "$(ROOT_DIR)/node_modules/.bin/../vite/bin/vite.js" "Vite 子进程"; \
+	kill_pattern "pnpm --filter @suiyuan/admin-web dev" "管理端父进程"; \
+	kill_pattern "pnpm --filter @suiyuan/mobile-h5 dev" "移动端父进程"; \
+	kill_local_port "$(DEV_BACKEND_PORT)" "后端"; \
+	kill_local_port "$(DEV_ADMIN_PORT)" "管理端"; \
+	kill_local_port "$(DEV_MOBILE_PORT)" "移动端"; \
+	residual=0; \
+	for port in "$(DEV_BACKEND_PORT)" "$(DEV_ADMIN_PORT)" "$(DEV_MOBILE_PORT)"; do \
+		if lsof -nP -iTCP:$$port -sTCP:LISTEN >/dev/null 2>&1; then \
+			echo "端口 $$port 仍有本地监听进程，kill 失败"; \
+			lsof -nP -iTCP:$$port -sTCP:LISTEN 2>/dev/null || true; \
+			residual=1; \
+		fi; \
+	done; \
+	for port in "$(DEV_POSTGRES_PORT)" "$(DEV_REDIS_PORT)"; do \
+		if lsof_out="$$(lsof -nP -iTCP:$$port -sTCP:LISTEN 2>/dev/null || true)" && [ -n "$$lsof_out" ]; then \
+			echo "端口 $$port 仍有监听进程，未做强制处理，请按需手动检查："; \
+			printf '%s\n' "$$lsof_out"; \
+		fi; \
+	done; \
+	if [ "$$residual" -eq 1 ]; then \
+		exit 1; \
+	fi; \
+	echo "项目停止完成"
 
 reinit:
 	$(INFRA_COMPOSE) down --volumes --remove-orphans

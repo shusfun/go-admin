@@ -4,16 +4,16 @@ services:
     restart: unless-stopped
     network_mode: bridge
     environment:
-      POSTGRES_DB: ${DEV_POSTGRES_DB:-suiyuan_dev}
-      POSTGRES_USER: ${DEV_POSTGRES_USER:-suiyuan_dev}
-      POSTGRES_PASSWORD: ${DEV_POSTGRES_PASSWORD:-suiyuan_dev}
+      POSTGRES_DB: ${DEV_POSTGRES_DB:-go_admin_dev}
+      POSTGRES_USER: ${DEV_POSTGRES_USER:-go_admin_dev}
+      POSTGRES_PASSWORD: ${DEV_POSTGRES_PASSWORD:-go_admin_dev}
       TZ: Asia/Shanghai
     ports:
       - ${DEV_POSTGRES_PORT:-15432}:5432
     volumes:
       - ./.tmp/docker/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DEV_POSTGRES_USER:-suiyuan_dev} -d ${DEV_POSTGRES_DB:-suiyuan_dev}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DEV_POSTGRES_USER:-go_admin_dev} -d ${DEV_POSTGRES_DB:-go_admin_dev}"]
       interval: 10s
       timeout: 5s
       retries: 5

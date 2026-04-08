@@ -118,8 +118,9 @@ func validateSSLMode(mode string) bool {
 // ─── 请求结构体 ───
 
 type statusResponse struct {
-	NeedsSetup bool   `json:"needs_setup"`
-	Step       string `json:"step"`
+	NeedsSetup bool          `json:"needs_setup"`
+	Step       string        `json:"step"`
+	Defaults   SetupDefaults `json:"defaults"`
 }
 
 type testDBRequest struct {
@@ -150,6 +151,7 @@ func getStatus(c *gin.Context) {
 	setupOK(c, statusResponse{
 		NeedsSetup: NeedsSetup(),
 		Step:       "welcome",
+		Defaults:   ReadSetupDefaults(),
 	})
 }
 

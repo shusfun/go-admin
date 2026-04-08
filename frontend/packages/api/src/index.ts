@@ -567,11 +567,6 @@ export function createApiClient(options: ClientOptions) {
 
 // ─── Setup Wizard API（不需要认证） ───
 
-type SetupStatus = {
-  needs_setup: boolean;
-  step: string;
-};
-
 type TestDBPayload = {
   host: string;
   port: number;
@@ -588,6 +583,29 @@ type TestRedisPayload = {
   db: number;
 };
 
+export type SetupDefaults = {
+  environment: string;
+  database: TestDBPayload;
+  redis: TestRedisPayload;
+  admin: {
+    username: string;
+    email: string;
+    phone: string;
+  };
+};
+
+export type SetupStatus = {
+  needs_setup: boolean;
+  step: string;
+  defaults: SetupDefaults;
+};
+
+type SetupStatusPayload = {
+  needs_setup: boolean;
+  step: string;
+  defaults?: SetupDefaults;
+};
+
 type InstallPayload = {
   database: TestDBPayload;
   redis: TestRedisPayload;
@@ -598,6 +616,31 @@ type InstallPayload = {
     phone: string;
   };
 };
+
+export function getFallbackSetupDefaults(): SetupDefaults {
+  return {
+    environment: "dev",
+    database: {
+      host: "127.0.0.1",
+      port: 5432,
+      user: "postgres",
+      password: "",
+      dbname: "go_admin",
+      sslmode: "disable",
+    },
+    redis: {
+      host: "127.0.0.1",
+      port: 6379,
+      password: "",
+      db: 0,
+    },
+    admin: {
+      username: "admin",
+      email: "",
+      phone: "",
+    },
+  };
+}
 
 export function createSetupApi(baseURL: string) {
   const instance = axios.create({
@@ -616,7 +659,13 @@ export function createSetupApi(baseURL: string) {
 
   return {
     async getStatus() {
-      return unwrap<SetupStatus>(() => instance.get<ApiEnvelope<SetupStatus>>("/api/v1/setup/status"));
+      const status = await unwrap<SetupStatusPayload>(() =>
+        instance.get<ApiEnvelope<SetupStatusPayload>>("/api/v1/setup/status"),
+      );
+      return {
+        ...status,
+        defaults: status.defaults ?? getFallbackSetupDefaults(),
+      };
     },
     async testDatabase(payload: TestDBPayload) {
       return unwrap<{ message: string }>(() =>

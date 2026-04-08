@@ -5,7 +5,7 @@ settings:
     # 服务器ip，默认使用 0.0.0.0
     host: 0.0.0.0
     # 服务名称
-    name: suiyuan_dev
+    name: go-admin-dev
     # 端口号
     port: 18123 # 服务端口号
     readtimeout: 1
@@ -30,11 +30,11 @@ settings:
     # 数据库类型 mysql, sqlite3, postgres, sqlserver
     driver: postgres
     # PostgreSQL 连接串示例:
-    # host=127.0.0.1 port=15432 user=suiyuan_dev password=suiyuan_dev dbname=suiyuan_dev sslmode=disable TimeZone=Asia/Shanghai
-    source: host=127.0.0.1 port=15432 user=suiyuan_dev password=suiyuan_dev dbname=suiyuan_dev sslmode=disable TimeZone=Asia/Shanghai
+    # host=127.0.0.1 port=15432 user=go_admin_dev password=go_admin_dev dbname=go_admin_dev sslmode=disable TimeZone=Asia/Shanghai
+    source: host=127.0.0.1 port=15432 user=go_admin_dev password=go_admin_dev dbname=go_admin_dev sslmode=disable TimeZone=Asia/Shanghai
   gen:
     # 代码生成读取的数据库名称
-    dbname: suiyuan_dev
+    dbname: go_admin_dev
     # 代码生成是使用前端代码存放位置，需要指定到src文件夹，相对路径
     frontpath: ../go-admin-ui/src
   extend: # 扩展项使用说明

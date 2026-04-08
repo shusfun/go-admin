@@ -3,6 +3,7 @@ import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from 
 import { useQuery } from "@tanstack/react-query";
 
 import { createApiClient, ApiError, createSetupApi } from "@suiyuan/api";
+import type { SetupStatus } from "@suiyuan/api";
 import { createSessionManager } from "@suiyuan/auth";
 import { adaptMenuTree, deriveTenantCode, findMenuByPath } from "@suiyuan/core";
 import { AdminShell, BrandBlock, IdentityCard, SectionCard, TreeNav } from "@suiyuan/ui-admin";
@@ -193,6 +194,7 @@ function ShellContent({
 
 export function App() {
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
   const [authenticated, setAuthenticated] = useState(Boolean(sessionManager.read()?.token));
   const api = useAdminApi(setAuthenticated);
   const checkedRef = useRef(false);
@@ -204,7 +206,10 @@ export function App() {
 
     setupApi
       .getStatus()
-      .then((status) => setNeedsSetup(status.needs_setup))
+      .then((status) => {
+        setSetupStatus(status);
+        setNeedsSetup(status.needs_setup);
+      })
       .catch(() => setNeedsSetup(false)); // 接口不可用时视为已安装
   }, []);
 
@@ -235,8 +240,8 @@ export function App() {
   }
 
   // 阶段 2：需要初始化安装
-  if (needsSetup) {
-    return <SetupWizardPage setupApi={setupApi} onComplete={() => setNeedsSetup(false)} />;
+  if (needsSetup && setupStatus) {
+    return <SetupWizardPage initialStatus={setupStatus} setupApi={setupApi} onComplete={() => setNeedsSetup(false)} />;
   }
 
   // 阶段 3：未登录

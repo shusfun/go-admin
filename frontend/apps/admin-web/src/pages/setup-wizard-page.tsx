@@ -55,21 +55,24 @@ const STEP_LABELS: Record<Step, string> = {
 // ─── 主组件 ───
 
 type SetupWizardPageProps = {
+  initialStatus: SetupStatus;
   setupApi: SetupApi;
   onComplete: () => void;
 };
 
 type SetupStatus = Awaited<ReturnType<SetupApi["getStatus"]>>;
 
-export function SetupWizardPage({ setupApi, onComplete }: SetupWizardPageProps) {
+export function SetupWizardPage({ initialStatus, setupApi, onComplete }: SetupWizardPageProps) {
+  const defaults = initialStatus.defaults;
   const [currentStep, setCurrentStep] = useState<Step>("database");
-  const [dbValues, setDbValues] = useState<DBFormValues | null>(null);
-  const [redisValues, setRedisValues] = useState<RedisFormValues | null>(null);
+  const [dbValues, setDbValues] = useState<DBFormValues | null>(() => defaults.database);
+  const [redisValues, setRedisValues] = useState<RedisFormValues | null>(() => defaults.redis);
   const [installing, setInstalling] = useState(false);
   const [installError, setInstallError] = useState("");
   const [completionHint, setCompletionHint] = useState("");
 
   const stepIndex = STEPS.indexOf(currentStep);
+  const environmentLabel = getEnvironmentLabel(defaults.environment);
 
   function handleDbComplete(values: DBFormValues) {
     setDbValues(values);
@@ -119,6 +122,9 @@ export function SetupWizardPage({ setupApi, onComplete }: SetupWizardPageProps) 
         <small className="auth-kicker">Setup Wizard</small>
         <h1 style={{ fontSize: "clamp(28px, 4vw, 42px)" }}>系统初始化配置</h1>
         <p>首次使用需要配置数据库和 Redis 连接，创建管理员账号。</p>
+        <p style={{ color: "var(--color-muted)", fontSize: 13 }}>
+          已按当前{environmentLabel}预填连接参数，你可以直接测试，也可以按实际部署环境修改。
+        </p>
 
         {/* 步骤指示器 */}
         <div className="setup-steps" style={{ display: "flex", gap: 8, marginTop: 24 }}>
@@ -154,6 +160,7 @@ export function SetupWizardPage({ setupApi, onComplete }: SetupWizardPageProps) 
           )}
           {currentStep === "admin" && (
             <AdminStep
+              defaultValues={defaults.admin}
               installing={installing}
               installError={installError}
               onBack={() => setCurrentStep("redis")}
@@ -376,11 +383,13 @@ function RedisStep({
 // ─── 管理员步骤 ───
 
 function AdminStep({
+  defaultValues,
   installing,
   installError,
   onBack,
   onComplete,
 }: {
+  defaultValues: Pick<AdminFormValues, "username" | "email" | "phone">;
   installing: boolean;
   installError: string;
   onBack: () => void;
@@ -388,11 +397,11 @@ function AdminStep({
 }) {
   const form = useForm<AdminFormValues>({
     defaultValues: {
-      username: "admin",
+      username: defaultValues.username || "admin",
       password: "",
       confirmPassword: "",
-      email: "",
-      phone: "",
+      email: defaultValues.email || "",
+      phone: defaultValues.phone || "",
     },
     resolver: zodResolver(adminSchema),
   });
@@ -461,6 +470,17 @@ function CompleteStep({ hint }: { hint: string }) {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getEnvironmentLabel(environment: string) {
+  switch (environment) {
+    case "prod":
+      return "生产环境";
+    case "test":
+      return "测试环境";
+    default:
+      return "开发环境";
+  }
 }
 
 export async function waitForSetupCompletion(
