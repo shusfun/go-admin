@@ -132,12 +132,28 @@ env-print:
 
 check-dev-ports:
 	@conflict=0; \
+	filter_lines() { \
+		pattern="$$1"; \
+		if command -v rg >/dev/null 2>&1; then \
+			rg "$$pattern"; \
+		else \
+			grep -E "$$pattern"; \
+		fi; \
+	}; \
+	filter_lines_v() { \
+		pattern="$$1"; \
+		if command -v rg >/dev/null 2>&1; then \
+			rg -v "$$pattern"; \
+		else \
+			grep -Ev "$$pattern"; \
+		fi; \
+	}; \
 	check_port() { \
 		port="$$1"; \
 		expected_name="$$2"; \
 		label="$$3"; \
-		docker_lines="$$(docker ps --format '{{.Names}} {{.Ports}}' | rg ":$$port->" || true)"; \
-		foreign_lines="$$(printf '%s\n' "$$docker_lines" | rg -v "^$$expected_name " || true)"; \
+		docker_lines="$$(docker ps --format '{{.Names}} {{.Ports}}' | filter_lines ":$$port->" || true)"; \
+		foreign_lines="$$(printf '%s\n' "$$docker_lines" | filter_lines_v "^$$expected_name " || true)"; \
 		if [ -n "$$foreign_lines" ]; then \
 			echo "$$label 端口 $$port 已被其他 Docker 容器占用："; \
 			printf '%s\n' "$$foreign_lines"; \
