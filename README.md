@@ -86,16 +86,25 @@ git clone https://github.com/go-admin-team/go-admin.git
 cd go-admin
 ```
 
-### 2. 初始化依赖与 OpenAPI 产物
+### 2. 构建 `devctl`
 
 ```bash
-make init
+go build -o ./devctl ./tools/devctl
 ```
 
-### 3. 启动开发基础设施
+Windows 下会生成 `devctl.exe`，其余平台生成 `devctl`。后续开发流程统一通过这个工具执行。
+
+### 3. 检查环境并安装依赖
 
 ```bash
-make infra-up
+./devctl doctor
+./devctl deps all
+```
+
+### 4. 启动开发基础设施
+
+```bash
+./devctl service start postgres redis
 ```
 
 默认会启动：
@@ -106,24 +115,47 @@ make infra-up
 Docker 项目前缀默认取仓库根 `package.json.name`，当前仓库默认值为 `go-admin`。如果需要自定义容器前缀，可覆盖：
 
 ```bash
-PROJECT_PREFIX=my-local-env make infra-up
+./devctl --project-prefix my-local-env service start postgres redis
 ```
 
-### 4. 启动后端
+### 5. 启动后端与前端
 
 ```bash
-make dev-backend
+./devctl service start backend
+./devctl service start admin
 ```
 
-`make dev-backend` 默认读取 `config/settings.pg.yml`，与本地 PostgreSQL / Redis 开发基础设施配套。
+如需移动端开发：
+
+```bash
+./devctl service start mobile
+```
+
+`devctl service start backend` 默认读取 `config/settings.pg.yml`，与本地 PostgreSQL / Redis 开发基础设施配套。
+
+- Windows / macOS：`backend`、`admin`、`mobile` 默认在独立终端窗口启动
+- Linux：本地服务保持在当前终端体系内运行，不依赖额外图形窗口
+- `postgres` / `redis` 始终通过 `docker compose up -d` 后台运行
 
 首次启动时，后端检测到系统未安装，会进入 **Setup Wizard 模式**：仅暴露 `/api/v1/setup/*` 路由，不连接数据库，等待前端引导完成初始化配置。
 
-### 5. 启动前端
+如果你更偏好交互式入口，可以直接打开 TUI：
 
 ```bash
-make dev-admin
+./devctl tui
 ```
+
+`devctl tui` 现在会显示服务面板、动作面板和输出面板，并支持：
+
+- `Space` 勾选服务
+- `Enter` 执行右侧动作栏当前高亮动作
+- `Tab` 在服务面板与动作面板间切换
+- `s/x/r/l/d/u/q` 直接触发启动、停止、重启、日志、自检、刷新、退出
+
+所有受管服务日志和状态文件都会写入项目内的 `temp/devctl/`，便于直接排查：
+
+- `temp/devctl/logs/<service>.log`
+- `temp/devctl/state.json`
 
 打开浏览器访问前端地址，系统会自动检测后端状态并显示 **Setup Wizard** 界面。
 
@@ -147,7 +179,7 @@ make dev-admin
 ### 7. 重置环境
 
 ```bash
-make reinit
+./devctl reinit --yes
 ```
 
 该命令会同时清理：
@@ -160,7 +192,7 @@ make reinit
 如果前面使用过自定义前缀，重置时也要使用同一个前缀：
 
 ```bash
-PROJECT_PREFIX=my-local-env make reinit
+./devctl --project-prefix my-local-env reinit --yes
 ```
 
 ## Setup Wizard 说明
@@ -194,33 +226,33 @@ PROJECT_PREFIX=my-local-env make reinit
 
 ## 常用命令
 
-### 后端
+### 后端 / 开发工具
 
 ```bash
-# 开发
-make infra-up                                     # 启动 PostgreSQL + Redis 开发基础设施
-make dev-backend                                  # 启动 API 服务（默认使用 config/settings.pg.yml）
-make dev-admin                                    # 启动 admin-web 开发服务器
-make reinit                                       # 重置应用栈、PG/Redis 数据卷与安装态
-
-# 构建 / 迁移
-make build                                        # CGO_ENABLED=0，输出 ./go-admin
+go build -o ./devctl ./tools/devctl               # 构建 devctl 工具
+./devctl doctor                                   # 检查 go/node/pnpm/docker/docker compose
+./devctl env                                      # 打印当前端口、前缀、日志目录和状态文件
+./devctl setup-status                             # 检查是否会进入 Setup Wizard
+./devctl service start postgres redis             # 启动 PostgreSQL + Redis 开发基础设施
+./devctl service start backend                    # 启动 API 服务（默认使用 config/settings.pg.yml）
+./devctl service start admin                      # 启动 admin-web 开发服务器
+./devctl service start mobile                     # 启动 mobile-h5 开发服务器
+./devctl service stop all                         # 停止全部受管服务
+./devctl reinit --yes                             # 重置应用栈、PG/Redis 数据卷与安装态
+./devctl build backend                            # CGO_ENABLED=0，输出 ./go-admin
+./devctl test backend                             # 运行后端测试
+./devctl migrate                                  # 数据库迁移
 ./go-admin server -c config/settings.yml -a true  # 启动并自动同步 sys_api 记录
-./go-admin migrate -c config/settings.pg.yml      # 数据库迁移
-
-# 工具
-go test ./...                                     # 运行全部测试
-go mod tidy                                       # 同步依赖
-go generate                                       # 重新生成 Swagger 文档
 ```
 
 ### 前端
 
 ```bash
-make init                 # 初始化 Go / pnpm 依赖，并生成 OpenAPI 产物
-make dev-admin            # 启动 admin-web 开发服务器
-make dev-mobile           # 启动 mobile-h5 开发服务器
-make openapi              # 生成 Swagger，并同步前端 client + types
+./devctl deps frontend    # 安装 pnpm 工作区依赖
+./devctl service start admin
+./devctl service start mobile
+./devctl openapi          # 生成 Swagger，并同步前端 client + types
+./devctl test frontend    # 运行前端测试
 pnpm build                # 构建所有包和应用
 pnpm test                 # 运行全部测试 (vitest)
 pnpm typecheck            # 全工作区 TypeScript 类型检查
@@ -233,18 +265,18 @@ pnpm typecheck            # 全工作区 TypeScript 类型检查
 docker build -t go-admin:latest .
 
 # 启动开发基础设施
-make infra-up
+./devctl service start postgres redis
 
 # 启动应用容器
-make docker-up
+docker compose up -d
 
 # 停止应用容器
-make docker-down
+docker compose down
 ```
 
 容器首次启动时同样会进入 Setup Wizard 模式，通过浏览器完成安装即可。
 
-`make infra-up`、`make docker-up`、`make docker-down`、`make reinit` 都会读取同一个 `PROJECT_PREFIX`。默认值来自仓库根 `package.json.name`，当前仓库默认值为 `go-admin`，也可以在命令前覆盖。
+`devctl` 与 `docker compose` 默认都读取仓库名推导出的项目名前缀，当前仓库默认值为 `go-admin`。如需覆盖，可以在命令前传入 `--project-prefix`。
 
 ### 交叉编译
 

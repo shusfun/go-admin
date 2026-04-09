@@ -92,10 +92,12 @@ cd go-admin
 ### 推荐开发流
 
 ```bash
-make init
-make infra-up
-make dev-backend
-make dev-admin
+go build -o ./devctl ./tools/devctl
+./devctl doctor
+./devctl deps all
+./devctl service start postgres redis
+./devctl service start backend
+./devctl service start admin
 ```
 
 这套流程默认使用以下端口：
@@ -109,47 +111,60 @@ make dev-admin
 如果只想看当前实际配置，可以执行：
 
 ```bash
-make env-print
+./devctl env
 ```
 
 ### 容器前缀规则
 
-- 所有 `docker compose` 相关命令都读取同一个 `PROJECT_PREFIX`
+- 所有 `docker compose` 相关命令都读取同一个项目名前缀
 - 默认值来自仓库根 `package.json.name`
 - 当前仓库默认值是 `go-admin`
-- 如需覆盖，可在命令前传入新的前缀
+- 如需覆盖，可在命令前传入 `--project-prefix`
 
 ```bash
-PROJECT_PREFIX=my-local-env make infra-up
-PROJECT_PREFIX=my-local-env make reinit
+./devctl --project-prefix my-local-env service start postgres redis
+./devctl --project-prefix my-local-env reinit --yes
 ```
 
 ### 四个核心命令
 
 ```bash
-make infra-up
-make dev-backend
-make dev-admin
-make reinit
+./devctl service start postgres redis
+./devctl service start backend
+./devctl service start admin
+./devctl reinit --yes
 ```
 
-- `make infra-up`：启动 PostgreSQL 和 Redis 开发容器
-- `make dev-backend`：启动后端，默认读取 `config/settings.pg.yml`
-- `make dev-admin`：启动管理端开发服务器
-- `make reinit`：按当前前缀清理应用栈、开发容器、工作区数据目录、安装锁和本地产物
+- `devctl service start postgres redis`：启动 PostgreSQL 和 Redis 开发容器
+- `devctl service start backend`：启动后端，默认读取 `config/settings.pg.yml`
+- `devctl service start admin`：启动管理端开发服务器
+- `devctl reinit --yes`：按当前前缀清理应用栈、开发容器、工作区数据目录、安装锁和本地产物
+- `devctl tui`：打开交互式控制台，支持空格勾选、多选、自动刷新与最近操作输出
+- `devctl tui` 运行时会把日志和状态文件写到项目内 `temp/devctl/`，便于直接排查：
+  - `temp/devctl/logs/<service>.log`
+  - `temp/devctl/state.json`
+- `devctl tui` 常用键位：
+  - `Space` 勾选服务
+  - `Enter` 执行右侧动作栏当前高亮动作
+  - `Tab` 在服务面板与动作面板间切换
+  - `s/x/r/l/d/u/q` 直接触发启动、停止、重启、日志、自检、刷新、退出
+
+- Windows / macOS：`backend`、`admin`、`mobile` 默认在独立终端窗口启动
+- Linux：本地服务保持在当前终端体系内运行，不依赖额外图形窗口
+- `postgres` / `redis` 始终通过 `docker compose up -d` 后台运行
 
 ### Setup Wizard 说明
 
-- 首次执行 `make dev-backend` 时，如果 `config/.installed` 不存在，后端会进入 Setup Wizard 模式
+- 首次执行 `devctl service start backend` 时，如果 `config/.installed` 不存在，后端会进入 Setup Wizard 模式
 - Setup 模式下只暴露 `/api/v1/setup/*` 接口，不会托管前端静态资源
-- 启动 `make dev-admin` 后，前端会自动检测安装状态并引导初始化数据库、Redis 和管理员账号
+- 启动 `devctl service start admin` 后，前端会自动检测安装状态并引导初始化数据库、Redis 和管理员账号
 - 安装完成后会写入 `config/settings.yml` 与 `config/.installed`
 - 容器部署时请持久化 `config/` 目录，否则重启后会重新进入安装流程
 
 ### OpenAPI 到前端类型
 
 ```bash
-make openapi
+./devctl openapi
 ```
 
 该命令会完成以下工作：
@@ -162,13 +177,13 @@ make openapi
 ### 其他常用命令
 
 ```bash
-make doctor
-make setup-status
-make build
-make db-migrate
-make dev-mobile
-make docker-up
-make docker-down
+./devctl doctor
+./devctl setup-status
+./devctl build backend
+./devctl migrate
+./devctl service start mobile
+./devctl service stop all
+./devctl test backend
 ```
 
 ## 📨 互动
