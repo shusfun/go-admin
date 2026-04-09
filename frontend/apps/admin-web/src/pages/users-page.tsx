@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { CrudDataPage } from "../components/crud-data-page";
-import { SectionCard } from "@suiyuan/ui-admin";
+import { Button, ConfirmDialog, FormActions, FormDialog, Input, SectionCard, toast } from "@suiyuan/ui-admin";
 import { createApiClient } from "@suiyuan/api";
 import type { SysDeptRecord, SysPostRecord, SysRoleRecord, SysUserRecord } from "@suiyuan/types";
 
@@ -20,6 +20,7 @@ export function UsersPage({ api }: { api: ReturnType<typeof createApiClient> }) 
   const queryClient = useQueryClient();
   const [passwordTarget, setPasswordTarget] = useState<SysUserRecord | null>(null);
   const [nextPassword, setNextPassword] = useState("");
+  const [statusTarget, setStatusTarget] = useState<SysUserRecord | null>(null);
   const rolesQuery = useQuery({
     queryKey: ["admin-page", "role-options"],
     queryFn: async () => {
@@ -85,16 +86,11 @@ export function UsersPage({ api }: { api: ReturnType<typeof createApiClient> }) 
 
   async function handleStatusToggle(item: SysUserRecord) {
     const nextStatus = item.status === "2" ? "1" : "2";
-    const nextLabel = nextStatus === "2" ? "启用" : "停用";
-    if (!window.confirm(`确认${nextLabel}用户「${item.username}」吗？`)) {
-      return;
-    }
-
     try {
       await statusMutation.mutateAsync({ userId: item.userId, status: nextStatus });
+      toast.success(`用户「${item.username}」状态已更新`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "用户状态更新失败";
-      window.alert(message);
+      toast.error(error instanceof Error ? error.message : "用户状态更新失败");
     }
   }
 
@@ -103,16 +99,15 @@ export function UsersPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       return;
     }
     if (!nextPassword.trim()) {
-      window.alert("请输入新密码");
+      toast.error("请输入新密码");
       return;
     }
 
     try {
       await passwordMutation.mutateAsync({ userId: passwordTarget.userId, password: nextPassword.trim() });
-      window.alert(`用户「${passwordTarget.username}」密码已重置`);
+      toast.success(`用户「${passwordTarget.username}」密码已重置`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "密码重置失败";
-      window.alert(message);
+      toast.error(error instanceof Error ? error.message : "密码重置失败");
     }
   }
 
@@ -180,33 +175,29 @@ export function UsersPage({ api }: { api: ReturnType<typeof createApiClient> }) 
         queryKey="users"
         renderAside={() => (
         <SectionCard title="迁移说明" description="这一页对应官方 sys-user，沿用原后端字段，不在第一阶段重塑权限分配交互。">
-          <ul className="detail-list">
-            <li>角色、部门、岗位列已经使用后台选项映射为名称，不再只显示 ID。</li>
-            <li>状态切换和密码重置已接入真实接口，仍不做批量操作。</li>
-            <li>角色权限分配仍保持原后端规则，不在这一轮扩展成复杂授权器。</li>
-          </ul>
+          <div className="space-y-2 text-sm leading-7 text-muted-foreground">
+            <p>角色、部门、岗位列已经使用后台选项映射为名称，不再只显示 ID。</p>
+            <p>状态切换和密码重置已接入真实接口，仍不做批量操作。</p>
+            <p>角色权限分配仍保持原后端规则，不在这一轮扩展成复杂授权器。</p>
+          </div>
         </SectionCard>
         )}
         rowActions={(item) => (
           <>
-            <button
-              className="tiny-action"
-              disabled={statusMutation.isPending}
-              onClick={() => void handleStatusToggle(item)}
-              type="button"
-            >
+            <Button disabled={statusMutation.isPending} onClick={() => setStatusTarget(item)} size="sm" type="button" variant="outline">
               {item.status === "2" ? "停用" : "启用"}
-            </button>
-            <button
-              className="tiny-action"
+            </Button>
+            <Button
               onClick={() => {
                 setPasswordTarget(item);
                 setNextPassword("");
               }}
+              size="sm"
               type="button"
+              variant="outline"
             >
               重置密码
-            </button>
+            </Button>
           </>
         )}
         searchFields={[
@@ -218,33 +209,54 @@ export function UsersPage({ api }: { api: ReturnType<typeof createApiClient> }) 
         toDraft={(item) => ({ ...item, password: "" })}
         updateItem={(payload) => api.admin.updateUser(payload as { userId: number })}
       />
-      {passwordTarget ? (
-        <div className="modal-mask">
-          <div className="modal-card compact-modal">
-            <h3>重置密码</h3>
-            <p className="dialog-description">当前用户：{passwordTarget.username}</p>
-            <label className="form-field">
-              <span>新密码</span>
-              <input onChange={(event) => setNextPassword(event.target.value)} type="password" value={nextPassword} />
-            </label>
-            <div className="inline-actions">
-              <button className="primary-action" disabled={passwordMutation.isPending} onClick={() => void handleResetPassword()} type="button">
-                {passwordMutation.isPending ? "提交中..." : "确认重置"}
-              </button>
-              <button
-                className="soft-link"
-                onClick={() => {
-                  setPasswordTarget(null);
-                  setNextPassword("");
-                }}
-                type="button"
-              >
-                取消
-              </button>
-            </div>
-          </div>
+      <FormDialog
+        description={passwordTarget ? `当前用户：${passwordTarget.username}` : undefined}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPasswordTarget(null);
+            setNextPassword("");
+          }
+        }}
+        open={passwordTarget !== null}
+        title="重置密码"
+      >
+        <div className="grid gap-4">
+          <Input onChange={(event) => setNextPassword(event.target.value)} type="password" value={nextPassword} />
+          <FormActions>
+            <Button disabled={passwordMutation.isPending} onClick={() => void handleResetPassword()} type="button">
+              {passwordMutation.isPending ? "提交中..." : "确认重置"}
+            </Button>
+            <Button
+              onClick={() => {
+                setPasswordTarget(null);
+                setNextPassword("");
+              }}
+              type="button"
+              variant="outline"
+            >
+              取消
+            </Button>
+          </FormActions>
         </div>
-      ) : null}
+      </FormDialog>
+      <ConfirmDialog
+        actionLabel={statusTarget?.status === "2" ? "确认停用" : "确认启用"}
+        description={statusTarget ? `用户「${statusTarget.username}」的状态将被更新。` : ""}
+        onConfirm={async () => {
+          if (!statusTarget) {
+            return;
+          }
+          await handleStatusToggle(statusTarget);
+          setStatusTarget(null);
+        }}
+        open={statusTarget !== null}
+        setOpen={(open) => {
+          if (!open) {
+            setStatusTarget(null);
+          }
+        }}
+        title={statusTarget?.status === "2" ? "确认停用该用户？" : "确认启用该用户？"}
+      />
     </>
   );
 }

@@ -1,7 +1,35 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { SectionCard } from "@suiyuan/ui-admin";
+import {
+  AdminPageStack,
+  AdminTwoColumn,
+  AsyncActionButton,
+  Button,
+  ConfirmDialog,
+  DataTableSection,
+  FilterPanel,
+  FormActions,
+  FormDialog,
+  FormField,
+  FormSection,
+  Input,
+  PageHeader,
+  Pagination,
+  RowActions,
+  Select,
+  StatusBadge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Textarea,
+  Toolbar,
+  TreeSelectorPanel,
+  toast,
+} from "@suiyuan/ui-admin";
 import { createApiClient } from "@suiyuan/api";
 import type { SysRoleRecord, TreeOptionNode } from "@suiyuan/types";
 
@@ -16,13 +44,6 @@ type RoleDraft = {
   admin: boolean;
   dataScope: string;
 };
-
-type FeedbackState =
-  | {
-      tone: "success" | "error";
-      message: string;
-    }
-  | null;
 
 const statusLabels: Record<string, string> = {
   "1": "停用",
@@ -45,6 +66,12 @@ const dataScopeOptions = [
   { value: "5", label: "仅本人数据权限" },
 ];
 
+const statusOptions = [
+  { value: "", label: "全部状态" },
+  { value: "2", label: "正常" },
+  { value: "1", label: "停用" },
+];
+
 function createRoleDraft(source?: Partial<SysRoleRecord>): RoleDraft {
   return {
     roleId: source?.roleId,
@@ -59,94 +86,6 @@ function createRoleDraft(source?: Partial<SysRoleRecord>): RoleDraft {
   };
 }
 
-function collectNodeIds(nodes: TreeOptionNode[]): number[] {
-  return nodes.flatMap((node) => [node.id, ...collectNodeIds(node.children || [])]);
-}
-
-function collectSingleNodeIds(node: TreeOptionNode): number[] {
-  return [node.id, ...collectNodeIds(node.children || [])];
-}
-
-function toggleTreeNode(checkedIds: number[], node: TreeOptionNode, checked: boolean) {
-  const next = new Set(checkedIds);
-  for (const id of collectSingleNodeIds(node)) {
-    if (checked) {
-      next.add(id);
-      continue;
-    }
-    next.delete(id);
-  }
-  return Array.from(next);
-}
-
-function TreeSelector({
-  title,
-  description,
-  nodes,
-  checkedIds,
-  disabled = false,
-  onChange,
-}: {
-  title: string;
-  description: string;
-  nodes: TreeOptionNode[];
-  checkedIds: number[];
-  disabled?: boolean;
-  onChange: (next: number[]) => void;
-}) {
-  const checkedSet = useMemo(() => new Set(checkedIds), [checkedIds]);
-
-  function renderNode(node: TreeOptionNode) {
-    const descendantIds = collectSingleNodeIds(node);
-    const checkedCount = descendantIds.filter((id) => checkedSet.has(id)).length;
-    const isChecked = checkedCount === descendantIds.length && descendantIds.length > 0;
-    const isIndeterminate = checkedCount > 0 && checkedCount < descendantIds.length;
-
-    return (
-      <li className="tree-node" key={`${title}-${node.id}`}>
-        <label className={`tree-node-row${disabled ? " disabled" : ""}`}>
-          <input
-            checked={isChecked}
-            disabled={disabled}
-            onChange={(event) => onChange(toggleTreeNode(checkedIds, node, event.target.checked))}
-            ref={(element) => {
-              if (element) {
-                element.indeterminate = isIndeterminate;
-              }
-            }}
-            type="checkbox"
-          />
-          <span>{node.label}</span>
-        </label>
-        {node.children?.length ? <ul className="tree-node-children">{node.children.map((child) => renderNode(child))}</ul> : null}
-      </li>
-    );
-  }
-
-  return (
-    <div className="tree-panel">
-      <div className="tree-panel-head">
-        <div>
-          <h4>{title}</h4>
-          <p>{description}</p>
-        </div>
-        <div className="inline-actions">
-          <button className="tiny-action" disabled={disabled} onClick={() => onChange(collectNodeIds(nodes))} type="button">
-            全选
-          </button>
-          <button className="tiny-action" disabled={disabled} onClick={() => onChange([])} type="button">
-            清空
-          </button>
-        </div>
-      </div>
-      <p className="tree-summary">当前选中 {checkedIds.length} 项</p>
-      <div className="tree-scroll">
-        {nodes.length ? <ul className="tree-root">{nodes.map((node) => renderNode(node))}</ul> : <p className="empty-tip">暂无可选项</p>}
-      </div>
-    </div>
-  );
-}
-
 export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) {
   const queryClient = useQueryClient();
   const [pageIndex, setPageIndex] = useState(1);
@@ -156,7 +95,6 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogTitle, setDialogTitle] = useState("新增角色");
   const [dialogLoading, setDialogLoading] = useState(false);
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [draft, setDraft] = useState<RoleDraft>(createRoleDraft());
   const [menuTree, setMenuTree] = useState<TreeOptionNode[]>([]);
   const [deptTree, setDeptTree] = useState<TreeOptionNode[]>([]);
@@ -164,6 +102,8 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
   const [deptCheckedIds, setDeptCheckedIds] = useState<number[]>([]);
   const [lockedMenuIds, setLockedMenuIds] = useState<number[]>([]);
   const [originalRoleKey, setOriginalRoleKey] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<SysRoleRecord | null>(null);
+  const [statusTarget, setStatusTarget] = useState<SysRoleRecord | null>(null);
 
   const rolesQuery = useQuery({
     queryKey: ["admin-page", "roles", roleNameFilter, roleKeyFilter, statusFilter, pageIndex],
@@ -176,6 +116,7 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
         status: statusFilter || undefined,
       }),
   });
+
   const saveMutation = useMutation({
     mutationFn: async (payload: RoleDraft) => {
       const nextMenuIds = originalRoleKey === "admin" ? lockedMenuIds : menuCheckedIds;
@@ -193,6 +134,7 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
         menuIds: nextMenuIds,
         deptIds: nextDeptIds,
       };
+
       if (payload.roleId) {
         await api.admin.updateRole(nextPayload as { roleId: number });
         await api.admin.updateRoleDataScope({
@@ -200,65 +142,49 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
           dataScope: payload.dataScope,
           deptIds: nextDeptIds,
         });
-        return { mode: "update" as const };
+        return "updated";
       }
+
       const roleId = await api.admin.createRole(nextPayload);
       if (!roleId) {
-        throw new Error("角色已创建，但接口未返回 roleId，无法继续保存数据权限");
+        throw new Error("角色已创建，但未返回 roleId");
       }
       await api.admin.updateRoleDataScope({
         roleId,
         dataScope: payload.dataScope,
         deptIds: nextDeptIds,
       });
-      return { mode: "create" as const };
+      return "created";
     },
-    onSuccess: async (result) => {
-      setFeedback({
-        tone: "success",
-        message: result.mode === "create" ? "角色已创建" : "角色已更新",
-      });
-      setDialogOpen(false);
-      resetDialog();
+    onSuccess: async (mode) => {
+      toast.success(mode === "created" ? "角色已创建" : "角色已更新");
+      closeDialog();
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "roles"] });
     },
     onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "角色保存失败",
-      });
+      toast.error(error instanceof Error ? error.message : "角色保存失败");
     },
   });
+
   const statusMutation = useMutation({
     mutationFn: async (payload: { roleId: number; status: string }) => api.admin.updateRoleStatus(payload.roleId, payload.status),
-    onSuccess: async () => {
-      setFeedback({
-        tone: "success",
-        message: "角色状态已更新",
-      });
+    onSuccess: async (_, payload) => {
+      toast.success(payload.status === "2" ? "角色已启用" : "角色已停用");
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "roles"] });
     },
     onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "角色状态更新失败",
-      });
+      toast.error(error instanceof Error ? error.message : "角色状态更新失败");
     },
   });
+
   const deleteMutation = useMutation({
     mutationFn: async (roleId: number) => api.admin.deleteRoles({ ids: [roleId] }),
     onSuccess: async () => {
-      setFeedback({
-        tone: "success",
-        message: "角色已删除",
-      });
+      toast.success("角色已删除");
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "roles"] });
     },
     onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "角色删除失败",
-      });
+      toast.error(error instanceof Error ? error.message : "角色删除失败");
     },
   });
 
@@ -267,7 +193,7 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
   const totalPages = Math.max(1, Math.ceil(total / 20));
   const menuTreeLocked = originalRoleKey === "admin";
 
-  function resetDialog() {
+  function resetDialogState() {
     setDraft(createRoleDraft());
     setMenuTree([]);
     setDeptTree([]);
@@ -275,6 +201,12 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
     setDeptCheckedIds([]);
     setLockedMenuIds([]);
     setOriginalRoleKey("");
+    setDialogLoading(false);
+  }
+
+  function closeDialog() {
+    setDialogOpen(false);
+    resetDialogState();
   }
 
   async function loadPermissionTrees(roleId: number) {
@@ -287,75 +219,59 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
   }
 
   async function openCreateDialog() {
-    setDialogOpen(true);
     setDialogTitle("新增角色");
+    setDialogOpen(true);
     setDialogLoading(true);
-    resetDialog();
+    resetDialogState();
     try {
       await loadPermissionTrees(0);
     } catch (error) {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "角色权限树加载失败",
-      });
-      setDialogOpen(false);
-    } finally {
-      setDialogLoading(false);
+      toast.error(error instanceof Error ? error.message : "角色权限树加载失败");
+      closeDialog();
+      return;
     }
+    setDialogLoading(false);
   }
 
   async function openEditDialog(item: SysRoleRecord) {
-    setDialogOpen(true);
     setDialogTitle(`编辑角色 · ${item.roleName}`);
+    setDialogOpen(true);
     setDialogLoading(true);
     try {
       const [detail] = await Promise.all([api.admin.getRole(item.roleId), loadPermissionTrees(item.roleId)]);
       setDraft(createRoleDraft(detail));
       setOriginalRoleKey(detail.roleKey);
     } catch (error) {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "角色详情加载失败",
-      });
-      setDialogOpen(false);
-    } finally {
-      setDialogLoading(false);
-    }
-  }
-
-  async function handleDelete(item: SysRoleRecord) {
-    if (!window.confirm(`确认删除角色「${item.roleName}」吗？`)) {
+      toast.error(error instanceof Error ? error.message : "角色详情加载失败");
+      closeDialog();
       return;
     }
-    deleteMutation.mutate(item.roleId);
+    setDialogLoading(false);
   }
 
   async function handleStatusToggle(item: SysRoleRecord) {
     const nextStatus = item.status === "2" ? "1" : "2";
-    const actionText = nextStatus === "2" ? "启用" : "停用";
-    if (!window.confirm(`确认${actionText}角色「${item.roleName}」吗？`)) {
-      return;
-    }
-    statusMutation.mutate({
-      roleId: item.roleId,
-      status: nextStatus,
-    });
+    await statusMutation.mutateAsync({ roleId: item.roleId, status: nextStatus });
   }
 
   return (
-    <div className="page-stack">
-      <header className="page-hero compact">
-        <small>Admin Module</small>
-        <h2>角色管理</h2>
-        <p>角色页已恢复完整管理能力，包含角色基础信息、菜单权限、状态切换和数据权限配置。</p>
-      </header>
+    <AdminPageStack>
+      <PageHeader
+        actions={
+          <Button onClick={() => void openCreateDialog()} type="button">
+            新增角色
+          </Button>
+        }
+        description="角色页已经完全切换到统一后台模板，菜单权限、部门权限和状态变更全部走 `ui-admin` 组件编排。"
+        kicker="Admin Module"
+        title="角色管理"
+      />
 
-      <div className="module-grid">
-        <SectionCard title="筛选与操作" description="角色保存时会带完整菜单和部门权限，避免更新时清空关联表。">
-          <div className="search-grid">
-            <label className="search-field">
-              <span>角色名称</span>
-              <input
+      <AdminTwoColumn>
+        <FilterPanel description="角色保存时会按正确顺序提交角色主信息、菜单权限和数据权限，避免更新时丢失关联。">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <FormField label="角色名称">
+              <Input
                 onChange={(event) => {
                   setPageIndex(1);
                   setRoleNameFilter(event.target.value);
@@ -363,10 +279,9 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
                 placeholder="按角色名称过滤"
                 value={roleNameFilter}
               />
-            </label>
-            <label className="search-field">
-              <span>角色编码</span>
-              <input
+            </FormField>
+            <FormField label="角色编码">
+              <Input
                 onChange={(event) => {
                   setPageIndex(1);
                   setRoleKeyFilter(event.target.value);
@@ -374,274 +289,204 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
                 placeholder="按 roleKey 过滤"
                 value={roleKeyFilter}
               />
-            </label>
-            <label className="search-field">
-              <span>状态</span>
-              <select
-                onChange={(event) => {
-                  setPageIndex(1);
-                  setStatusFilter(event.target.value);
-                }}
-                value={statusFilter}
-              >
-                <option value="">全部</option>
-                <option value="2">正常</option>
-                <option value="1">停用</option>
-              </select>
-            </label>
+            </FormField>
+            <FormField label="状态">
+              <Select onValueChange={(value) => {
+                setPageIndex(1);
+                setStatusFilter(value);
+              }} options={statusOptions} placeholder="选择状态" value={statusFilter} />
+            </FormField>
           </div>
-          <div className="inline-actions">
-            <button className="primary-action" onClick={() => void openCreateDialog()} type="button">
-              新增角色
-            </button>
-            <button
-              className="soft-link"
-              onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", "roles"] })}
-              type="button"
-            >
+          <Toolbar>
+            <Button onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", "roles"] })} type="button" variant="outline">
               刷新数据
-            </button>
+            </Button>
+          </Toolbar>
+        </FilterPanel>
+
+        <FilterPanel description="本页不做旧样式兼容，后续新增角色相关能力也必须继续沿用这套表单和树面板。" title="收口说明">
+          <div className="space-y-2 text-sm leading-7 text-muted-foreground">
+            <p>编辑角色时会同时拉取角色详情、菜单树和部门树，确保提交总是带完整权限集合。</p>
+            <p>`admin` 角色的菜单权限保持锁定，只展示当前已绑定结果，避免误清空核心权限。</p>
+            <p>仅在“自定数据权限”下展示部门树选择，其他权限范围不再渲染多余结构。</p>
           </div>
-          {feedback ? <p className={`inline-feedback${feedback.tone === "error" ? " error" : ""}`}>{feedback.message}</p> : null}
-        </SectionCard>
+        </FilterPanel>
+      </AdminTwoColumn>
 
-        <SectionCard title="当前说明" description="这页不再停留在只读查询，已经补到可维护的真实后台页。">
-          <ul className="detail-list">
-            <li>编辑时会同时拉取角色详情、菜单树和部门树，确保提交总是带完整权限数据。</li>
-            <li>`admin` 角色保留菜单权限保护，编辑时仅展示已绑定菜单，不允许误清空。</li>
-            <li>数据权限沿用后端既有语义，自定义部门时才展示部门树选择器。</li>
-          </ul>
-        </SectionCard>
-      </div>
+      <DataTableSection description={`当前共 ${total} 条角色记录。`} title="角色列表">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>角色名称</TableHead>
+              <TableHead>角色编码</TableHead>
+              <TableHead>排序</TableHead>
+              <TableHead>数据权限</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead>备注</TableHead>
+              <TableHead>操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.roleId}>
+                <TableCell>
+                  <div className="space-y-1">
+                    <div className="font-medium text-foreground">{row.roleName}</div>
+                    <div className="text-xs text-muted-foreground">{row.admin ? "系统管理员角色" : `角色 ID: ${row.roleId}`}</div>
+                  </div>
+                </TableCell>
+                <TableCell>{row.roleKey}</TableCell>
+                <TableCell>{row.roleSort}</TableCell>
+                <TableCell>{dataScopeLabels[row.dataScope] || row.dataScope || "-"}</TableCell>
+                <TableCell>
+                  <StatusBadge status={statusLabels[row.status] || row.status} />
+                </TableCell>
+                <TableCell>{row.remark || "-"}</TableCell>
+                <TableCell>
+                  <RowActions>
+                    <Button onClick={() => void openEditDialog(row)} size="sm" type="button" variant="outline">
+                      编辑
+                    </Button>
+                    <Button onClick={() => setStatusTarget(row)} size="sm" type="button" variant="outline">
+                      {row.status === "2" ? "停用" : "启用"}
+                    </Button>
+                    {row.roleKey !== "admin" ? (
+                      <Button onClick={() => setDeleteTarget(row)} size="sm" type="button" variant="destructive">
+                        删除
+                      </Button>
+                    ) : null}
+                  </RowActions>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <Pagination onNext={() => setPageIndex((current) => current + 1)} onPrevious={() => setPageIndex((current) => current - 1)} page={pageIndex} totalPages={totalPages} />
+      </DataTableSection>
 
-      <SectionCard title="角色列表" description={`当前共 ${total} 条角色记录。`}>
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>角色名称</th>
-                <th>角色编码</th>
-                <th>排序</th>
-                <th>数据权限</th>
-                <th>状态</th>
-                <th>备注</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.roleId}>
-                  <td>
-                    <strong>{row.roleName}</strong>
-                    <div className="cell-subline">{row.admin ? "系统管理员角色" : `角色ID: ${row.roleId}`}</div>
-                  </td>
-                  <td>{row.roleKey}</td>
-                  <td>{row.roleSort}</td>
-                  <td>{dataScopeLabels[row.dataScope] || row.dataScope || "-"}</td>
-                  <td>{statusLabels[row.status] || row.status}</td>
-                  <td>{row.remark || "-"}</td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="tiny-action" onClick={() => void openEditDialog(row)} type="button">
-                        编辑
-                      </button>
-                      <button className="tiny-action" onClick={() => void handleStatusToggle(row)} type="button">
-                        {row.status === "2" ? "停用" : "启用"}
-                      </button>
-                      {row.roleKey !== "admin" ? (
-                        <button className="tiny-action danger" onClick={() => void handleDelete(row)} type="button">
-                          删除
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="pagination-row">
-          <button className="soft-link" disabled={pageIndex <= 1} onClick={() => setPageIndex((current) => current - 1)} type="button">
-            上一页
-          </button>
-          <span>
-            第 {pageIndex} / {totalPages} 页
-          </span>
-          <button
-            className="soft-link"
-            disabled={pageIndex >= totalPages}
-            onClick={() => setPageIndex((current) => current + 1)}
-            type="button"
-          >
-            下一页
-          </button>
-        </div>
-      </SectionCard>
+      <FormDialog
+        description="角色弹层统一承载基础字段、菜单权限和部门权限，不再使用页面自带 modal 结构。"
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            resetDialogState();
+          }
+        }}
+        open={dialogOpen}
+        title={dialogTitle}
+      >
+        {dialogLoading ? (
+          <div className="flex flex-1 items-center py-6 text-sm text-muted-foreground">正在加载角色权限树...</div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="grid gap-6">
+                <FormSection description="字段直接对应后端 DTO，不额外引入兼容层。" title="基础信息">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField label="角色名称">
+                      <Input onChange={(event) => setDraft((current) => ({ ...current, roleName: event.target.value }))} value={draft.roleName} />
+                    </FormField>
+                    <FormField label="角色编码">
+                      <Input onChange={(event) => setDraft((current) => ({ ...current, roleKey: event.target.value }))} value={draft.roleKey} />
+                    </FormField>
+                    <FormField label="角色排序">
+                      <Input
+                        onChange={(event) => setDraft((current) => ({ ...current, roleSort: Number(event.target.value) }))}
+                        type="number"
+                        value={String(draft.roleSort)}
+                      />
+                    </FormField>
+                    <FormField label="状态">
+                      <Select
+                        onValueChange={(value) => setDraft((current) => ({ ...current, status: value }))}
+                        options={statusOptions.filter((item) => item.value)}
+                        value={draft.status}
+                      />
+                    </FormField>
+                    <FormField label="数据权限">
+                      <Select onValueChange={(value) => setDraft((current) => ({ ...current, dataScope: value }))} options={dataScopeOptions} value={draft.dataScope} />
+                    </FormField>
+                    <FormField label="标记">
+                      <Input onChange={(event) => setDraft((current) => ({ ...current, flag: event.target.value }))} value={draft.flag} />
+                    </FormField>
+                    <FormField className="md:col-span-2" label="备注">
+                      <Textarea onChange={(event) => setDraft((current) => ({ ...current, remark: event.target.value }))} rows={4} value={draft.remark} />
+                    </FormField>
+                  </div>
+                </FormSection>
 
-      {dialogOpen ? (
-        <div className="modal-mask">
-          <div className="modal-card role-modal">
-            <div className="detail-modal-head">
-              <div>
-                <h3>{dialogTitle}</h3>
-                <p className="dialog-description">角色保存分为角色主信息和数据权限两段，页面会自动按正确顺序提交。</p>
-              </div>
-              <button
-                className="soft-link"
-                onClick={() => {
-                  setDialogOpen(false);
-                  resetDialog();
-                }}
-                type="button"
-              >
-                关闭
-              </button>
-            </div>
-            {dialogLoading ? <p className="empty-tip">正在加载角色权限树...</p> : null}
-            {!dialogLoading ? (
-              <>
-                <div className="form-grid two-columns">
-                  <label className="form-field">
-                    <span>角色名称</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          roleName: event.target.value,
-                        }))
-                      }
-                      value={draft.roleName}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>角色编码</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          roleKey: event.target.value,
-                        }))
-                      }
-                      value={draft.roleKey}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>角色排序</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          roleSort: Number(event.target.value),
-                        }))
-                      }
-                      type="number"
-                      value={String(draft.roleSort)}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>状态</span>
-                    <select
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          status: event.target.value,
-                        }))
-                      }
-                      value={draft.status}
-                    >
-                      <option value="2">正常</option>
-                      <option value="1">停用</option>
-                    </select>
-                  </label>
-                  <label className="form-field">
-                    <span>数据权限</span>
-                    <select
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          dataScope: event.target.value,
-                        }))
-                      }
-                      value={draft.dataScope}
-                    >
-                      {dataScopeOptions.map((item) => (
-                        <option key={`data-scope-${item.value}`} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="form-field">
-                    <span>标记</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          flag: event.target.value,
-                        }))
-                      }
-                      value={draft.flag}
-                    />
-                  </label>
-                  <label className="form-field role-remark-field">
-                    <span>备注</span>
-                    <textarea
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          remark: event.target.value,
-                        }))
-                      }
-                      rows={4}
-                      value={draft.remark}
-                    />
-                  </label>
-                </div>
-
-                <div className="two-column-grid role-tree-grid">
-                  <TreeSelector
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <TreeSelectorPanel
                     checkedIds={menuCheckedIds}
-                    description={menuTreeLocked ? "admin 角色的菜单权限保持锁定，只展示已绑定结果。" : "勾选菜单即提交完整菜单权限集合。"}
+                    description={menuTreeLocked ? "admin 角色菜单权限已锁定，仅展示已绑定结果。" : "勾选结果将随角色一起提交。"}
                     disabled={menuTreeLocked}
                     nodes={menuTree}
                     onChange={setMenuCheckedIds}
                     title="菜单权限"
                   />
-                  <TreeSelector
+                  <TreeSelectorPanel
                     checkedIds={deptCheckedIds}
-                    description={draft.dataScope === "2" ? "仅在“自定数据权限”时生效。" : "当前数据权限不需要单独选择部门。"}
+                    description={draft.dataScope === "2" ? "仅在“自定数据权限”时生效。" : "当前数据权限范围无需单独选择部门。"}
                     disabled={draft.dataScope !== "2"}
                     nodes={deptTree}
                     onChange={setDeptCheckedIds}
                     title="部门权限"
                   />
                 </div>
-
-                <div className="inline-actions">
-                  <button
-                    className="primary-action"
-                    disabled={saveMutation.isPending || !draft.roleName.trim() || !draft.roleKey.trim()}
-                    onClick={() => saveMutation.mutate(draft)}
-                    type="button"
-                  >
-                    {saveMutation.isPending ? "保存中..." : "保存角色"}
-                  </button>
-                  <button
-                    className="soft-link"
-                    onClick={() => {
-                      setDialogOpen(false);
-                      resetDialog();
-                    }}
-                    type="button"
-                  >
-                    取消
-                  </button>
-                </div>
-              </>
-            ) : null}
+              </div>
+            </div>
+            <FormActions className="mt-4 shrink-0 border-t border-border pt-4">
+              <AsyncActionButton
+                disabled={!draft.roleName.trim() || !draft.roleKey.trim()}
+                loading={saveMutation.isPending}
+                onClick={() => saveMutation.mutate(draft)}
+                type="button"
+              >
+                保存角色
+              </AsyncActionButton>
+              <Button onClick={closeDialog} type="button" variant="outline">
+                取消
+              </Button>
+            </FormActions>
           </div>
-        </div>
-      ) : null}
-    </div>
+        )}
+      </FormDialog>
+
+      <ConfirmDialog
+        description={statusTarget ? `角色「${statusTarget.roleName}」的状态将被更新。` : ""}
+        onConfirm={async () => {
+          if (!statusTarget) {
+            return;
+          }
+          await handleStatusToggle(statusTarget);
+          setStatusTarget(null);
+        }}
+        open={statusTarget !== null}
+        setOpen={(open) => {
+          if (!open) {
+            setStatusTarget(null);
+          }
+        }}
+        title={statusTarget?.status === "2" ? "确认停用该角色？" : "确认启用该角色？"}
+      />
+
+      <ConfirmDialog
+        description={deleteTarget ? `删除角色「${deleteTarget.roleName}」后不可恢复。` : ""}
+        onConfirm={async () => {
+          if (!deleteTarget) {
+            return;
+          }
+          await deleteMutation.mutateAsync(deleteTarget.roleId);
+          setDeleteTarget(null);
+        }}
+        open={deleteTarget !== null}
+        setOpen={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+          }
+        }}
+        title="确认删除该角色？"
+      />
+    </AdminPageStack>
   );
 }

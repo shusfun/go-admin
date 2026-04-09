@@ -3,9 +3,17 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
+import {
+  AsyncActionButton,
+  AuthLayout,
+  Button,
+  FormActions,
+  FormField,
+  InlineNotice,
+  Input,
+  WizardLayout,
+} from "@suiyuan/ui-admin";
 import type { SetupApi } from "@suiyuan/api";
-
-// ─── Schema 定义 ───
 
 const dbSchema = z.object({
   host: z.string().min(1, "请输入主机地址"),
@@ -39,8 +47,6 @@ type DBFormValues = z.infer<typeof dbSchema>;
 type RedisFormValues = z.infer<typeof redisSchema>;
 type AdminFormValues = z.infer<typeof adminSchema>;
 
-// ─── 步骤常量 ───
-
 const STEPS = ["database", "redis", "admin", "complete"] as const;
 type Step = (typeof STEPS)[number];
 
@@ -50,8 +56,6 @@ const STEP_LABELS: Record<Step, string> = {
   admin: "管理员账号",
   complete: "安装完成",
 };
-
-// ─── 主组件 ───
 
 type SetupWizardPageProps = {
   initialStatus: SetupStatus;
@@ -73,18 +77,11 @@ export function SetupWizardPage({ initialStatus, setupApi, onComplete }: SetupWi
   const stepIndex = STEPS.indexOf(currentStep);
   const environmentLabel = getEnvironmentLabel(defaults.environment);
 
-  function handleDbComplete(values: DBFormValues) {
-    setDbValues(values);
-    setCurrentStep("redis");
-  }
-
-  function handleRedisComplete(values: RedisFormValues) {
-    setRedisValues(values);
-    setCurrentStep("admin");
-  }
-
   async function handleAdminComplete(values: AdminFormValues) {
-    if (!dbValues || !redisValues) return;
+    if (!dbValues || !redisValues) {
+      return;
+    }
+
     setInstalling(true);
     setInstallError("");
     setCompletionHint("");
@@ -116,64 +113,57 @@ export function SetupWizardPage({ initialStatus, setupApi, onComplete }: SetupWi
   }
 
   return (
-    <div className="auth-layout">
-      <section className="auth-card" style={{ maxWidth: 640 }}>
-        <small className="auth-kicker">Setup Wizard</small>
-        <h1 style={{ fontSize: "clamp(28px, 4vw, 42px)" }}>系统初始化配置</h1>
-        <p>首次使用需要配置数据库和 Redis 连接，创建管理员账号。</p>
-        <p style={{ color: "var(--color-muted)", fontSize: 13 }}>
-          已按当前{environmentLabel}预填连接参数，你可以直接测试，也可以按实际部署环境修改。
-        </p>
-
-        {/* 步骤指示器 */}
-        <div className="setup-steps" style={{ display: "flex", gap: 8, marginTop: 24 }}>
-          {STEPS.map((step, idx) => (
-            <div
-              key={step}
-              style={{
-                flex: 1,
-                height: 4,
-                borderRadius: 2,
-                background: idx <= stepIndex ? "var(--color-accent, #0f766e)" : "rgba(18,19,26,0.1)",
-                transition: "background 0.3s",
-              }}
-            />
-          ))}
+    <AuthLayout
+      aside={
+        <div className="grid max-w-xl gap-4 rounded-[2rem] border border-border/70 bg-card/80 p-6 shadow-[var(--shadow-card)]">
+          <p className="text-sm font-semibold text-foreground">初始化说明</p>
+          <div className="space-y-2 text-sm leading-7 text-muted-foreground">
+            <p>已按当前{environmentLabel}预填连接参数，你可以直接测试，也可以按实际部署环境修改。</p>
+            <p>安装成功后系统会自动重启，页面会在探测到安装完成后跳回登录态。</p>
+          </div>
         </div>
-        <div style={{ marginTop: 8, color: "var(--color-muted)", fontSize: 13 }}>
-          步骤 {stepIndex + 1} / {STEPS.length}：{STEP_LABELS[currentStep]}
-        </div>
-
-        {/* 步骤内容 */}
-        <div style={{ marginTop: 24 }}>
-          {currentStep === "database" && (
-            <DatabaseStep setupApi={setupApi} defaultValues={dbValues} onComplete={handleDbComplete} />
-          )}
-          {currentStep === "redis" && (
-            <RedisStep
-              setupApi={setupApi}
-              defaultValues={redisValues}
-              onBack={() => setCurrentStep("database")}
-              onComplete={handleRedisComplete}
-            />
-          )}
-          {currentStep === "admin" && (
-            <AdminStep
-              defaultValues={defaults.admin}
-              installing={installing}
-              installError={installError}
-              onBack={() => setCurrentStep("redis")}
-              onComplete={handleAdminComplete}
-            />
-          )}
-          {currentStep === "complete" && <CompleteStep hint={completionHint} />}
-        </div>
-      </section>
-    </div>
+      }
+      description="首次使用需要配置数据库和 Redis 连接，并创建管理员账号。所有步骤都已切换到统一向导组件。"
+      kicker="Setup Wizard"
+      title="系统初始化配置"
+    >
+      <WizardLayout
+        currentStep={stepIndex}
+        description={`步骤 ${stepIndex + 1} / ${STEPS.length}：${STEP_LABELS[currentStep]}`}
+        steps={STEPS.map((step) => ({ label: STEP_LABELS[step] }))}
+        title="安装向导"
+      >
+        {currentStep === "database" ? (
+          <DatabaseStep defaultValues={dbValues} onComplete={(values) => {
+            setDbValues(values);
+            setCurrentStep("redis");
+          }} setupApi={setupApi} />
+        ) : null}
+        {currentStep === "redis" ? (
+          <RedisStep
+            defaultValues={redisValues}
+            onBack={() => setCurrentStep("database")}
+            onComplete={(values) => {
+              setRedisValues(values);
+              setCurrentStep("admin");
+            }}
+            setupApi={setupApi}
+          />
+        ) : null}
+        {currentStep === "admin" ? (
+          <AdminStep
+            defaultValues={defaults.admin}
+            installError={installError}
+            installing={installing}
+            onBack={() => setCurrentStep("redis")}
+            onComplete={handleAdminComplete}
+          />
+        ) : null}
+        {currentStep === "complete" ? <CompleteStep hint={completionHint} /> : null}
+      </WizardLayout>
+    </AuthLayout>
   );
 }
-
-// ─── 数据库步骤 ───
 
 function DatabaseStep({
   setupApi,
@@ -200,12 +190,14 @@ function DatabaseStep({
 
   async function handleTest() {
     const valid = await form.trigger();
-    if (!valid) return;
+    if (!valid) {
+      return;
+    }
     setTesting(true);
     setTestResult(null);
     try {
       await setupApi.testDatabase(form.getValues());
-      setTestResult({ ok: true, msg: "数据库连接成功 ✓" });
+      setTestResult({ ok: true, msg: "数据库连接成功" });
     } catch (error) {
       setTestResult({ ok: false, msg: error instanceof Error ? error.message : "连接失败" });
     } finally {
@@ -215,7 +207,7 @@ function DatabaseStep({
 
   return (
     <form
-      className="auth-form"
+      className="grid gap-5"
       onSubmit={form.handleSubmit((values) => {
         if (!testResult?.ok) {
           setTestResult({ ok: false, msg: "请先测试连接" });
@@ -224,55 +216,33 @@ function DatabaseStep({
         onComplete(values);
       })}
     >
-      <div className="form-grid two-columns">
-        <label className="form-field">
-          <span>主机地址</span>
-          <input {...form.register("host")} placeholder="127.0.0.1" />
-          <em>{form.formState.errors.host?.message}</em>
-        </label>
-        <label className="form-field">
-          <span>端口</span>
-          <input {...form.register("port", { valueAsNumber: true })} placeholder="5432" type="number" />
-          <em>{form.formState.errors.port?.message}</em>
-        </label>
+      <div className="grid gap-4 md:grid-cols-2">
+        <FormField error={form.formState.errors.host?.message} label="主机地址">
+          <Input {...form.register("host")} placeholder="127.0.0.1" />
+        </FormField>
+        <FormField error={form.formState.errors.port?.message} label="端口">
+          <Input {...form.register("port", { valueAsNumber: true })} placeholder="5432" type="number" />
+        </FormField>
+        <FormField error={form.formState.errors.user?.message} label="用户名">
+          <Input {...form.register("user")} placeholder="postgres" />
+        </FormField>
+        <FormField error={form.formState.errors.password?.message} label="密码">
+          <Input {...form.register("password")} placeholder="数据库密码" type="password" />
+        </FormField>
       </div>
-      <div className="form-grid two-columns">
-        <label className="form-field">
-          <span>用户名</span>
-          <input {...form.register("user")} placeholder="postgres" />
-          <em>{form.formState.errors.user?.message}</em>
-        </label>
-        <label className="form-field">
-          <span>密码</span>
-          <input {...form.register("password")} placeholder="数据库密码" type="password" />
-          <em>{form.formState.errors.password?.message}</em>
-        </label>
-      </div>
-      <div className="form-grid">
-        <label className="form-field">
-          <span>数据库名</span>
-          <input {...form.register("dbname")} placeholder="go_admin" />
-          <em>{form.formState.errors.dbname?.message}</em>
-        </label>
-      </div>
-
-      {testResult && (
-        <div className={testResult.ok ? "inline-feedback" : "inline-feedback error"}>{testResult.msg}</div>
-      )}
-
-      <div style={{ display: "flex", gap: 12 }}>
-        <button className="soft-link" disabled={testing} onClick={handleTest} type="button">
+      <FormField error={form.formState.errors.dbname?.message} label="数据库名">
+        <Input {...form.register("dbname")} placeholder="go_admin" />
+      </FormField>
+      {testResult ? <InlineNotice tone={testResult.ok ? "success" : "danger"}>{testResult.msg}</InlineNotice> : null}
+      <FormActions>
+        <Button disabled={testing} onClick={() => void handleTest()} type="button" variant="outline">
           {testing ? "测试中..." : "测试连接"}
-        </button>
-        <button className="primary-action" style={{ flex: 1 }} type="submit">
-          下一步
-        </button>
-      </div>
+        </Button>
+        <Button type="submit">下一步</Button>
+      </FormActions>
     </form>
   );
 }
-
-// ─── Redis 步骤 ───
 
 function RedisStep({
   setupApi,
@@ -300,12 +270,14 @@ function RedisStep({
 
   async function handleTest() {
     const valid = await form.trigger();
-    if (!valid) return;
+    if (!valid) {
+      return;
+    }
     setTesting(true);
     setTestResult(null);
     try {
       await setupApi.testRedis(form.getValues());
-      setTestResult({ ok: true, msg: "Redis 连接成功 ✓" });
+      setTestResult({ ok: true, msg: "Redis 连接成功" });
     } catch (error) {
       setTestResult({ ok: false, msg: error instanceof Error ? error.message : "连接失败" });
     } finally {
@@ -315,7 +287,7 @@ function RedisStep({
 
   return (
     <form
-      className="auth-form"
+      className="grid gap-5"
       onSubmit={form.handleSubmit((values) => {
         if (!testResult?.ok) {
           setTestResult({ ok: false, msg: "请先测试连接" });
@@ -324,51 +296,33 @@ function RedisStep({
         onComplete(values);
       })}
     >
-      <div className="form-grid two-columns">
-        <label className="form-field">
-          <span>主机地址</span>
-          <input {...form.register("host")} placeholder="127.0.0.1" />
-          <em>{form.formState.errors.host?.message}</em>
-        </label>
-        <label className="form-field">
-          <span>端口</span>
-          <input {...form.register("port", { valueAsNumber: true })} placeholder="6379" type="number" />
-          <em>{form.formState.errors.port?.message}</em>
-        </label>
+      <div className="grid gap-4 md:grid-cols-2">
+        <FormField error={form.formState.errors.host?.message} label="主机地址">
+          <Input {...form.register("host")} placeholder="127.0.0.1" />
+        </FormField>
+        <FormField error={form.formState.errors.port?.message} label="端口">
+          <Input {...form.register("port", { valueAsNumber: true })} placeholder="6379" type="number" />
+        </FormField>
+        <FormField error={form.formState.errors.password?.message} label="密码（可选）">
+          <Input {...form.register("password")} placeholder="Redis 密码" type="password" />
+        </FormField>
+        <FormField error={form.formState.errors.db?.message} label="数据库编号">
+          <Input {...form.register("db", { valueAsNumber: true })} max={15} min={0} placeholder="0" type="number" />
+        </FormField>
       </div>
-      <div className="form-grid two-columns">
-        <label className="form-field">
-          <span>密码（可选）</span>
-          <input {...form.register("password")} placeholder="Redis 密码" type="password" />
-          <em>{form.formState.errors.password?.message}</em>
-        </label>
-        <label className="form-field">
-          <span>数据库编号</span>
-          <input {...form.register("db", { valueAsNumber: true })} max={15} min={0} placeholder="0" type="number" />
-          <em>{form.formState.errors.db?.message}</em>
-        </label>
-      </div>
-
-      {testResult && (
-        <div className={testResult.ok ? "inline-feedback" : "inline-feedback error"}>{testResult.msg}</div>
-      )}
-
-      <div style={{ display: "flex", gap: 12 }}>
-        <button className="soft-link" onClick={onBack} type="button">
+      {testResult ? <InlineNotice tone={testResult.ok ? "success" : "danger"}>{testResult.msg}</InlineNotice> : null}
+      <FormActions>
+        <Button onClick={onBack} type="button" variant="ghost">
           上一步
-        </button>
-        <button className="soft-link" disabled={testing} onClick={handleTest} type="button">
+        </Button>
+        <Button disabled={testing} onClick={() => void handleTest()} type="button" variant="outline">
           {testing ? "测试中..." : "测试连接"}
-        </button>
-        <button className="primary-action" style={{ flex: 1 }} type="submit">
-          下一步
-        </button>
-      </div>
+        </Button>
+        <Button type="submit">下一步</Button>
+      </FormActions>
     </form>
   );
 }
-
-// ─── 管理员步骤 ───
 
 function AdminStep({
   defaultValues,
@@ -395,66 +349,49 @@ function AdminStep({
   });
 
   return (
-    <form className="auth-form" onSubmit={form.handleSubmit(onComplete)}>
-      <label className="form-field">
-        <span>管理员用户名</span>
-        <input {...form.register("username")} placeholder="admin" />
-        <em>{form.formState.errors.username?.message}</em>
-      </label>
-      <div className="form-grid two-columns">
-        <label className="form-field">
-          <span>密码</span>
-          <input {...form.register("password")} placeholder="至少 6 位" type="password" />
-          <em>{form.formState.errors.password?.message}</em>
-        </label>
-        <label className="form-field">
-          <span>确认密码</span>
-          <input {...form.register("confirmPassword")} placeholder="再次输入密码" type="password" />
-          <em>{form.formState.errors.confirmPassword?.message}</em>
-        </label>
+    <form className="grid gap-5" onSubmit={form.handleSubmit(onComplete)}>
+      <FormField error={form.formState.errors.username?.message} label="管理员用户名">
+        <Input {...form.register("username")} placeholder="admin" />
+      </FormField>
+      <div className="grid gap-4 md:grid-cols-2">
+        <FormField error={form.formState.errors.password?.message} label="密码">
+          <Input {...form.register("password")} placeholder="至少 6 位" type="password" />
+        </FormField>
+        <FormField error={form.formState.errors.confirmPassword?.message} label="确认密码">
+          <Input {...form.register("confirmPassword")} placeholder="再次输入密码" type="password" />
+        </FormField>
+        <FormField error={form.formState.errors.email?.message} label="邮箱（可选）">
+          <Input {...form.register("email")} placeholder="admin@example.com" type="email" />
+        </FormField>
+        <FormField error={form.formState.errors.phone?.message} label="手机号（可选）">
+          <Input {...form.register("phone")} placeholder="手机号码" />
+        </FormField>
       </div>
-      <div className="form-grid two-columns">
-        <label className="form-field">
-          <span>邮箱（可选）</span>
-          <input {...form.register("email")} placeholder="admin@example.com" type="email" />
-          <em>{form.formState.errors.email?.message}</em>
-        </label>
-        <label className="form-field">
-          <span>手机号（可选）</span>
-          <input {...form.register("phone")} placeholder="手机号码" />
-          <em>{form.formState.errors.phone?.message}</em>
-        </label>
-      </div>
-
-      {installError && <div className="auth-error">{installError}</div>}
-
-      <div style={{ display: "flex", gap: 12 }}>
-        <button className="soft-link" disabled={installing} onClick={onBack} type="button">
+      {installError ? <InlineNotice tone="danger">{installError}</InlineNotice> : null}
+      <FormActions>
+        <Button disabled={installing} onClick={onBack} type="button" variant="ghost">
           上一步
-        </button>
-        <button className="primary-action" disabled={installing} style={{ flex: 1 }} type="submit">
-          {installing ? "正在安装..." : "开始安装"}
-        </button>
-      </div>
+        </Button>
+        <AsyncActionButton loading={installing} loadingLabel="正在安装..." type="submit">
+          开始安装
+        </AsyncActionButton>
+      </FormActions>
     </form>
   );
 }
 
-// ─── 完成步骤 ───
-
 function CompleteStep({ hint }: { hint: string }) {
   return (
-    <div style={{ textAlign: "center", padding: "32px 0" }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>✓</div>
-      <h2 style={{ margin: "0 0 12px", fontFamily: "var(--font-display)" }}>安装完成</h2>
-      <p style={{ color: "var(--color-muted)" }}>系统正在重启中，请稍候...</p>
-      <p style={{ color: "var(--color-muted)", fontSize: 13 }}>重启完成后将自动跳转到登录页面。</p>
-      {hint ? <p className="auth-error">{hint}</p> : null}
+    <div className="grid gap-4 py-6 text-center">
+      <div className="text-5xl text-primary">✓</div>
+      <div className="space-y-2">
+        <h2 className="text-2xl font-semibold text-foreground">安装完成</h2>
+        <p className="text-sm leading-7 text-muted-foreground">系统正在重启中，请稍候。重启完成后将自动跳转到登录页面。</p>
+      </div>
+      {hint ? <InlineNotice tone="warning">{hint}</InlineNotice> : null}
     </div>
   );
 }
-
-// ─── 工具函数 ───
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

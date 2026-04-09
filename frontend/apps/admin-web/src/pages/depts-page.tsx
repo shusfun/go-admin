@@ -1,7 +1,31 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { SectionCard } from "@suiyuan/ui-admin";
+import {
+  AdminPageStack,
+  AdminTwoColumn,
+  AsyncActionButton,
+  Button,
+  ConfirmDialog,
+  FilterPanel,
+  FormActions,
+  FormDialog,
+  FormField,
+  Input,
+  PageHeader,
+  RowActions,
+  Select,
+  StatusBadge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Toolbar,
+  TreeTableSection,
+  toast,
+} from "@suiyuan/ui-admin";
 import { createApiClient } from "@suiyuan/api";
 import type { SysDeptRecord } from "@suiyuan/types";
 
@@ -18,12 +42,11 @@ type DeptDraft = {
   status: number;
 };
 
-type FeedbackState =
-  | {
-      tone: "success" | "error";
-      message: string;
-    }
-  | null;
+const statusOptions = [
+  { value: "", label: "全部状态" },
+  { value: "2", label: "正常" },
+  { value: "1", label: "停用" },
+];
 
 function createDeptDraft(parentId = 0, source?: Partial<SysDeptRecord>): DeptDraft {
   return {
@@ -46,7 +69,7 @@ export function DeptsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
   const [dialogTitle, setDialogTitle] = useState("新增部门");
   const [dialogLoading, setDialogLoading] = useState(false);
   const [draft, setDraft] = useState<DeptDraft>(createDeptDraft());
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FlatDeptRecord | null>(null);
 
   const deptQuery = useQuery({
     queryKey: ["admin-page", "depts-tree", deptNameFilter, statusFilter],
@@ -69,40 +92,29 @@ export function DeptsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
         status: payload.status,
       };
       if (payload.deptId) {
-        return api.admin.updateDept(nextPayload as { deptId: number });
+        await api.admin.updateDept(nextPayload as { deptId: number });
+        return "updated";
       }
-      return api.admin.createDept(nextPayload);
+      await api.admin.createDept(nextPayload);
+      return "created";
     },
-    onSuccess: async (_result, payload) => {
-      setFeedback({
-        tone: "success",
-        message: payload.deptId ? "部门已更新" : "部门已创建",
-      });
-      setDialogOpen(false);
-      setDraft(createDeptDraft());
+    onSuccess: async (mode) => {
+      toast.success(mode === "created" ? "部门已创建" : "部门已更新");
+      closeDialog();
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "depts-tree"] });
     },
     onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "部门保存失败",
-      });
+      toast.error(error instanceof Error ? error.message : "部门保存失败");
     },
   });
   const deleteMutation = useMutation({
     mutationFn: async (deptId: number) => api.admin.deleteDepts({ ids: [deptId] }),
     onSuccess: async () => {
-      setFeedback({
-        tone: "success",
-        message: "部门已删除",
-      });
+      toast.success("部门已删除");
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "depts-tree"] });
     },
     onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "部门删除失败",
-      });
+      toast.error(error instanceof Error ? error.message : "部门删除失败");
     },
   });
 
@@ -120,13 +132,25 @@ export function DeptsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       status: 2,
       level: 0,
     };
-    return [root, ...rows].filter((item) => {
-      if (!draft.deptId || item.deptId === 0) {
-        return true;
-      }
-      return item.deptId !== draft.deptId && !item.deptPath.includes(`/${draft.deptId}/`);
-    });
+
+    return [root, ...rows]
+      .filter((item) => {
+        if (!draft.deptId || item.deptId === 0) {
+          return true;
+        }
+        return item.deptId !== draft.deptId && !item.deptPath.includes(`/${draft.deptId}/`);
+      })
+      .map((item) => ({
+        value: String(item.deptId),
+        label: `${"　".repeat(item.level)}${item.deptName}`,
+      }));
   }, [draft.deptId, rows]);
+
+  function closeDialog() {
+    setDialogOpen(false);
+    setDialogLoading(false);
+    setDraft(createDeptDraft());
+  }
 
   function openCreateDialog(parent?: FlatDeptRecord) {
     setDialogTitle(parent ? `新增子部门 · ${parent.deptName}` : "新增部门");
@@ -135,242 +159,175 @@ export function DeptsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
   }
 
   async function openEditDialog(item: FlatDeptRecord) {
+    setDialogOpen(true);
     setDialogLoading(true);
     try {
       const detail = await api.admin.getDept(item.deptId);
       setDialogTitle(`编辑部门 · ${detail.deptName}`);
       setDraft(createDeptDraft(detail.parentId, detail));
-      setDialogOpen(true);
-    } finally {
-      setDialogLoading(false);
-    }
-  }
-
-  async function handleDelete(item: FlatDeptRecord) {
-    if (!window.confirm(`确认删除部门「${item.deptName}」吗？`)) {
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "部门详情加载失败");
+      closeDialog();
       return;
     }
-    deleteMutation.mutate(item.deptId);
+    setDialogLoading(false);
   }
 
   return (
-    <div className="page-stack">
-      <header className="page-hero compact">
-        <small>Admin Module</small>
-        <h2>部门管理</h2>
-        <p>部门树已经升级为可维护页面，支持组织结构的新增、编辑和删除。</p>
-      </header>
+    <AdminPageStack>
+      <PageHeader
+        actions={
+          <Button onClick={() => openCreateDialog()} type="button">
+            新增部门
+          </Button>
+        }
+        description="部门树已经切换到统一树表与表单弹层，组织结构维护不再依赖旧页面样式和自定义 modal。"
+        kicker="Admin Module"
+        title="部门管理"
+      />
 
-      <div className="module-grid">
-        <SectionCard title="筛选与操作" description="当前保留树表形态，优先保证与用户、角色、岗位的组织关联稳定。">
-          <div className="search-grid">
-            <label className="search-field">
-              <span>部门名称</span>
-              <input onChange={(event) => setDeptNameFilter(event.target.value)} placeholder="按部门名称过滤" value={deptNameFilter} />
-            </label>
-            <label className="search-field">
-              <span>状态</span>
-              <select onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
-                <option value="">全部</option>
-                <option value="2">正常</option>
-                <option value="1">停用</option>
-              </select>
-            </label>
+      <AdminTwoColumn>
+        <FilterPanel description="当前继续保留树表形态，优先保证与用户、角色、岗位的组织关联稳定。">
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField label="部门名称">
+              <Input onChange={(event) => setDeptNameFilter(event.target.value)} placeholder="按部门名称过滤" value={deptNameFilter} />
+            </FormField>
+            <FormField label="状态">
+              <Select onValueChange={setStatusFilter} options={statusOptions} value={statusFilter} />
+            </FormField>
           </div>
-          <div className="inline-actions">
-            <button className="primary-action" onClick={() => openCreateDialog()} type="button">
-              新增部门
-            </button>
-            <button
-              className="soft-link"
-              onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", "depts-tree"] })}
-              type="button"
-            >
+          <Toolbar>
+            <Button onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", "depts-tree"] })} type="button" variant="outline">
               刷新数据
-            </button>
+            </Button>
+          </Toolbar>
+        </FilterPanel>
+
+        <FilterPanel description="父部门选择会自动排除当前节点及其后代，避免形成循环树。" title="收口说明">
+          <div className="space-y-2 text-sm leading-7 text-muted-foreground">
+            <p>新增与编辑都会刷新整棵部门树，不在前端做局部拼接补丁。</p>
+            <p>页面仍沿用后端既有字段，不额外引入自定义部门属性。</p>
+            <p>树结构、新增子级、删除确认统一收敛到 `ui-admin` 组件，不再保留旧按钮类名。</p>
           </div>
-          {feedback ? <p className={`inline-feedback${feedback.tone === "error" ? " error" : ""}`}>{feedback.message}</p> : null}
-        </SectionCard>
-        <SectionCard title="当前说明" description="部门路径由后端自动维护，前端只提交基础业务字段。">
-          <ul className="detail-list">
-            <li>新增和编辑都会重新刷新整棵部门树，避免本地拼装脏数据。</li>
-            <li>父部门选择时会排除当前节点和其后代，避免形成循环树。</li>
-            <li>这一页继续沿用原后端字段，不额外引入自定义部门属性。</li>
-          </ul>
-        </SectionCard>
-      </div>
+        </FilterPanel>
+      </AdminTwoColumn>
 
-      <SectionCard title="部门树" description={`当前共 ${rows.length} 个部门节点。`}>
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>部门名称</th>
-                <th>负责人</th>
-                <th>手机号</th>
-                <th>邮箱</th>
-                <th>状态</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.deptId}>
-                  <td>{`${"　".repeat(row.level)}${row.deptName}`}</td>
-                  <td>{row.leader || "-"}</td>
-                  <td>{row.phone || "-"}</td>
-                  <td>{row.email || "-"}</td>
-                  <td>{row.status === 2 ? "正常" : "停用"}</td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="tiny-action" onClick={() => void openEditDialog(row)} type="button">
-                        编辑
-                      </button>
-                      <button className="tiny-action" onClick={() => openCreateDialog(row)} type="button">
-                        新增子级
-                      </button>
-                      <button className="tiny-action danger" onClick={() => void handleDelete(row)} type="button">
-                        删除
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </SectionCard>
+      <TreeTableSection description={`当前共 ${rows.length} 个部门节点。`} title="部门树">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>部门名称</TableHead>
+              <TableHead>负责人</TableHead>
+              <TableHead>手机号</TableHead>
+              <TableHead>邮箱</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead>操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.deptId}>
+                <TableCell>{`${"　".repeat(row.level)}${row.deptName}`}</TableCell>
+                <TableCell>{row.leader || "-"}</TableCell>
+                <TableCell>{row.phone || "-"}</TableCell>
+                <TableCell>{row.email || "-"}</TableCell>
+                <TableCell>
+                  <StatusBadge status={row.status === 2 ? "正常" : "停用"} />
+                </TableCell>
+                <TableCell>
+                  <RowActions>
+                    <Button onClick={() => void openEditDialog(row)} size="sm" type="button" variant="outline">
+                      编辑
+                    </Button>
+                    <Button onClick={() => openCreateDialog(row)} size="sm" type="button" variant="outline">
+                      新增子级
+                    </Button>
+                    <Button onClick={() => setDeleteTarget(row)} size="sm" type="button" variant="destructive">
+                      删除
+                    </Button>
+                  </RowActions>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TreeTableSection>
 
-      {dialogOpen ? (
-        <div className="modal-mask">
-          <div className="modal-card">
-            <div className="detail-modal-head">
-              <div>
-                <h3>{dialogTitle}</h3>
-                <p className="dialog-description">部门树结构由后端维护路径，当前表单只关注业务字段。</p>
+      <FormDialog
+        description="部门树结构由后端维护路径，前端只负责录入业务字段。"
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            closeDialog();
+          }
+        }}
+        open={dialogOpen}
+        title={dialogTitle}
+      >
+        {dialogLoading ? (
+          <div className="flex flex-1 items-center py-6 text-sm text-muted-foreground">正在加载部门详情...</div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField label="上级部门">
+                  <Select onValueChange={(value) => setDraft((current) => ({ ...current, parentId: Number(value) }))} options={parentOptions} value={String(draft.parentId)} />
+                </FormField>
+                <FormField label="部门名称">
+                  <Input onChange={(event) => setDraft((current) => ({ ...current, deptName: event.target.value }))} value={draft.deptName} />
+                </FormField>
+                <FormField label="负责人">
+                  <Input onChange={(event) => setDraft((current) => ({ ...current, leader: event.target.value }))} value={draft.leader} />
+                </FormField>
+                <FormField label="显示排序">
+                  <Input onChange={(event) => setDraft((current) => ({ ...current, sort: Number(event.target.value) }))} type="number" value={String(draft.sort)} />
+                </FormField>
+                <FormField label="手机号">
+                  <Input onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))} value={draft.phone} />
+                </FormField>
+                <FormField label="邮箱">
+                  <Input onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} value={draft.email} />
+                </FormField>
+                <FormField label="状态">
+                  <Select onValueChange={(value) => setDraft((current) => ({ ...current, status: Number(value) }))} options={statusOptions.filter((item) => item.value)} value={String(draft.status)} />
+                </FormField>
               </div>
-              <button className="soft-link" onClick={() => setDialogOpen(false)} type="button">
-                关闭
-              </button>
             </div>
-            {dialogLoading ? <p className="empty-tip">正在加载部门详情...</p> : null}
-            {!dialogLoading ? (
-              <>
-                <div className="form-grid two-columns">
-                  <label className="form-field">
-                    <span>上级部门</span>
-                    <select
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          parentId: Number(event.target.value),
-                        }))
-                      }
-                      value={String(draft.parentId)}
-                    >
-                      {parentOptions.map((item) => (
-                        <option key={`dept-parent-${item.deptId}`} value={item.deptId}>
-                          {`${"　".repeat(item.level)}${item.deptName}`}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="form-field">
-                    <span>部门名称</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          deptName: event.target.value,
-                        }))
-                      }
-                      value={draft.deptName}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>负责人</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          leader: event.target.value,
-                        }))
-                      }
-                      value={draft.leader}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>排序</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          sort: Number(event.target.value),
-                        }))
-                      }
-                      type="number"
-                      value={String(draft.sort)}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>手机号</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          phone: event.target.value,
-                        }))
-                      }
-                      value={draft.phone}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>邮箱</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          email: event.target.value,
-                        }))
-                      }
-                      value={draft.email}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>状态</span>
-                    <select
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          status: Number(event.target.value),
-                        }))
-                      }
-                      value={String(draft.status)}
-                    >
-                      <option value="2">正常</option>
-                      <option value="1">停用</option>
-                    </select>
-                  </label>
-                </div>
-                <div className="inline-actions">
-                  <button
-                    className="primary-action"
-                    disabled={saveMutation.isPending || !draft.deptName.trim() || !draft.leader.trim()}
-                    onClick={() => saveMutation.mutate(draft)}
-                    type="button"
-                  >
-                    {saveMutation.isPending ? "保存中..." : "保存部门"}
-                  </button>
-                  <button className="soft-link" onClick={() => setDialogOpen(false)} type="button">
-                    取消
-                  </button>
-                </div>
-              </>
-            ) : null}
+            <FormActions className="mt-4 shrink-0 border-t border-border pt-4">
+              <AsyncActionButton
+                disabled={!draft.deptName.trim() || !draft.leader.trim()}
+                loading={saveMutation.isPending}
+                onClick={() => saveMutation.mutate(draft)}
+                type="button"
+              >
+                保存部门
+              </AsyncActionButton>
+              <Button onClick={closeDialog} type="button" variant="outline">
+                取消
+              </Button>
+            </FormActions>
           </div>
-        </div>
-      ) : null}
-    </div>
+        )}
+      </FormDialog>
+
+      <ConfirmDialog
+        description={deleteTarget ? `删除部门「${deleteTarget.deptName}」后不可恢复。` : ""}
+        onConfirm={async () => {
+          if (!deleteTarget) {
+            return;
+          }
+          await deleteMutation.mutateAsync(deleteTarget.deptId);
+          setDeleteTarget(null);
+        }}
+        open={deleteTarget !== null}
+        setOpen={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+          }
+        }}
+        title="确认删除该部门？"
+      />
+    </AdminPageStack>
   );
 }
 

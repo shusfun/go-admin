@@ -4,12 +4,14 @@ import path from "node:path";
 export type DevPorts = {
   DEV_BACKEND_PORT: number;
   DEV_ADMIN_PORT: number;
+  DEV_SHOWCASE_PORT: number;
   DEV_MOBILE_PORT: number;
 };
 
 const defaultPorts: DevPorts = {
   DEV_BACKEND_PORT: 18123,
   DEV_ADMIN_PORT: 26173,
+  DEV_SHOWCASE_PORT: 26175,
   DEV_MOBILE_PORT: 26174,
 };
 

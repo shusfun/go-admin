@@ -1,4 +1,4 @@
-import { SectionCard } from "@suiyuan/ui-admin";
+import { AdminPageStack, Button, PageHeader, ReadonlyCodeBlock, SectionCard } from "@suiyuan/ui-admin";
 
 type ToolLinkPageProps = {
   title: string;
@@ -20,33 +20,33 @@ export function ToolLinkPage({
   notes,
 }: ToolLinkPageProps) {
   return (
-    <div className="page-stack">
-      <header className="page-hero compact">
-        <small>{kicker}</small>
-        <h2>{title}</h2>
-        <p>{description}</p>
-      </header>
+    <AdminPageStack>
+      <PageHeader description={description} kicker={kicker} title={title} />
 
-      <div className="tool-grid">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {links.map((link) => (
           <SectionCard key={link.href} title={link.label} description={link.note}>
-            <div className="tool-link-stack">
-              <a className="primary-action tool-link-anchor" href={link.href} rel="noreferrer" target="_blank">
-                打开页面
-              </a>
-              <code>{link.href}</code>
+            <div className="grid gap-4">
+              <div>
+                <Button asChild type="button">
+                  <a href={link.href} rel="noreferrer" target="_blank">
+                    打开页面
+                  </a>
+                </Button>
+              </div>
+              <ReadonlyCodeBlock title="目标地址">{link.href}</ReadonlyCodeBlock>
             </div>
           </SectionCard>
         ))}
       </div>
 
       <SectionCard title="当前阶段说明" description="这些工具页先作为可达入口保留，后续再决定是否完全 React 化。">
-        <ul className="detail-list">
+        <div className="space-y-2 text-sm leading-7 text-muted-foreground">
           {notes.map((note) => (
-            <li key={note}>{note}</li>
+            <p key={note}>{note}</p>
           ))}
-        </ul>
+        </div>
       </SectionCard>
-    </div>
+    </AdminPageStack>
   );
 }

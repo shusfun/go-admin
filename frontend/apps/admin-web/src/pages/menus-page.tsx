@@ -1,7 +1,33 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { SectionCard } from "@suiyuan/ui-admin";
+import {
+  AdminPageStack,
+  AdminTwoColumn,
+  AsyncActionButton,
+  Button,
+  Checkbox,
+  ConfirmDialog,
+  FilterPanel,
+  FormActions,
+  FormDialog,
+  FormField,
+  FormSection,
+  Input,
+  PageHeader,
+  RowActions,
+  Select,
+  StatusBadge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Toolbar,
+  TreeTableSection,
+  toast,
+} from "@suiyuan/ui-admin";
 import { createApiClient } from "@suiyuan/api";
 import type { SysApiRecord, SysMenuRecord } from "@suiyuan/types";
 
@@ -26,18 +52,35 @@ type MenuDraft = {
   apis: number[];
 };
 
-type FeedbackState =
-  | {
-      tone: "success" | "error";
-      message: string;
-    }
-  | null;
-
 const menuTypeLabels: Record<string, string> = {
   M: "目录",
   C: "菜单",
   F: "按钮",
 };
+
+const visibleOptions = [
+  { value: "", label: "全部状态" },
+  { value: "0", label: "显示" },
+  { value: "1", label: "隐藏" },
+];
+
+const menuTypeOptions = [
+  { value: "M", label: "目录" },
+  { value: "C", label: "菜单" },
+  { value: "F", label: "按钮" },
+];
+
+const actionOptions = [
+  { value: "GET", label: "GET" },
+  { value: "POST", label: "POST" },
+  { value: "PUT", label: "PUT" },
+  { value: "DELETE", label: "DELETE" },
+];
+
+const binaryOptions = [
+  { value: "1", label: "否" },
+  { value: "0", label: "是" },
+];
 
 function createMenuDraft(parentId = 0, source?: Partial<SysMenuRecord>): MenuDraft {
   return {
@@ -68,7 +111,7 @@ export function MenusPage({ api }: { api: ReturnType<typeof createApiClient> }) 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogLoading, setDialogLoading] = useState(false);
   const [draft, setDraft] = useState<MenuDraft>(createMenuDraft());
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FlatMenuRecord | null>(null);
 
   const menusQuery = useQuery({
     queryKey: ["admin-page", "menus-tree", titleFilter, visibleFilter],
@@ -82,6 +125,7 @@ export function MenusPage({ api }: { api: ReturnType<typeof createApiClient> }) 
     queryKey: ["admin-page", "menu-api-options"],
     queryFn: () => api.admin.listApis({ pageIndex: 1, pageSize: 500, type: "BUS" }),
   });
+
   const saveMutation = useMutation({
     mutationFn: async (payload: MenuDraft) => {
       const nextPayload = {
@@ -103,40 +147,29 @@ export function MenusPage({ api }: { api: ReturnType<typeof createApiClient> }) 
         apis: payload.apis,
       };
       if (payload.menuId) {
-        return api.admin.updateMenu(nextPayload as { menuId: number; apis?: number[] });
+        await api.admin.updateMenu(nextPayload as { menuId: number; apis?: number[] });
+        return "updated";
       }
-      return api.admin.createMenu(nextPayload);
+      await api.admin.createMenu(nextPayload);
+      return "created";
     },
-    onSuccess: async (_result, payload) => {
-      setFeedback({
-        tone: "success",
-        message: payload.menuId ? "菜单已更新" : "菜单已创建",
-      });
-      setDialogOpen(false);
-      setDraft(createMenuDraft());
+    onSuccess: async (mode) => {
+      toast.success(mode === "created" ? "菜单已创建" : "菜单已更新");
+      closeDialog();
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "menus-tree"] });
     },
     onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "菜单保存失败",
-      });
+      toast.error(error instanceof Error ? error.message : "菜单保存失败");
     },
   });
   const deleteMutation = useMutation({
     mutationFn: async (menuId: number) => api.admin.deleteMenus({ ids: [menuId] }),
     onSuccess: async () => {
-      setFeedback({
-        tone: "success",
-        message: "菜单已删除",
-      });
+      toast.success("菜单已删除");
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "menus-tree"] });
     },
     onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "菜单删除失败",
-      });
+      toast.error(error instanceof Error ? error.message : "菜单删除失败");
     },
   });
 
@@ -161,384 +194,271 @@ export function MenusPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       isFrame: "1",
       level: 0,
     };
-    return [root, ...rows].filter((item) => {
-      if (!draft.menuId || item.menuId === 0) {
-        return true;
-      }
-      return item.menuId !== draft.menuId && !item.paths.includes(`/${draft.menuId}/`);
-    });
+    return [root, ...rows]
+      .filter((item) => {
+        if (!draft.menuId || item.menuId === 0) {
+          return true;
+        }
+        return item.menuId !== draft.menuId && !item.paths.includes(`/${draft.menuId}/`);
+      })
+      .map((item) => ({
+        value: String(item.menuId),
+        label: `${"　".repeat(item.level)}${item.title}`,
+      }));
   }, [draft.menuId, rows]);
 
-  async function openCreateDialog(parent?: FlatMenuRecord) {
+  function closeDialog() {
+    setDialogOpen(false);
+    setDialogLoading(false);
+    setDraft(createMenuDraft());
+  }
+
+  function openCreateDialog(parent?: FlatMenuRecord) {
     setDialogTitle(parent ? `新增子菜单 · ${parent.title}` : "新增菜单");
     setDraft(createMenuDraft(parent?.menuId || 0));
     setDialogOpen(true);
   }
 
   async function openEditDialog(item: FlatMenuRecord) {
+    setDialogOpen(true);
     setDialogLoading(true);
     try {
       const detail = await api.admin.getMenu(item.menuId);
       setDialogTitle(`编辑菜单 · ${detail.title}`);
       setDraft(createMenuDraft(detail.parentId, detail));
-      setDialogOpen(true);
-    } finally {
-      setDialogLoading(false);
-    }
-  }
-
-  async function handleDelete(item: FlatMenuRecord) {
-    if (!window.confirm(`确认删除菜单「${item.title}」吗？`)) {
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "菜单详情加载失败");
+      closeDialog();
       return;
     }
-    deleteMutation.mutate(item.menuId);
+    setDialogLoading(false);
+  }
+
+  function toggleApi(apiId: number, checked: boolean) {
+    setDraft((current) => ({
+      ...current,
+      apis: checked ? Array.from(new Set([...current.apis, apiId])) : current.apis.filter((item) => item !== apiId),
+    }));
   }
 
   return (
-    <div className="page-stack">
-      <header className="page-hero compact">
-        <small>Admin Module</small>
-        <h2>菜单管理</h2>
-        <p>菜单管理已经切到第二阶段，支持树结构查询、增改删，以及 API 关联保真提交。</p>
-      </header>
+    <AdminPageStack>
+      <PageHeader
+        actions={
+          <Button onClick={() => openCreateDialog()} type="button">
+            新增菜单
+          </Button>
+        }
+        description="菜单页已经统一到树表模板、表单弹层和确认流，目录、菜单、按钮节点共享同一套后台编辑器。"
+        kicker="Admin Module"
+        title="菜单管理"
+      />
 
-      <div className="module-grid">
-        <SectionCard title="筛选与操作" description="菜单更新时会保留现有关联 API，避免误清空权限绑定。">
-          <div className="search-grid">
-            <label className="search-field">
-              <span>菜单名称</span>
-              <input onChange={(event) => setTitleFilter(event.target.value)} placeholder="按标题过滤" value={titleFilter} />
-            </label>
-            <label className="search-field">
-              <span>显示状态</span>
-              <select onChange={(event) => setVisibleFilter(event.target.value)} value={visibleFilter}>
-                <option value="">全部</option>
-                <option value="0">显示</option>
-                <option value="1">隐藏</option>
-              </select>
-            </label>
+      <AdminTwoColumn>
+        <FilterPanel description="菜单更新时会保留现有关联 API，避免误清空权限绑定关系。">
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField label="菜单名称">
+              <Input onChange={(event) => setTitleFilter(event.target.value)} placeholder="按标题过滤" value={titleFilter} />
+            </FormField>
+            <FormField label="显示状态">
+              <Select onValueChange={setVisibleFilter} options={visibleOptions} value={visibleFilter} />
+            </FormField>
           </div>
-          <div className="inline-actions">
-            <button className="primary-action" onClick={() => void openCreateDialog()} type="button">
-              新增菜单
-            </button>
-            <button
-              className="soft-link"
-              onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", "menus-tree"] })}
-              type="button"
-            >
+          <Toolbar>
+            <Button onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", "menus-tree"] })} type="button" variant="outline">
               刷新数据
-            </button>
+            </Button>
+          </Toolbar>
+        </FilterPanel>
+
+        <FilterPanel description="这页只处理树结构管理与权限绑定，不在本轮扩展图标库或路由设计器。" title="收口说明">
+          <div className="space-y-2 text-sm leading-7 text-muted-foreground">
+            <p>目录、菜单、按钮三类节点共享一套表单，字段按后端 DTO 原样提交。</p>
+            <p>编辑时先拉取详情再回填 API 关联，避免 `sys_menu_api_rule` 被意外清空。</p>
+            <p>树结构展示和新增子级都统一走当前页模板，不再保留页面级按钮 class 和 modal 结构。</p>
           </div>
-          {feedback ? <p className={`inline-feedback${feedback.tone === "error" ? " error" : ""}`}>{feedback.message}</p> : null}
-        </SectionCard>
+        </FilterPanel>
+      </AdminTwoColumn>
 
-        <SectionCard title="当前说明" description="优先把树结构管理做到稳定可用，不在本轮做图标库和路由设计器。">
-          <ul className="detail-list">
-            <li>目录、菜单、按钮三类节点共用一套编辑器，字段按后端 DTO 原样提交。</li>
-            <li>编辑菜单时会先拉取详情，再回填现有关联 API，避免清空 `sys_menu_api_rule`。</li>
-            <li>开发工具页的 React 化不在本轮范围，菜单仍可指向桥接页路径。</li>
-          </ul>
-        </SectionCard>
-      </div>
-
-      <SectionCard title="菜单树" description={`当前共 ${rows.length} 个节点，树结构按后端返回顺序展开。`}>
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>菜单名称</th>
-                <th>路径 / 组件</th>
-                <th>类型</th>
-                <th>权限标识</th>
-                <th>可见</th>
-                <th>关联 API</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.menuId}>
-                  <td>
-                    <strong>{`${"　".repeat(row.level)}${row.title}`}</strong>
-                    <div className="cell-subline">{row.menuName || "-"}</div>
-                  </td>
-                  <td>
+      <TreeTableSection description={`当前共 ${rows.length} 个菜单节点。`} title="菜单树">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>菜单名称</TableHead>
+              <TableHead>路径 / 组件</TableHead>
+              <TableHead>类型</TableHead>
+              <TableHead>权限标识</TableHead>
+              <TableHead>显示状态</TableHead>
+              <TableHead>关联 API</TableHead>
+              <TableHead>操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={row.menuId}>
+                <TableCell>
+                  <div className="space-y-1">
+                    <div className="font-medium text-foreground">{`${"　".repeat(row.level)}${row.title}`}</div>
+                    <div className="text-xs text-muted-foreground">{row.menuName || "-"}</div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="space-y-1">
                     <div>{row.path || "-"}</div>
-                    <div className="cell-subline">{row.component || "-"}</div>
-                  </td>
-                  <td>{menuTypeLabels[row.menuType] || row.menuType}</td>
-                  <td>{row.permission || "-"}</td>
-                  <td>{row.visible === "0" ? "显示" : "隐藏"}</td>
-                  <td>{row.sysApi?.length || 0}</td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="tiny-action" onClick={() => void openEditDialog(row)} type="button">
-                        编辑
-                      </button>
-                      {row.menuType !== "F" ? (
-                        <button className="tiny-action" onClick={() => void openCreateDialog(row)} type="button">
-                          新增子级
-                        </button>
-                      ) : null}
-                      <button className="tiny-action danger" onClick={() => void handleDelete(row)} type="button">
-                        删除
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </SectionCard>
+                    <div className="text-xs text-muted-foreground">{row.component || "-"}</div>
+                  </div>
+                </TableCell>
+                <TableCell>{menuTypeLabels[row.menuType] || row.menuType}</TableCell>
+                <TableCell>{row.permission || "-"}</TableCell>
+                <TableCell>
+                  <StatusBadge status={row.visible === "0" ? "显示" : "隐藏"} />
+                </TableCell>
+                <TableCell>{row.sysApi?.length || 0}</TableCell>
+                <TableCell>
+                  <RowActions>
+                    <Button onClick={() => void openEditDialog(row)} size="sm" type="button" variant="outline">
+                      编辑
+                    </Button>
+                    {row.menuType !== "F" ? (
+                      <Button onClick={() => openCreateDialog(row)} size="sm" type="button" variant="outline">
+                        新增子级
+                      </Button>
+                    ) : null}
+                    <Button onClick={() => setDeleteTarget(row)} size="sm" type="button" variant="destructive">
+                      删除
+                    </Button>
+                  </RowActions>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TreeTableSection>
 
-      {dialogOpen ? (
-        <div className="modal-mask">
-          <div className="modal-card detail-modal">
-            <div className="detail-modal-head">
-              <div>
-                <h3>{dialogTitle}</h3>
-                <p className="dialog-description">当前编辑器直接对应后端菜单 DTO，提交后会刷新整个菜单树。</p>
-              </div>
-              <button className="soft-link" onClick={() => setDialogOpen(false)} type="button">
-                关闭
-              </button>
-            </div>
-            {dialogLoading ? <p className="empty-tip">正在加载菜单详情...</p> : null}
-            {!dialogLoading ? (
-              <>
-                <div className="form-grid two-columns">
-                  <label className="form-field">
-                    <span>上级菜单</span>
-                    <select
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          parentId: Number(event.target.value),
-                        }))
-                      }
-                      value={String(draft.parentId)}
-                    >
-                      {parentOptions.map((item) => (
-                        <option key={`parent-${item.menuId}`} value={item.menuId}>
-                          {`${"　".repeat(item.level)}${item.title}`}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="form-field">
-                    <span>菜单类型</span>
-                    <select
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          menuType: event.target.value,
-                        }))
-                      }
-                      value={draft.menuType}
-                    >
-                      <option value="M">目录</option>
-                      <option value="C">菜单</option>
-                      <option value="F">按钮</option>
-                    </select>
-                  </label>
-                  <label className="form-field">
-                    <span>菜单标题</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          title: event.target.value,
-                        }))
-                      }
-                      value={draft.title}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>路由名称</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          menuName: event.target.value,
-                        }))
-                      }
-                      value={draft.menuName}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>菜单图标</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          icon: event.target.value,
-                        }))
-                      }
-                      value={draft.icon}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>显示排序</span>
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          sort: Number(event.target.value),
-                        }))
-                      }
-                      type="number"
-                      value={String(draft.sort)}
-                    />
-                  </label>
-                  {draft.menuType !== "F" ? (
-                    <label className="form-field">
-                      <span>路由地址</span>
-                      <input
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            path: event.target.value,
-                          }))
-                        }
-                        value={draft.path}
+      <FormDialog
+        description="菜单表单直接对应后端字段，提交后刷新整棵菜单树。"
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            closeDialog();
+          }
+        }}
+        open={dialogOpen}
+        title={dialogTitle}
+      >
+        {dialogLoading ? (
+          <div className="flex flex-1 items-center py-6 text-sm text-muted-foreground">正在加载菜单详情...</div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="grid gap-6">
+                <FormSection description="目录、菜单、按钮的核心字段统一在这里维护。" title="基础信息">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField label="上级菜单">
+                      <Select
+                        onValueChange={(value) => setDraft((current) => ({ ...current, parentId: Number(value) }))}
+                        options={parentOptions}
+                        value={String(draft.parentId)}
                       />
-                    </label>
-                  ) : null}
-                  {draft.menuType !== "F" ? (
-                    <label className="form-field">
-                      <span>组件路径</span>
-                      <input
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            component: event.target.value,
-                          }))
-                        }
-                        value={draft.component}
-                      />
-                    </label>
-                  ) : null}
-                  {(draft.menuType === "C" || draft.menuType === "F") ? (
-                    <label className="form-field">
-                      <span>权限标识</span>
-                      <input
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            permission: event.target.value,
-                          }))
-                        }
-                        value={draft.permission}
-                      />
-                    </label>
-                  ) : null}
-                  {(draft.menuType === "C" || draft.menuType === "F") ? (
-                    <label className="form-field">
-                      <span>请求方式</span>
-                      <select
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            action: event.target.value,
-                          }))
-                        }
-                        value={draft.action}
-                      >
-                        <option value="GET">GET</option>
-                        <option value="POST">POST</option>
-                        <option value="PUT">PUT</option>
-                        <option value="DELETE">DELETE</option>
-                      </select>
-                    </label>
-                  ) : null}
-                  {draft.menuType !== "F" ? (
-                    <label className="form-field">
-                      <span>显示状态</span>
-                      <select
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            visible: event.target.value,
-                          }))
-                        }
-                        value={draft.visible}
-                      >
-                        <option value="0">显示</option>
-                        <option value="1">隐藏</option>
-                      </select>
-                    </label>
-                  ) : null}
-                  {draft.menuType !== "F" ? (
-                    <label className="form-field">
-                      <span>是否外链</span>
-                      <select
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            isFrame: event.target.value,
-                          }))
-                        }
-                        value={draft.isFrame}
-                      >
-                        <option value="1">否</option>
-                        <option value="0">是</option>
-                      </select>
-                    </label>
-                  ) : null}
-                </div>
+                    </FormField>
+                    <FormField label="菜单类型">
+                      <Select onValueChange={(value) => setDraft((current) => ({ ...current, menuType: value }))} options={menuTypeOptions} value={draft.menuType} />
+                    </FormField>
+                    <FormField label="菜单标题">
+                      <Input onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} value={draft.title} />
+                    </FormField>
+                    <FormField label="路由名称">
+                      <Input onChange={(event) => setDraft((current) => ({ ...current, menuName: event.target.value }))} value={draft.menuName} />
+                    </FormField>
+                    <FormField label="菜单图标">
+                      <Input onChange={(event) => setDraft((current) => ({ ...current, icon: event.target.value }))} value={draft.icon} />
+                    </FormField>
+                    <FormField label="显示排序">
+                      <Input onChange={(event) => setDraft((current) => ({ ...current, sort: Number(event.target.value) }))} type="number" value={String(draft.sort)} />
+                    </FormField>
+                    {draft.menuType !== "F" ? (
+                      <FormField label="路由地址">
+                        <Input onChange={(event) => setDraft((current) => ({ ...current, path: event.target.value }))} value={draft.path} />
+                      </FormField>
+                    ) : null}
+                    {draft.menuType !== "F" ? (
+                      <FormField label="组件路径">
+                        <Input onChange={(event) => setDraft((current) => ({ ...current, component: event.target.value }))} value={draft.component} />
+                      </FormField>
+                    ) : null}
+                    {draft.menuType !== "F" ? (
+                      <FormField label="显示状态">
+                        <Select onValueChange={(value) => setDraft((current) => ({ ...current, visible: value }))} options={visibleOptions.filter((item) => item.value)} value={draft.visible} />
+                      </FormField>
+                    ) : null}
+                    {draft.menuType !== "F" ? (
+                      <FormField label="是否外链">
+                        <Select onValueChange={(value) => setDraft((current) => ({ ...current, isFrame: value }))} options={binaryOptions} value={draft.isFrame} />
+                      </FormField>
+                    ) : null}
+                    {draft.menuType !== "M" ? (
+                      <FormField label="权限标识">
+                        <Input onChange={(event) => setDraft((current) => ({ ...current, permission: event.target.value }))} value={draft.permission} />
+                      </FormField>
+                    ) : null}
+                    {draft.menuType !== "M" ? (
+                      <FormField label="请求方式">
+                        <Select onValueChange={(value) => setDraft((current) => ({ ...current, action: value }))} options={actionOptions} value={draft.action} />
+                      </FormField>
+                    ) : null}
+                  </div>
+                </FormSection>
 
-                {(draft.menuType === "C" || draft.menuType === "F") ? (
-                  <div className="field-stack">
-                    <h4>关联 API</h4>
-                    <div className="checkbox-grid">
+                {draft.menuType !== "M" ? (
+                  <FormSection description="接口权限绑定统一走复选列表，不再使用旧页面样式容器。" title="关联 API">
+                    <div className="grid gap-3 md:grid-cols-2">
                       {(apiOptionsQuery.data?.list || []).map((item: SysApiRecord) => {
                         const checked = draft.apis.includes(item.id);
                         return (
-                          <label className={`check-option${checked ? " active" : ""}`} key={`api-${item.id}`}>
-                            <input
-                              checked={checked}
-                              onChange={(event) =>
-                                setDraft((current) => ({
-                                  ...current,
-                                  apis: event.target.checked
-                                    ? [...current.apis, item.id]
-                                    : current.apis.filter((apiId) => apiId !== item.id),
-                                }))
-                              }
-                              type="checkbox"
-                            />
-                            <div>
-                              <strong>{item.title || "未命名接口"}</strong>
-                              <span>{`${item.action} ${item.path}`}</span>
+                          <label className="flex items-start gap-3 rounded-2xl border border-border/70 bg-secondary/20 px-4 py-3" key={item.id}>
+                            <Checkbox checked={checked} onCheckedChange={(value) => toggleApi(item.id, value === true)} />
+                            <div className="space-y-1">
+                              <div className="text-sm font-medium text-foreground">{item.title || "未命名接口"}</div>
+                              <div className="text-xs text-muted-foreground">{`${item.action} ${item.path}`}</div>
                             </div>
                           </label>
                         );
                       })}
                     </div>
-                  </div>
+                  </FormSection>
                 ) : null}
-
-                <div className="inline-actions">
-                  <button
-                    className="primary-action"
-                    disabled={saveMutation.isPending || !draft.title.trim()}
-                    onClick={() => saveMutation.mutate(draft)}
-                    type="button"
-                  >
-                    {saveMutation.isPending ? "保存中..." : "保存菜单"}
-                  </button>
-                  <button className="soft-link" onClick={() => setDialogOpen(false)} type="button">
-                    取消
-                  </button>
-                </div>
-              </>
-            ) : null}
+              </div>
+            </div>
+            <FormActions className="mt-4 shrink-0 border-t border-border pt-4">
+              <AsyncActionButton disabled={!draft.title.trim()} loading={saveMutation.isPending} onClick={() => saveMutation.mutate(draft)} type="button">
+                保存菜单
+              </AsyncActionButton>
+              <Button onClick={closeDialog} type="button" variant="outline">
+                取消
+              </Button>
+            </FormActions>
           </div>
-        </div>
-      ) : null}
-    </div>
+        )}
+      </FormDialog>
+
+      <ConfirmDialog
+        description={deleteTarget ? `删除菜单「${deleteTarget.title}」后不可恢复。` : ""}
+        onConfirm={async () => {
+          if (!deleteTarget) {
+            return;
+          }
+          await deleteMutation.mutateAsync(deleteTarget.menuId);
+          setDeleteTarget(null);
+        }}
+        open={deleteTarget !== null}
+        setOpen={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+          }
+        }}
+        title="确认删除该菜单？"
+      />
+    </AdminPageStack>
   );
 }
 

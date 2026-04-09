@@ -1,38 +1,37 @@
-import { useEffect, useRef, useState } from "react";
-import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { BrowserRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { createApiClient, ApiError, createSetupApi } from "@suiyuan/api";
 import type { SetupStatus } from "@suiyuan/api";
 import { createSessionManager } from "@suiyuan/auth";
 import { adaptMenuTree, deriveTenantCode, findMenuByPath } from "@suiyuan/core";
-import { AdminShell, BrandBlock, IdentityCard, SectionCard, TreeNav } from "@suiyuan/ui-admin";
+import { AdminAppShell, Card, CardContent, CardDescription, CardHeader, CardTitle, Loading } from "@suiyuan/ui-admin";
 import type { AppMenuNode, AppSession, InfoResponse, ProfileResponse } from "@suiyuan/types";
 
-import { DashboardPage } from "./pages/dashboard-page";
-import { ApisPage } from "./pages/apis-page";
-import { BuildToolPage } from "./pages/build-tool-page";
-import { CodegenPage } from "./pages/codegen-page";
-import { ConfigsPage } from "./pages/configs-page";
-import { DeptsPage } from "./pages/depts-page";
-import { DictsPage } from "./pages/dicts-page";
-import { LoginLogsPage } from "./pages/login-logs-page";
-import { LoginPage } from "./pages/login-page";
-import { MenusPage } from "./pages/menus-page";
-import { ModulePage } from "./pages/module-page";
-import { OpsPage } from "./pages/ops-page";
-import { OperaLogsPage } from "./pages/opera-logs-page";
-import { PostsPage } from "./pages/posts-page";
-import { ProfilePage } from "./pages/profile-page";
-import { RolesPage } from "./pages/roles-page";
-import { ScheduleJobsPage } from "./pages/schedule-jobs-page";
-import { ScheduleLogsPage } from "./pages/schedule-logs-page";
-import { ServerMonitorPage } from "./pages/server-monitor-page";
-import { SetConfigPage } from "./pages/set-config-page";
-import { SwaggerPage } from "./pages/swagger-page";
-import { UsersPage } from "./pages/users-page";
-
-import { SetupWizardPage } from "./pages/setup-wizard-page";
+const LoginPage = lazy(async () => ({ default: (await import("./pages/login-page")).LoginPage }));
+const SetupWizardPage = lazy(async () => ({ default: (await import("./pages/setup-wizard-page")).SetupWizardPage }));
+const DashboardPage = lazy(async () => ({ default: (await import("./pages/dashboard-page")).DashboardPage }));
+const UsersPage = lazy(async () => ({ default: (await import("./pages/users-page")).UsersPage }));
+const MenusPage = lazy(async () => ({ default: (await import("./pages/menus-page")).MenusPage }));
+const RolesPage = lazy(async () => ({ default: (await import("./pages/roles-page")).RolesPage }));
+const DeptsPage = lazy(async () => ({ default: (await import("./pages/depts-page")).DeptsPage }));
+const PostsPage = lazy(async () => ({ default: (await import("./pages/posts-page")).PostsPage }));
+const DictsPage = lazy(async () => ({ default: (await import("./pages/dicts-page")).DictsPage }));
+const ConfigsPage = lazy(async () => ({ default: (await import("./pages/configs-page")).ConfigsPage }));
+const SetConfigPage = lazy(async () => ({ default: (await import("./pages/set-config-page")).SetConfigPage }));
+const ApisPage = lazy(async () => ({ default: (await import("./pages/apis-page")).ApisPage }));
+const LoginLogsPage = lazy(async () => ({ default: (await import("./pages/login-logs-page")).LoginLogsPage }));
+const OperaLogsPage = lazy(async () => ({ default: (await import("./pages/opera-logs-page")).OperaLogsPage }));
+const ServerMonitorPage = lazy(async () => ({ default: (await import("./pages/server-monitor-page")).ServerMonitorPage }));
+const SwaggerPage = lazy(async () => ({ default: (await import("./pages/swagger-page")).SwaggerPage }));
+const BuildToolPage = lazy(async () => ({ default: (await import("./pages/build-tool-page")).BuildToolPage }));
+const CodegenPage = lazy(async () => ({ default: (await import("./pages/codegen-page")).CodegenPage }));
+const ScheduleJobsPage = lazy(async () => ({ default: (await import("./pages/schedule-jobs-page")).ScheduleJobsPage }));
+const ScheduleLogsPage = lazy(async () => ({ default: (await import("./pages/schedule-logs-page")).ScheduleLogsPage }));
+const OpsPage = lazy(async () => ({ default: (await import("./pages/ops-page")).OpsPage }));
+const ProfilePage = lazy(async () => ({ default: (await import("./pages/profile-page")).ProfilePage }));
+const ModulePage = lazy(async () => ({ default: (await import("./pages/module-page")).ModulePage }));
 
 const tenant = deriveTenantCode(window.location.hostname, import.meta.env.VITE_TENANT_CODE || "local");
 const sessionManager = createSessionManager("admin");
@@ -53,12 +52,16 @@ function useAdminApi(setAuthenticated: (value: boolean) => void) {
 
 function LoadingScreen() {
   return (
-    <div className="auth-layout">
-      <section className="auth-card">
-        <small className="auth-kicker">Bootstrapping</small>
-        <h1>正在同步后台上下文</h1>
-        <p>系统正在拉取用户信息、权限和动态菜单。</p>
-      </section>
+    <div className="grid min-h-[100dvh] place-items-center bg-background px-6">
+      <Card className="w-full max-w-xl">
+        <CardHeader>
+          <CardTitle>正在同步后台上下文</CardTitle>
+          <CardDescription>系统正在拉取用户信息、权限和动态菜单。</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Loading label="正在初始化工作台" />
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -133,62 +136,46 @@ function ShellContent({
   }, [currentMenu, isFixedRoute, location.pathname, menuTree, navigate]);
 
   return (
-    <AdminShell
-      sidebar={
-        <>
-          <BrandBlock />
-          <IdentityCard
-            avatar={info.avatar}
-            name={info.name || info.userName}
-            roleName={info.roles.join(" / ")}
-            tenantCode={tenant.tenantCode}
-          />
-          <TreeNav menuTree={menuTree} />
-          <SectionCard title="固定入口" description="新后台先把高频入口固定在侧栏底部。">
-            <div className="inline-actions">
-              <NavLink className="soft-link" to="/ops-service">
-                运维服务
-              </NavLink>
-              <NavLink className="soft-link" to="/profile">
-                个人中心
-              </NavLink>
-              <button className="soft-link danger" onClick={() => void onLogout()} type="button">
-                退出登录
-              </button>
-            </div>
-          </SectionCard>
-        </>
-      }
+    <AdminAppShell
+      avatar={info.avatar}
+      currentPath={location.pathname}
+      menuTree={menuTree}
+      onLogout={() => void onLogout()}
+      tenantCode={tenant.tenantCode}
+      userName={info.name || info.userName}
+      userRole={info.roles.join(" / ")}
     >
-      <Routes>
-        <Route
-          element={<DashboardPage info={info} menuTree={menuTree} profile={profile} tenantCode={tenant.tenantCode} />}
-          path="/"
-        />
-        <Route element={<UsersPage api={api} />} path="/admin/sys-user" />
-        <Route element={<MenusPage api={api} />} path="/admin/sys-menu" />
-        <Route element={<RolesPage api={api} />} path="/admin/sys-role" />
-        <Route element={<DeptsPage api={api} />} path="/admin/sys-dept" />
-        <Route element={<PostsPage api={api} />} path="/admin/sys-post" />
-        <Route element={<DictsPage api={api} />} path="/admin/dict" />
-        <Route element={<DictsPage api={api} />} path="/admin/dict/data/:dictId" />
-        <Route element={<ConfigsPage api={api} />} path="/admin/sys-config" />
-        <Route element={<SetConfigPage api={api} />} path="/admin/sys-config/set" />
-        <Route element={<ApisPage api={api} />} path="/admin/sys-api" />
-        <Route element={<LoginLogsPage api={api} />} path="/admin/sys-login-log" />
-        <Route element={<OperaLogsPage api={api} />} path="/admin/sys-oper-log" />
-        <Route element={<ServerMonitorPage api={api} />} path="/sys-tools/monitor" />
-        <Route element={<SwaggerPage />} path="/dev-tools/swagger" />
-        <Route element={<BuildToolPage />} path="/dev-tools/build" />
-        <Route element={<CodegenPage />} path="/dev-tools/gen" />
-        <Route element={<CodegenPage />} path="/dev-tools/editTable" />
-        <Route element={<ScheduleJobsPage api={api} />} path="/schedule/manage" />
-        <Route element={<ScheduleLogsPage api={api} />} path="/schedule/log" />
-        <Route element={<OpsPage api={api} />} path="/ops-service" />
-        <Route element={<ProfilePage info={info} profile={profile} />} path="/profile" />
-        <Route element={<ModulePage currentMenu={currentMenu} />} path="*" />
-      </Routes>
-    </AdminShell>
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route
+            element={<DashboardPage info={info} menuTree={menuTree} profile={profile} tenantCode={tenant.tenantCode} />}
+            path="/"
+          />
+          <Route element={<UsersPage api={api} />} path="/admin/sys-user" />
+          <Route element={<MenusPage api={api} />} path="/admin/sys-menu" />
+          <Route element={<RolesPage api={api} />} path="/admin/sys-role" />
+          <Route element={<DeptsPage api={api} />} path="/admin/sys-dept" />
+          <Route element={<PostsPage api={api} />} path="/admin/sys-post" />
+          <Route element={<DictsPage api={api} />} path="/admin/dict" />
+          <Route element={<DictsPage api={api} />} path="/admin/dict/data/:dictId" />
+          <Route element={<ConfigsPage api={api} />} path="/admin/sys-config" />
+          <Route element={<SetConfigPage api={api} />} path="/admin/sys-config/set" />
+          <Route element={<ApisPage api={api} />} path="/admin/sys-api" />
+          <Route element={<LoginLogsPage api={api} />} path="/admin/sys-login-log" />
+          <Route element={<OperaLogsPage api={api} />} path="/admin/sys-oper-log" />
+          <Route element={<ServerMonitorPage api={api} />} path="/sys-tools/monitor" />
+          <Route element={<SwaggerPage />} path="/dev-tools/swagger" />
+          <Route element={<BuildToolPage />} path="/dev-tools/build" />
+          <Route element={<CodegenPage />} path="/dev-tools/gen" />
+          <Route element={<CodegenPage />} path="/dev-tools/editTable" />
+          <Route element={<ScheduleJobsPage api={api} />} path="/schedule/manage" />
+          <Route element={<ScheduleLogsPage api={api} />} path="/schedule/log" />
+          <Route element={<OpsPage api={api} />} path="/ops-service" />
+          <Route element={<ProfilePage info={info} profile={profile} />} path="/profile" />
+          <Route element={<ModulePage currentMenu={currentMenu} />} path="*" />
+        </Routes>
+      </Suspense>
+    </AdminAppShell>
   );
 }
 
@@ -241,32 +228,38 @@ export function App() {
 
   // 阶段 2：需要初始化安装
   if (needsSetup && setupStatus) {
-    return <SetupWizardPage initialStatus={setupStatus} setupApi={setupApi} onComplete={() => setNeedsSetup(false)} />;
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <SetupWizardPage initialStatus={setupStatus} setupApi={setupApi} onComplete={() => setNeedsSetup(false)} />
+      </Suspense>
+    );
   }
 
   // 阶段 3：未登录
   if (!authenticated) {
     return (
-      <LoginPage
-        getCaptcha={async () => {
-          const captcha = await api.auth.getCaptcha();
-          return {
-            image: captcha.data,
-            uuid: captcha.id,
-          };
-        }}
-        onSubmit={async (values) => {
-          try {
-            await handleLogin(values);
-          } catch (error) {
-            if (error instanceof ApiError) {
-              throw error;
+      <Suspense fallback={<LoadingScreen />}>
+        <LoginPage
+          getCaptcha={async () => {
+            const captcha = await api.auth.getCaptcha();
+            return {
+              image: captcha.data,
+              uuid: captcha.id,
+            };
+          }}
+          onSubmit={async (values) => {
+            try {
+              await handleLogin(values);
+            } catch (error) {
+              if (error instanceof ApiError) {
+                throw error;
+              }
+              throw new Error("登录接口调用失败");
             }
-            throw new Error("登录接口调用失败");
-          }
-        }}
-        tenantCode={tenant.tenantCode}
-      />
+          }}
+          tenantCode={tenant.tenantCode}
+        />
+      </Suspense>
     );
   }
 

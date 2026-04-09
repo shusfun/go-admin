@@ -1,8 +1,33 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import {
+  AdminPageStack,
+  AsyncActionButton,
+  Button,
+  CommitList,
+  ConfirmActionDialog,
+  DataTableSection,
+  DetailDialog,
+  InlineNotice,
+  Input,
+  LogViewer,
+  PageHeader,
+  ProgressSteps,
+  RowActions,
+  SectionCard,
+  StatStrip,
+  StatusBadge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TaskStatusCard,
+  toast,
+} from "@suiyuan/ui-admin";
 import { ApiError, createApiClient } from "@suiyuan/api";
-import { SectionCard } from "@suiyuan/ui-admin";
 import type {
   CommitInfo,
   CreateOpsTaskPayload,
@@ -10,16 +35,15 @@ import type {
   OpsEnvironmentItem,
   OpsErrorEvent,
   OpsTaskDetail,
-  OpsTaskListItem,
   OpsTaskStatus,
   OpsTaskType,
 } from "@suiyuan/types";
 
-const actionMeta: Record<OpsTaskType, { label: string; accent: "primary" | "soft" }> = {
-  deploy_backend: { label: "发布后端", accent: "soft" },
-  deploy_frontend: { label: "发布前端", accent: "soft" },
-  deploy_all: { label: "全部发布", accent: "primary" },
-  restart_backend: { label: "重启后端", accent: "soft" },
+const actionMeta: Record<OpsTaskType, { label: string; variant: "default" | "outline" }> = {
+  deploy_backend: { label: "发布后端", variant: "outline" },
+  deploy_frontend: { label: "发布前端", variant: "outline" },
+  deploy_all: { label: "全部发布", variant: "default" },
+  restart_backend: { label: "重启后端", variant: "outline" },
 };
 
 const statusText: Record<OpsTaskStatus, string> = {
@@ -56,7 +80,6 @@ export function OpsPage({ api }: { api: ReturnType<typeof createApiClient> }) {
   const queryClient = useQueryClient();
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [confirmValue, setConfirmValue] = useState("");
-  const [expandedCommitKey, setExpandedCommitKey] = useState<string | null>(null);
   const [viewerTaskId, setViewerTaskId] = useState<number | null>(null);
   const [streamState, setStreamState] = useState<StreamSnapshot | null>(null);
 
@@ -91,6 +114,7 @@ export function OpsPage({ api }: { api: ReturnType<typeof createApiClient> }) {
   const createTaskMutation = useMutation({
     mutationFn: (payload: CreateOpsTaskPayload) => api.ops.createTask(payload),
     onSuccess: async (result) => {
+      toast.success("运维任务已创建");
       setViewerTaskId(result.id);
       setConfirmState(null);
       setConfirmValue("");
@@ -99,16 +123,23 @@ export function OpsPage({ api }: { api: ReturnType<typeof createApiClient> }) {
         queryClient.invalidateQueries({ queryKey: ["admin", "ops", "tasks"] }),
       ]);
     },
+    onError: (error) => {
+      toast.error(toErrorMessage(error));
+    },
   });
 
   const cancelTaskMutation = useMutation({
     mutationFn: (taskId: number) => api.ops.cancelTask(taskId),
     onSuccess: async (_, taskId) => {
+      toast.success("任务取消请求已提交");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin", "ops", "environments"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "ops", "tasks"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "ops", "task", taskId] }),
       ]);
+    },
+    onError: (error) => {
+      toast.error(toErrorMessage(error));
     },
   });
 
@@ -239,327 +270,242 @@ export function OpsPage({ api }: { api: ReturnType<typeof createApiClient> }) {
 
   const task = taskDetailQuery.data;
   const live = streamState;
+  const environments = environmentsQuery.data || [];
 
   return (
-    <div className="page-stack">
-      <header className="page-hero ops-hero">
-        <small>Ops Service</small>
-        <h2>一页完成发布、重启与实时观察</h2>
-        <p>管理端直接调用后端运维服务，卡片负责决策，执行弹窗负责可追溯过程，历史区负责复盘。</p>
-      </header>
+    <AdminPageStack>
+      <PageHeader
+        description="运维页已经彻底切到统一组件体系，环境卡片、提交流、确认弹层、实时日志和任务状态都不再依赖旧 `ops-*` 样式。"
+        kicker="Ops Service"
+        title="一页完成发布、重启与实时观察"
+      />
 
-      <section className="ops-summary-bar">
-        <div>
-          <strong>{environmentsQuery.data?.length || 0}</strong>
-          <span>已加载环境</span>
-        </div>
-        <div>
-          <strong>{countRunningTasks(environmentsQuery.data)}</strong>
-          <span>运行中任务</span>
-        </div>
-        <div>
-          <strong>{countPendingCommits(environmentsQuery.data, "backend")}</strong>
-          <span>后端待发布提交</span>
-        </div>
-        <div>
-          <strong>{countPendingCommits(environmentsQuery.data, "frontend")}</strong>
-          <span>前端待发布提交</span>
-        </div>
-      </section>
+      <StatStrip
+        items={[
+          { label: "已加载环境", value: environments.length },
+          { label: "运行中任务", value: countRunningTasks(environments) },
+          { label: "后端待发布提交", value: countPendingCommits(environments, "backend") },
+          { label: "前端待发布提交", value: countPendingCommits(environments, "frontend") },
+        ]}
+      />
 
       {environmentsQuery.isError ? (
-        <SectionCard title="环境查询失败" description="运维页已接入接口，但当前没有拿到环境数据。">
-          <p className="ops-inline-error">{toErrorMessage(environmentsQuery.error)}</p>
-        </SectionCard>
+        <InlineNotice tone="danger" title="环境查询失败">
+          {toErrorMessage(environmentsQuery.error)}
+        </InlineNotice>
       ) : null}
 
-      <div className="ops-grid">
-        {(environmentsQuery.data || []).map((env) => {
-          const backendExpanded = expandedCommitKey === `${env.key}:backend`;
-          const frontendExpanded = expandedCommitKey === `${env.key}:frontend`;
+      <div className="grid gap-6 xl:grid-cols-2">
+        {environments.map((env) => {
           const running = Boolean(env.runningTask);
-
           return (
-            <article className={`ops-card${running ? " running" : ""}${!env.enabled ? " disabled" : ""}`} key={env.key}>
-              <div className={`ops-card-status ${env.status}${running ? " pulsating" : ""}`} />
-              <div className="ops-card-header">
-                <div>
-                  <small>{env.key.toUpperCase()}</small>
-                  <h3>{env.name}</h3>
+            <SectionCard
+              description={`最近一次：${env.lastDeploy ? `${actionMeta[env.lastDeploy.type].label} · ${statusText[env.lastDeploy.status]} · ${formatDateTime(env.lastDeploy.finishedAt)}` : "从未发布"}`}
+              key={env.key}
+              title={env.name}
+            >
+              <div className="grid gap-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge status={running ? "运行中" : envStatusText[env.status]} />
+                  <StatusBadge status={env.enabled ? "正常" : "停用"} />
+                  <span className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">{env.key}</span>
                 </div>
-                <span className="ops-pill">{running ? "任务运行中" : envStatusText[env.status]}</span>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button asChild size="sm" type="button" variant="outline">
+                    <a href={env.domain} rel="noreferrer" target="_blank">
+                      打开环境
+                    </a>
+                  </Button>
+                  {env.runningTask ? (
+                    <Button onClick={() => setViewerTaskId(env.runningTask!.id)} size="sm" type="button" variant="outline">
+                      查看运行中任务
+                    </Button>
+                  ) : null}
+                </div>
+
+                {env.runningTask ? (
+                  <InlineNotice tone="info" title="当前环境有任务正在执行">
+                    {`${actionMeta[env.runningTask.type].label} · 步骤 ${env.runningTask.step}/${env.runningTask.totalSteps} ${env.runningTask.stepName || "处理中"}`}
+                  </InlineNotice>
+                ) : null}
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <CommitList
+                    commits={env.pendingCommits.backend.recent}
+                    description={`共 ${env.pendingCommits.backend.count} 条后端待发布提交`}
+                    title="后端提交"
+                  />
+                  <CommitList
+                    commits={env.pendingCommits.frontend.recent}
+                    description={`共 ${env.pendingCommits.frontend.count} 条前端待发布提交`}
+                    title="前端提交"
+                  />
+                </div>
+
+                <RowActions className="gap-3">
+                  {env.actions.map((type) => (
+                    <Button
+                      disabled={!env.enabled || running || createTaskMutation.isPending}
+                      key={type}
+                      onClick={() => {
+                        if (env.confirmName) {
+                          setConfirmState({ env, type });
+                          setConfirmValue("");
+                          return;
+                        }
+                        void handleCreateTask(env, type);
+                      }}
+                      type="button"
+                      variant={actionMeta[type].variant}
+                    >
+                      {actionMeta[type].label}
+                    </Button>
+                  ))}
+                </RowActions>
               </div>
-              <a className="ops-domain" href={env.domain} rel="noreferrer" target="_blank">
-                {env.domain || "未配置访问域名"}
-              </a>
-              <p className="ops-meta">
-                最近一次:
-                {env.lastDeploy
-                  ? ` ${actionMeta[env.lastDeploy.type].label} · ${statusText[env.lastDeploy.status]} · ${formatDateTime(env.lastDeploy.finishedAt)}`
-                  : " 从未发布"}
-              </p>
-              {env.runningTask ? (
-                <button className="ops-running-banner" onClick={() => setViewerTaskId(env.runningTask!.id)} type="button">
-                  正在执行: {actionMeta[env.runningTask.type].label} · 步骤 {env.runningTask.step}/{env.runningTask.totalSteps}{" "}
-                  {env.runningTask.stepName || "处理中"}
-                </button>
-              ) : null}
-              <div className="ops-commit-stack">
-                <CommitPreview
-                  expanded={backendExpanded}
-                  label="后端"
-                  onToggle={() => setExpandedCommitKey(backendExpanded ? null : `${env.key}:backend`)}
-                  commits={env.pendingCommits.backend.recent}
-                  count={env.pendingCommits.backend.count}
-                />
-                <CommitPreview
-                  expanded={frontendExpanded}
-                  label="前端"
-                  onToggle={() => setExpandedCommitKey(frontendExpanded ? null : `${env.key}:frontend`)}
-                  commits={env.pendingCommits.frontend.recent}
-                  count={env.pendingCommits.frontend.count}
-                />
-              </div>
-              <div className="ops-action-grid">
-                {env.actions.map((type) => (
-                  <button
-                    className={`ops-action-button ${actionMeta[type].accent}`}
-                    disabled={!env.enabled || running || createTaskMutation.isPending}
-                    key={type}
-                    onClick={() => {
-                      if (env.confirmName) {
-                        setConfirmState({ env, type });
-                        setConfirmValue("");
-                        return;
-                      }
-                      void handleCreateTask(env, type);
-                    }}
-                    type="button"
-                  >
-                    {actionMeta[type].label}
-                  </button>
-                ))}
-              </div>
-            </article>
+            </SectionCard>
           );
         })}
       </div>
 
-      <SectionCard title="最近任务" description="列表接口不回日志，点查看后再拉详情与实时流。">
-        <div className="ops-task-table">
-          <div className="ops-task-head">
-            <span>ID</span>
-            <span>环境</span>
-            <span>类型</span>
-            <span>状态</span>
-            <span>时间</span>
-            <span>操作</span>
-          </div>
-          {(tasksQuery.data?.list || []).map((item) => (
-            <div className="ops-task-row" key={item.id}>
-              <span>#{item.id}</span>
-              <span>{item.env}</span>
-              <span>{actionMeta[item.type].label}</span>
-              <span className={`ops-status-text ${item.status}`}>{statusText[item.status]}</span>
-              <span>{formatDateTime(item.finishedAt || item.startedAt || item.createdAt)}</span>
-              <button className="ops-text-button" onClick={() => setViewerTaskId(item.id)} type="button">
-                查看日志
-              </button>
+      <DataTableSection description="列表接口不返回实时日志，点击详情后再拉取任务详情与流式状态。" title="最近任务">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>ID</TableHead>
+              <TableHead>环境</TableHead>
+              <TableHead>类型</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead>时间</TableHead>
+              <TableHead>操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(tasksQuery.data?.list || []).map((item) => (
+              <TableRow key={item.id}>
+                <TableCell>#{item.id}</TableCell>
+                <TableCell>{item.env}</TableCell>
+                <TableCell>{actionMeta[item.type].label}</TableCell>
+                <TableCell>
+                  <StatusBadge status={statusText[item.status]} />
+                </TableCell>
+                <TableCell>{formatDateTime(item.finishedAt || item.startedAt || item.createdAt)}</TableCell>
+                <TableCell>
+                  <Button onClick={() => setViewerTaskId(item.id)} size="sm" type="button" variant="outline">
+                    查看日志
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </DataTableSection>
+
+      <ConfirmActionDialog
+        actionLabel="确认发布"
+        description={confirmState ? `必须先核对提交列表，再输入环境标识 ${confirmState.env.key} 完成确认。` : ""}
+        onConfirm={async () => {
+          if (!confirmState) {
+            return;
+          }
+          if (confirmValue !== confirmState.env.key) {
+            toast.error(`请输入 ${confirmState.env.key} 完成确认`);
+            return;
+          }
+          await handleCreateTask(confirmState.env, confirmState.type, confirmValue);
+        }}
+        open={confirmState !== null}
+        setOpen={(open) => {
+          if (!open) {
+            setConfirmState(null);
+            setConfirmValue("");
+          }
+        }}
+        title={confirmState ? `确认执行 ${actionMeta[confirmState.type].label} · ${confirmState.env.name}` : "确认操作"}
+      >
+        {confirmState ? (
+          <div className="grid gap-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <CommitList commits={pickConfirmCommits(confirmState.env, confirmState.type, "backend")} title="后端提交" />
+              <CommitList commits={pickConfirmCommits(confirmState.env, confirmState.type, "frontend")} title="前端提交" />
             </div>
-          ))}
-        </div>
-      </SectionCard>
-
-      {confirmState ? (
-        <div className="ops-modal-backdrop">
-          <div className="ops-modal confirm">
-            <div className="ops-modal-top">
-              <small>Production Gate</small>
-              <h3>确认发布到 {confirmState.env.name}</h3>
-              <p>必须先看完整提交列表，再输入环境标识完成确认。</p>
-            </div>
-            <div className="ops-commit-review">
-              <CommitGroup
-                commits={pickConfirmCommits(confirmState.env, confirmState.type, "backend")}
-                title="后端提交"
-              />
-              <CommitGroup
-                commits={pickConfirmCommits(confirmState.env, confirmState.type, "frontend")}
-                title="前端提交"
-              />
-            </div>
-            <label className="ops-confirm-input">
-              <span>请输入 {confirmState.env.key} 确认</span>
-              <input onChange={(event) => setConfirmValue(event.target.value)} value={confirmValue} />
-            </label>
-            {createTaskMutation.isError ? <p className="ops-inline-error">{toErrorMessage(createTaskMutation.error)}</p> : null}
-            <div className="ops-modal-actions">
-              <button
-                className="ops-action-button soft"
-                onClick={() => {
-                  setConfirmState(null);
-                  setConfirmValue("");
-                }}
-                type="button"
-              >
-                取消
-              </button>
-              <button
-                className="ops-action-button primary"
-                disabled={confirmValue !== confirmState.env.key || createTaskMutation.isPending}
-                onClick={() => void handleCreateTask(confirmState.env, confirmState.type, confirmValue)}
-                type="button"
-              >
-                确认发布
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {viewerTaskId !== null ? (
-        <div className="ops-modal-backdrop">
-          <div className="ops-modal task">
-            <div className="ops-modal-top">
-              <small>Execution Room</small>
-              <div className="ops-task-title-row">
-                <div>
-                  <h3>
-                    {task ? actionMeta[task.type].label : "任务详情"} · {task?.env || ""}
-                  </h3>
-                  <p>
-                    {live?.done
-                      ? `执行完成，耗时 ${live.done.duration || "未记录"}`
-                      : live?.error
-                        ? `${statusText[live.error.status]} · ${live.error.stepName || "执行失败"}`
-                        : task?.summary || "正在同步任务状态"}
-                  </p>
-                </div>
-                <button className="ops-close" onClick={() => setViewerTaskId(null)} type="button">
-                  关闭
-                </button>
-              </div>
-            </div>
-
-            {taskDetailQuery.isLoading ? <p className="ops-loading">正在拉取任务详情...</p> : null}
-            {task ? (
-              <>
-                <div className="ops-step-list">
-                  {buildStepStates(task, live).map((item) => (
-                    <div className={`ops-step-item ${item.state}`} key={`${item.index}-${item.label}`}>
-                      <span>{item.badge}</span>
-                      <strong>
-                        {item.index}/{item.total} {item.label}
-                      </strong>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="ops-log-panel">
-                  <div className="ops-log-head">
-                    <strong>实时日志</strong>
-                    <span>{live?.stepName || task.stepName || "等待任务推进"}</span>
-                  </div>
-                  <pre>{live?.log || task.log || "暂无日志"}</pre>
-                </div>
-
-                {live?.error ? (
-                  <div className="ops-error-box">
-                    <strong>{live.error.errMsg || "任务失败"}</strong>
-                    <p>{live.error.suggestion || "请检查日志后重试"}</p>
-                  </div>
-                ) : null}
-
-                {live?.status === "queued" || live?.status === "running" || task.status === "queued" || task.status === "running" ? (
-                  <div className="ops-modal-actions">
-                    <button
-                      className="ops-action-button soft"
-                      disabled={cancelTaskMutation.isPending}
-                      onClick={() => void cancelTaskMutation.mutateAsync(task.id)}
-                      type="button"
-                    >
-                      {cancelTaskMutation.isPending ? "取消中..." : "取消任务"}
-                    </button>
-                    {cancelTaskMutation.isError ? (
-                      <p className="ops-inline-error">{toErrorMessage(cancelTaskMutation.error)}</p>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                <div className="ops-result-grid">
-                  <SectionCard title="执行摘要" description="后端任务详情 + 前端流式状态合并展示。">
-                    <dl className="detail-grid">
-                      <dt>状态</dt>
-                      <dd>{statusText[live?.status || task.status]}</dd>
-                      <dt>当前步骤</dt>
-                      <dd>
-                        {live?.step || task.step}/{live?.totalSteps || task.totalSteps}
-                      </dd>
-                      <dt>开始时间</dt>
-                      <dd>{formatDateTime(task.startedAt)}</dd>
-                      <dt>结束时间</dt>
-                      <dd>{formatDateTime(task.finishedAt)}</dd>
-                    </dl>
-                  </SectionCard>
-                  <SectionCard title="本次提交" description="详情接口保存了本次任务真正纳入的提交集合。">
-                    <CommitGroup commits={task.commits.backend} title="后端提交" />
-                    <CommitGroup commits={task.commits.frontend} title="前端提交" />
-                  </SectionCard>
-                </div>
-              </>
+            <FormFieldLike label={`请输入 ${confirmState.env.key} 确认`}>
+              <Input onChange={(event) => setConfirmValue(event.target.value)} value={confirmValue} />
+            </FormFieldLike>
+            {createTaskMutation.isError ? (
+              <InlineNotice tone="danger">{toErrorMessage(createTaskMutation.error)}</InlineNotice>
             ) : null}
           </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
+        ) : null}
+      </ConfirmActionDialog>
 
-function CommitPreview({
-  count,
-  commits,
-  expanded,
-  label,
-  onToggle,
-}: {
-  count: number;
-  commits: CommitInfo[];
-  expanded: boolean;
-  label: string;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="ops-commit-block">
-      <button className="ops-commit-toggle" disabled={count === 0} onClick={onToggle} type="button">
-        <span>{label}</span>
-        <strong>{count} 个待发布提交</strong>
-      </button>
-      {expanded ? (
-        <div className="ops-commit-list">
-          {commits.map((commit) => (
-            <div className="ops-commit-row" key={`${commit.hash}-${commit.message}`}>
-              <span>{commit.hash.slice(0, 7)}</span>
-              <p>{commit.message}</p>
+      <DetailDialog
+        description={task ? `${actionMeta[task.type].label} · ${task.env}` : "任务详情"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewerTaskId(null);
+            setStreamState(null);
+          }
+        }}
+        open={viewerTaskId !== null}
+        title={task ? `${actionMeta[task.type].label} 执行详情` : "任务详情"}
+      >
+        {taskDetailQuery.isLoading ? (
+          <div className="py-4 text-sm text-muted-foreground">正在拉取任务详情...</div>
+        ) : task ? (
+          <div className="grid gap-6">
+            {live?.error ? (
+              <InlineNotice tone="danger" title={live.error.errMsg || "任务失败"}>
+                {live.error.suggestion || "请检查实时日志后重试"}
+              </InlineNotice>
+            ) : null}
+
+            <TaskStatusCard
+              actions={
+                live?.status === "queued" || live?.status === "running" || task.status === "queued" || task.status === "running" ? (
+                  <AsyncActionButton loading={cancelTaskMutation.isPending} onClick={() => void cancelTaskMutation.mutateAsync(task.id)} size="sm" type="button" variant="outline">
+                    取消任务
+                  </AsyncActionButton>
+                ) : null
+              }
+              description={live?.done ? `执行完成，耗时 ${live.done.duration || "未记录"}` : live?.stepName || task.stepName || task.summary || "正在同步任务状态"}
+              items={[
+                { label: "环境", value: task.env },
+                { label: "状态", value: statusText[live?.status || task.status] },
+                { label: "当前步骤", value: `${live?.step || task.step}/${live?.totalSteps || task.totalSteps}` },
+                { label: "开始时间", value: formatDateTime(task.startedAt) },
+                { label: "结束时间", value: formatDateTime(task.finishedAt) },
+                { label: "摘要", value: task.summary || "-" },
+              ]}
+              status={statusText[live?.status || task.status]}
+              title="任务状态"
+            />
+
+            <ProgressSteps items={buildStepStates(task, live).map((item) => ({
+              label: `${item.index}/${item.total} ${item.label}`,
+              meta: item.state === "running" ? "当前执行步骤" : undefined,
+              state: item.state,
+            }))} />
+
+            <LogViewer description={live?.stepName || task.stepName || "等待任务推进"} log={live?.log || task.log} title="实时日志" />
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <CommitList commits={task.commits.backend} title="后端提交" />
+              <CommitList commits={task.commits.frontend} title="前端提交" />
             </div>
-          ))}
-          {count > commits.length ? <small>共 {count} 条，仅展示最近 10 条。</small> : null}
-        </div>
-      ) : null}
-    </div>
+          </div>
+        ) : null}
+      </DetailDialog>
+    </AdminPageStack>
   );
 }
 
-function CommitGroup({ commits, title }: { commits: CommitInfo[]; title: string }) {
+function FormFieldLike({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <div className="ops-review-group">
-      <strong>{title}</strong>
-      {commits.length === 0 ? <p>本次没有待纳入的提交。</p> : null}
-      {commits.map((commit) => (
-        <div className="ops-review-row" key={`${title}-${commit.hash}-${commit.message}`}>
-          <span>{commit.hash.slice(0, 7)}</span>
-          <p>{commit.message}</p>
-        </div>
-      ))}
+    <div className="grid gap-2">
+      <p className="text-sm font-medium text-foreground">{label}</p>
+      {children}
     </div>
   );
 }
@@ -572,21 +518,21 @@ function buildStepStates(task: OpsTaskDetail, live: StreamSnapshot | null) {
   return labels.map((label, index) => {
     const step = index + 1;
     if (currentStatus === "success") {
-      return { badge: "✓", index: step, label, total: totalSteps, state: "success" };
+      return { index: step, label, total: totalSteps, state: "success" as const };
     }
     if ((currentStatus === "failed" || currentStatus === "cancelled") && step === currentStep) {
-      return { badge: "!", index: step, label, total: totalSteps, state: "failed" };
+      return { index: step, label, total: totalSteps, state: "failed" as const };
     }
     if ((currentStatus === "failed" || currentStatus === "cancelled") && step > currentStep) {
-      return { badge: "·", index: step, label, total: totalSteps, state: "skipped" };
+      return { index: step, label, total: totalSteps, state: "skipped" as const };
     }
     if (step < currentStep) {
-      return { badge: "✓", index: step, label, total: totalSteps, state: "success" };
+      return { index: step, label, total: totalSteps, state: "success" as const };
     }
     if (step === currentStep && (currentStatus === "running" || currentStatus === "queued")) {
-      return { badge: "↻", index: step, label, total: totalSteps, state: "running" };
+      return { index: step, label, total: totalSteps, state: "running" as const };
     }
-    return { badge: "·", index: step, label, total: totalSteps, state: "pending" };
+    return { index: step, label, total: totalSteps, state: "pending" as const };
   });
 }
 
@@ -631,7 +577,7 @@ function findEnvByKey(list: OpsEnvironmentItem[] | undefined, key: string) {
   return (list || []).find((item) => item.key === key);
 }
 
-function pickConfirmCommits(env: OpsEnvironmentItem, type: OpsTaskType, target: "backend" | "frontend") {
+function pickConfirmCommits(env: OpsEnvironmentItem, type: OpsTaskType, target: "backend" | "frontend"): CommitInfo[] {
   if (type === "restart_backend") {
     return [];
   }

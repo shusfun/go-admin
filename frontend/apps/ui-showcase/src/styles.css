@@ -13,6 +13,9 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at top left, hsl(var(--primary) / 0.12), transparent 28%),
+      radial-gradient(circle at top right, hsl(var(--accent) / 0.1), transparent 24%);
   }
 
   ::selection {

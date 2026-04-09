@@ -1,7 +1,32 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { SectionCard } from "@suiyuan/ui-admin";
+import {
+  Button,
+  ConfirmDialog,
+  DataTableSection,
+  EmptyBlock,
+  FilterPanel,
+  FormActions,
+  FormDialog,
+  FormField,
+  Input,
+  Loading,
+  PageHeader,
+  Pagination,
+  RowActions,
+  Select,
+  StatusBadge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Textarea,
+  Toolbar,
+  toast,
+} from "@suiyuan/ui-admin";
 import type { PagePayload, QueryPayload } from "@suiyuan/types";
 
 type Column<T> = {
@@ -15,7 +40,7 @@ type SearchField = {
   placeholder: string;
 };
 
-type FormField = {
+type FormFieldType = {
   key: string;
   label: string;
   type?: "text" | "password" | "number" | "textarea" | "select";
@@ -32,7 +57,7 @@ type CrudDataPageProps<T extends object> = {
   queryKey: string;
   columns: Array<Column<T>>;
   searchFields?: SearchField[];
-  formFields?: FormField[];
+  formFields?: FormFieldType[];
   fetcher: (params: QueryPayload) => Promise<PagePayload<T>>;
   createItem?: (payload: Record<string, unknown>) => Promise<unknown>;
   updateItem?: (payload: Record<string, unknown>) => Promise<unknown>;
@@ -47,13 +72,6 @@ type CrudDataPageProps<T extends object> = {
 function defaultDraftFactory() {
   return {};
 }
-
-type FeedbackState =
-  | {
-      tone: "success" | "error";
-      message: string;
-    }
-  | null;
 
 export function CrudDataPage<T extends object>({
   title,
@@ -78,7 +96,7 @@ export function CrudDataPage<T extends object>({
   const [draft, setDraft] = useState<Record<string, unknown>>(createDraft());
   const [editingId, setEditingId] = useState<number | string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const [deleteTarget, setDeleteTarget] = useState<T | null>(null);
 
   const params = useMemo<QueryPayload>(() => ({ ...filters, pageIndex, pageSize: 20 }), [filters, pageIndex]);
 
@@ -97,21 +115,15 @@ export function CrudDataPage<T extends object>({
       }
       return null;
     },
-    onSuccess: async (_result, payload) => {
-      setFeedback({
-        tone: "success",
-        message: payload.id || editingId !== null ? "记录已更新" : "记录已创建",
-      });
+    onSuccess: async () => {
+      toast.success(editingId !== null ? "记录已更新" : "记录已创建");
       setDialogOpen(false);
       setEditingId(null);
       setDraft(createDraft());
       await queryClient.invalidateQueries({ queryKey: ["admin-page", queryKey] });
     },
     onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "记录保存失败",
-      });
+      toast.error(error instanceof Error ? error.message : "记录保存失败");
     },
   });
 
@@ -123,17 +135,12 @@ export function CrudDataPage<T extends object>({
       return deleteItem(payload);
     },
     onSuccess: async () => {
-      setFeedback({
-        tone: "success",
-        message: "记录已删除",
-      });
+      toast.success("记录已删除");
+      setDeleteTarget(null);
       await queryClient.invalidateQueries({ queryKey: ["admin-page", queryKey] });
     },
     onError: (error) => {
-      setFeedback({
-        tone: "error",
-        message: error instanceof Error ? error.message : "记录删除失败",
-      });
+      toast.error(error instanceof Error ? error.message : "记录删除失败");
     },
   });
 
@@ -154,206 +161,214 @@ export function CrudDataPage<T extends object>({
   }
 
   return (
-    <div className="page-stack">
-      <header className="page-hero compact">
-        <small>Admin Module</small>
-        <h2>{title}</h2>
-        <p>{description}</p>
-      </header>
+    <div className="grid gap-6">
+      <PageHeader
+        description={description}
+        kicker="Admin Module"
+        title={title}
+      />
 
-      <div className="module-grid">
-        <SectionCard title="查询与操作" description="先完成真实接口接入，后续再逐模块升级视觉与交互。">
-          <div className="search-grid">
-            {searchFields.map((field) => (
-              <label className="search-field" key={field.key}>
-                <span>{field.label}</span>
-                <input
-                  onChange={(event) => {
-                    setPageIndex(1);
-                    setFilters((current) => ({
-                      ...current,
-                      [field.key]: event.target.value,
-                    }));
-                  }}
-                  placeholder={field.placeholder}
-                  value={filters[field.key] || ""}
-                />
-              </label>
-            ))}
-          </div>
-          <div className="inline-actions">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+        <FilterPanel description="统一使用后台模板组织搜索、筛选和高频操作，不再由页面自行拼布局。">
+          {searchFields.length ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {searchFields.map((field) => (
+                <FormField key={field.key} label={field.label}>
+                  <Input
+                    onChange={(event) => {
+                      setPageIndex(1);
+                      setFilters((current) => ({
+                        ...current,
+                        [field.key]: event.target.value,
+                      }));
+                    }}
+                    placeholder={field.placeholder}
+                    value={filters[field.key] || ""}
+                  />
+                </FormField>
+              ))}
+            </div>
+          ) : null}
+          <Toolbar>
             {createItem ? (
-              <button className="primary-action" onClick={openCreateDialog} type="button">
+              <Button onClick={openCreateDialog} type="button">
                 新建记录
-              </button>
+              </Button>
             ) : null}
-            <button
-              className="soft-link"
+            <Button
               onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", queryKey] })}
               type="button"
+              variant="outline"
             >
               刷新数据
-            </button>
-          </div>
-          {feedback ? <p className={`inline-feedback${feedback.tone === "error" ? " error" : ""}`}>{feedback.message}</p> : null}
-        </SectionCard>
+            </Button>
+          </Toolbar>
+        </FilterPanel>
 
         {renderAside ? renderAside() : null}
       </div>
 
-      <SectionCard
-        title="数据列表"
-        description={`当前共 ${total} 条记录。第一阶段以功能对齐为主，保留清晰、可直接迁移的结构。`}
-      >
-        {listQuery.isLoading ? <p className="empty-tip">正在加载数据...</p> : null}
-        {listQuery.isError ? <p className="empty-tip">数据查询失败，请检查登录态和接口配置。</p> : null}
-        {!listQuery.isLoading && !listQuery.isError ? (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  {columns.map((column) => (
-                    <th key={column.label}>{column.label}</th>
-                  ))}
-                  {(rowActions || createItem || updateItem || deleteItem) ? <th>操作</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((item) => (
-                  <tr key={String(getRowId(item))}>
-                    {columns.map((column) => (
-                      <td key={column.label}>{column.render(item)}</td>
-                    ))}
-                    {(rowActions || createItem || updateItem || deleteItem) ? (
-                      <td>
-                        <div className="row-actions">
-                          {updateItem ? (
-                            <button className="tiny-action" onClick={() => openEditDialog(item)} type="button">
-                              编辑
-                            </button>
-                          ) : null}
-                          {deleteItem ? (
-                            <button
-                              className="tiny-action danger"
-                              onClick={() => {
-                                if (!window.confirm("确认删除这条记录吗？")) {
-                                  return;
-                                }
-                                deleteMutation.mutate({ ids: [getRowId(item)] });
-                              }}
-                              type="button"
-                            >
-                              删除
-                            </button>
-                          ) : null}
-                          {rowActions ? rowActions(item) : null}
-                        </div>
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <DataTableSection description={`当前共 ${total} 条记录。`} title="数据列表">
+        {listQuery.isLoading ? <Loading label="正在加载数据" /> : null}
+        {listQuery.isError ? (
+          <EmptyBlock description="请检查登录态、接口返回和筛选条件。" title="数据查询失败" />
         ) : null}
-        <div className="pagination-row">
-          <button className="soft-link" disabled={pageIndex <= 1} onClick={() => setPageIndex((current) => current - 1)} type="button">
-            上一页
-          </button>
-          <span>
-            第 {pageIndex} / {totalPages} 页
-          </span>
-          <button
-            className="soft-link"
-            disabled={pageIndex >= totalPages}
-            onClick={() => setPageIndex((current) => current + 1)}
-            type="button"
-          >
-            下一页
-          </button>
-        </div>
-      </SectionCard>
+        {!listQuery.isLoading && !listQuery.isError ? (
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {columns.map((column) => (
+                    <TableHead key={column.label}>{column.label}</TableHead>
+                  ))}
+                  {(rowActions || createItem || updateItem || deleteItem) ? <TableHead>操作</TableHead> : null}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {list.length ? (
+                  list.map((item) => (
+                    <TableRow key={String(getRowId(item))}>
+                      {columns.map((column) => (
+                        <TableCell key={column.label}>
+                          {typeof column.render(item) === "string" &&
+                          ["状态", "结果", "健康状态"].some((keyword) => column.label.includes(keyword)) ? (
+                            <StatusBadge status={String(column.render(item))} />
+                          ) : (
+                            column.render(item)
+                          )}
+                        </TableCell>
+                      ))}
+                      {(rowActions || createItem || updateItem || deleteItem) ? (
+                        <TableCell>
+                          <RowActions>
+                            {updateItem ? (
+                              <Button onClick={() => openEditDialog(item)} size="sm" type="button" variant="outline">
+                                编辑
+                              </Button>
+                            ) : null}
+                            {deleteItem ? (
+                              <Button onClick={() => setDeleteTarget(item)} size="sm" type="button" variant="destructive">
+                                删除
+                              </Button>
+                            ) : null}
+                            {rowActions ? rowActions(item) : null}
+                          </RowActions>
+                        </TableCell>
+                      ) : null}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell className="py-8" colSpan={columns.length + 1}>
+                      <EmptyBlock description="当前没有匹配的记录。" title="暂无数据" />
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+            <Pagination onNext={() => setPageIndex((current) => current + 1)} onPrevious={() => setPageIndex((current) => current - 1)} page={pageIndex} totalPages={totalPages} />
+          </>
+        ) : null}
+      </DataTableSection>
 
       {dialogOpen && formFields.length > 0 ? (
-        <div className="modal-mask">
-          <div className="modal-card">
-            <h3>{editingId !== null ? "编辑记录" : "新建记录"}</h3>
-            <div className="form-grid">
-              {formFields.map((field) => (
-                <label className="form-field" key={field.key}>
-                  <span>{field.label}</span>
-                  {field.type === "textarea" ? (
-                    <textarea
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          [field.key]: event.target.value,
-                        }))
-                      }
-                      placeholder={field.placeholder}
-                      rows={4}
-                      value={String(draft[field.key] ?? "")}
-                    />
-                  ) : field.type === "select" ? (
-                    <select
-                      onChange={(event) => {
-                        const selectedOption = (field.options || []).find(
-                          (option) => String(option.value) === event.target.value,
-                        );
-                        setDraft((current) => ({
-                          ...current,
-                          [field.key]: selectedOption ? selectedOption.value : event.target.value,
-                        }));
-                      }}
-                      value={String(draft[field.key] ?? "")}
-                    >
-                      <option value="">请选择</option>
-                      {(field.options || []).map((option) => (
-                        <option key={`${field.key}-${option.value}`} value={String(option.value)}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      onChange={(event) =>
-                        setDraft((current) => ({
-                          ...current,
-                          [field.key]: field.type === "number" ? Number(event.target.value) : event.target.value,
-                        }))
-                      }
-                      placeholder={field.placeholder}
-                      type={field.type || "text"}
-                      value={String(draft[field.key] ?? "")}
-                    />
-                  )}
-                </label>
-              ))}
+        <FormDialog
+          description="统一使用后台表单弹层，保持布局、反馈和操作区一致。"
+          onOpenChange={setDialogOpen}
+          open={dialogOpen}
+          title={editingId !== null ? "编辑记录" : "新建记录"}
+        >
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="grid gap-4 md:grid-cols-2">
+                {formFields.map((field) => (
+                  <FormField
+                    className={field.type === "textarea" ? "md:col-span-2" : undefined}
+                    key={field.key}
+                    label={field.label}
+                  >
+                    {field.type === "textarea" ? (
+                      <Textarea
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            [field.key]: event.target.value,
+                          }))
+                        }
+                        placeholder={field.placeholder}
+                        rows={4}
+                        value={String(draft[field.key] ?? "")}
+                      />
+                    ) : field.type === "select" ? (
+                      <Select
+                        onValueChange={(value) => {
+                          const selectedOption = (field.options || []).find((option) => String(option.value) === value);
+                          setDraft((current) => ({
+                            ...current,
+                            [field.key]: selectedOption ? selectedOption.value : value,
+                          }));
+                        }}
+                        options={field.options || []}
+                        placeholder={field.placeholder || "请选择"}
+                        value={String(draft[field.key] ?? "")}
+                      />
+                    ) : (
+                      <Input
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            [field.key]: field.type === "number" ? Number(event.target.value) : event.target.value,
+                          }))
+                        }
+                        placeholder={field.placeholder}
+                        type={field.type || "text"}
+                        value={String(draft[field.key] ?? "")}
+                      />
+                    )}
+                  </FormField>
+                ))}
+              </div>
             </div>
-            <div className="inline-actions">
-              <button
-                className="primary-action"
-                disabled={saveMutation.isPending}
-                onClick={() => saveMutation.mutate(draft)}
-                type="button"
-              >
-                {saveMutation.isPending ? "保存中..." : "保存"}
-              </button>
-              <button
-                className="soft-link"
-                onClick={() => {
-                  setDialogOpen(false);
-                  setEditingId(null);
-                  setDraft(createDraft());
-                }}
-                type="button"
-              >
-                取消
-              </button>
-            </div>
+            <FormActions className="mt-4 shrink-0 border-t border-border pt-4">
+            <Button
+              disabled={saveMutation.isPending}
+              onClick={() => saveMutation.mutate(draft)}
+              type="button"
+            >
+              {saveMutation.isPending ? "保存中..." : "保存"}
+            </Button>
+            <Button
+              onClick={() => {
+                setDialogOpen(false);
+                setEditingId(null);
+                setDraft(createDraft());
+              }}
+              type="button"
+              variant="outline"
+            >
+              取消
+            </Button>
+            </FormActions>
           </div>
-        </div>
+        </FormDialog>
       ) : null}
+
+      <ConfirmDialog
+        description="删除后无法恢复，请确认这次操作确实必要。"
+        onConfirm={async () => {
+          if (!deleteTarget) {
+            return;
+          }
+          await deleteMutation.mutateAsync({ ids: [getRowId(deleteTarget)] });
+        }}
+        open={deleteTarget !== null}
+        setOpen={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+          }
+        }}
+        title="确认删除这条记录？"
+      />
     </div>
   );
 }

@@ -1,0 +1,211 @@
+// @vitest-environment jsdom
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  ConfirmDialog,
+  FormDialog,
+  LogViewer,
+  ThemeToggle,
+  TreeSelectorPanel,
+} from "./index";
+
+const setTheme = vi.fn();
+
+vi.mock("@suiyuan/design-tokens", () => ({
+  useTheme: () => ({
+    theme: "light",
+    setTheme,
+  }),
+}));
+
+let host: HTMLDivElement;
+let root: Root;
+let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+function findButton(label: string) {
+  return Array.from(document.querySelectorAll("button")).find((item) => item.textContent?.includes(label));
+}
+
+function findMenuItem(label: string) {
+  return Array.from(document.querySelectorAll("[role='menuitem']")).find((item) => item.textContent?.includes(label));
+}
+
+function dispatchPointerDown(target: Element | null | undefined) {
+  if (!target) {
+    return;
+  }
+  const EventCtor = globalThis.PointerEvent ?? MouseEvent;
+  target.dispatchEvent(new EventCtor("pointerdown", { bubbles: true, button: 0, ctrlKey: false }));
+}
+
+beforeEach(() => {
+  // React 19 test environment hint
+  (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  host = document.createElement("div");
+  document.body.appendChild(host);
+  root = createRoot(host);
+  setTheme.mockReset();
+  consoleErrorSpy = vi.spyOn(console, "error").mockImplementation((message?: unknown) => {
+    if (typeof message === "string" && message.includes("DialogContent")) {
+      return;
+    }
+  });
+});
+
+afterEach(() => {
+  act(() => {
+    root.unmount();
+  });
+  host.remove();
+  document.body.innerHTML = "";
+  consoleErrorSpy.mockRestore();
+});
+
+describe("ui-admin components", () => {
+  it("ConfirmDialog 点击确认后触发回调并关闭", async () => {
+    const onConfirm = vi.fn().mockResolvedValue(undefined);
+    const setOpen = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <ConfirmDialog
+          description="删除后无法恢复"
+          onConfirm={onConfirm}
+          open
+          setOpen={setOpen}
+          title="确认删除？"
+        />,
+      );
+    });
+
+    const confirmButton = findButton("确认");
+    expect(confirmButton).toBeTruthy();
+
+    await act(async () => {
+      confirmButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(setOpen).toHaveBeenCalledWith(false);
+  });
+
+  it("ConfirmDialog 点击取消时关闭弹层且不触发确认", async () => {
+    const onConfirm = vi.fn();
+    const setOpen = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <ConfirmDialog
+          description="取消后保持当前数据"
+          onConfirm={onConfirm}
+          open
+          setOpen={setOpen}
+          title="确认关闭？"
+        />,
+      );
+    });
+
+    const cancelButton = findButton("取消");
+    expect(cancelButton).toBeTruthy();
+
+    await act(async () => {
+      cancelButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(setOpen).toHaveBeenCalledWith(false);
+  });
+
+  it("FormDialog 在打开时渲染标题和内容", async () => {
+    const onOpenChange = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <FormDialog onOpenChange={onOpenChange} open title="编辑表单">
+          <div>表单内容</div>
+        </FormDialog>,
+      );
+    });
+
+    expect(document.body.textContent).toContain("编辑表单");
+    expect(document.body.textContent).toContain("表单内容");
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("TreeSelectorPanel 点击全选时返回完整节点集合", async () => {
+    const onChange = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <TreeSelectorPanel
+          checkedIds={[]}
+          nodes={[
+            {
+              id: 1,
+              label: "系统管理",
+              children: [
+                { id: 2, label: "用户管理" },
+                { id: 3, label: "角色管理" },
+              ],
+            },
+          ]}
+          onChange={onChange}
+          title="菜单权限"
+        />,
+      );
+    });
+
+    const selectAllButton = findButton("全选");
+    expect(selectAllButton).toBeTruthy();
+
+    await act(async () => {
+      selectAllButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(onChange).toHaveBeenCalledWith([1, 2, 3]);
+  });
+
+  it("LogViewer 在无日志时展示空态，有日志时展示内容", async () => {
+    await act(async () => {
+      root.render(<LogViewer title="实时日志" />);
+    });
+
+    expect(document.body.textContent).toContain("暂无日志");
+
+    await act(async () => {
+      root.render(<LogViewer log={"line-1\nline-2"} title="实时日志" />);
+    });
+
+    expect(document.body.textContent).toContain("line-1");
+    expect(document.body.textContent).toContain("line-2");
+  });
+
+  it("ThemeToggle 选择主题时调用 setTheme", async () => {
+    await act(async () => {
+      root.render(<ThemeToggle />);
+    });
+
+    const trigger = Array.from(document.querySelectorAll("button")).find((item) => item.querySelector("svg"));
+    expect(trigger).toBeTruthy();
+
+    await act(async () => {
+      dispatchPointerDown(trigger);
+    });
+
+    const menuItem = findMenuItem("深色主题");
+    expect(menuItem).toBeTruthy();
+
+    await act(async () => {
+      menuItem?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(setTheme).toHaveBeenCalledWith("dark");
+  });
+});
