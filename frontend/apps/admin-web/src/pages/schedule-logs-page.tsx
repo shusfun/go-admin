@@ -27,7 +27,6 @@ import {
   Toolbar,
 } from "@suiyuan/ui-admin";
 import { createApiClient } from "@suiyuan/api";
-import type { SysJobLogRecord } from "@suiyuan/types";
 
 const statusOptions = [
   { value: "", label: "全部状态" },

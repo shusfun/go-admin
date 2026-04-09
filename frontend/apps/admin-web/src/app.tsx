@@ -6,8 +6,11 @@ import { createApiClient, ApiError, createSetupApi } from "@suiyuan/api";
 import type { SetupStatus } from "@suiyuan/api";
 import { createSessionManager } from "@suiyuan/auth";
 import { adaptMenuTree, deriveTenantCode, findMenuByPath } from "@suiyuan/core";
+import { useI18n } from "@suiyuan/i18n";
 import { AdminAppShell, Card, CardContent, CardDescription, CardHeader, CardTitle, Loading } from "@suiyuan/ui-admin";
 import type { AppMenuNode, AppSession, InfoResponse, ProfileResponse } from "@suiyuan/types";
+
+import { AdminLocaleToggle } from "./components/admin-locale-toggle";
 
 const LoginPage = lazy(async () => ({ default: (await import("./pages/login-page")).LoginPage }));
 const SetupWizardPage = lazy(async () => ({ default: (await import("./pages/setup-wizard-page")).SetupWizardPage }));
@@ -51,15 +54,18 @@ function useAdminApi(setAuthenticated: (value: boolean) => void) {
 }
 
 function LoadingScreen() {
+  const { t } = useI18n();
+
   return (
     <div className="grid min-h-[100dvh] place-items-center bg-background px-6">
+      <AdminLocaleToggle />
       <Card className="w-full max-w-xl">
         <CardHeader>
-          <CardTitle>正在同步后台上下文</CardTitle>
-          <CardDescription>系统正在拉取用户信息、权限和动态菜单。</CardDescription>
+          <CardTitle>{t("admin.loading.title")}</CardTitle>
+          <CardDescription>{t("admin.loading.description")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <Loading label="正在初始化工作台" />
+          <Loading label={t("admin.loading.label")} />
         </CardContent>
       </Card>
     </div>
@@ -73,6 +79,7 @@ function AdminWorkbench({
   api: ReturnType<typeof createApiClient>;
   onLogout: () => Promise<void>;
 }) {
+  const { t } = useI18n();
   const infoQuery = useQuery({
     queryKey: ["admin", "info"],
     queryFn: () => api.system.getInfo(),
@@ -91,7 +98,7 @@ function AdminWorkbench({
   }
 
   if (!infoQuery.data || !profileQuery.data || !menuQuery.data) {
-    throw new Error("后台初始化失败");
+    throw new Error(t("admin.workbench.initError"));
   }
 
   return (
@@ -136,50 +143,54 @@ function ShellContent({
   }, [currentMenu, isFixedRoute, location.pathname, menuTree, navigate]);
 
   return (
-    <AdminAppShell
-      avatar={info.avatar}
-      currentPath={location.pathname}
-      menuTree={menuTree}
-      onLogout={() => void onLogout()}
-      tenantCode={tenant.tenantCode}
-      userName={info.name || info.userName}
-      userRole={info.roles.join(" / ")}
-    >
-      <Suspense fallback={<LoadingScreen />}>
-        <Routes>
-          <Route
-            element={<DashboardPage info={info} menuTree={menuTree} profile={profile} tenantCode={tenant.tenantCode} />}
-            path="/"
-          />
-          <Route element={<UsersPage api={api} />} path="/admin/sys-user" />
-          <Route element={<MenusPage api={api} />} path="/admin/sys-menu" />
-          <Route element={<RolesPage api={api} />} path="/admin/sys-role" />
-          <Route element={<DeptsPage api={api} />} path="/admin/sys-dept" />
-          <Route element={<PostsPage api={api} />} path="/admin/sys-post" />
-          <Route element={<DictsPage api={api} />} path="/admin/dict" />
-          <Route element={<DictsPage api={api} />} path="/admin/dict/data/:dictId" />
-          <Route element={<ConfigsPage api={api} />} path="/admin/sys-config" />
-          <Route element={<SetConfigPage api={api} />} path="/admin/sys-config/set" />
-          <Route element={<ApisPage api={api} />} path="/admin/sys-api" />
-          <Route element={<LoginLogsPage api={api} />} path="/admin/sys-login-log" />
-          <Route element={<OperaLogsPage api={api} />} path="/admin/sys-oper-log" />
-          <Route element={<ServerMonitorPage api={api} />} path="/sys-tools/monitor" />
-          <Route element={<SwaggerPage />} path="/dev-tools/swagger" />
-          <Route element={<BuildToolPage />} path="/dev-tools/build" />
-          <Route element={<CodegenPage />} path="/dev-tools/gen" />
-          <Route element={<CodegenPage />} path="/dev-tools/editTable" />
-          <Route element={<ScheduleJobsPage api={api} />} path="/schedule/manage" />
-          <Route element={<ScheduleLogsPage api={api} />} path="/schedule/log" />
-          <Route element={<OpsPage api={api} />} path="/ops-service" />
-          <Route element={<ProfilePage info={info} profile={profile} />} path="/profile" />
-          <Route element={<ModulePage currentMenu={currentMenu} />} path="*" />
-        </Routes>
-      </Suspense>
-    </AdminAppShell>
+    <>
+      <AdminLocaleToggle />
+      <AdminAppShell
+        avatar={info.avatar}
+        currentPath={location.pathname}
+        menuTree={menuTree}
+        onLogout={() => void onLogout()}
+        tenantCode={tenant.tenantCode}
+        userName={info.name || info.userName}
+        userRole={info.roles.join(" / ")}
+      >
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            <Route
+              element={<DashboardPage info={info} menuTree={menuTree} profile={profile} tenantCode={tenant.tenantCode} />}
+              path="/"
+            />
+            <Route element={<UsersPage api={api} />} path="/admin/sys-user" />
+            <Route element={<MenusPage api={api} />} path="/admin/sys-menu" />
+            <Route element={<RolesPage api={api} />} path="/admin/sys-role" />
+            <Route element={<DeptsPage api={api} />} path="/admin/sys-dept" />
+            <Route element={<PostsPage api={api} />} path="/admin/sys-post" />
+            <Route element={<DictsPage api={api} />} path="/admin/dict" />
+            <Route element={<DictsPage api={api} />} path="/admin/dict/data/:dictId" />
+            <Route element={<ConfigsPage api={api} />} path="/admin/sys-config" />
+            <Route element={<SetConfigPage api={api} />} path="/admin/sys-config/set" />
+            <Route element={<ApisPage api={api} />} path="/admin/sys-api" />
+            <Route element={<LoginLogsPage api={api} />} path="/admin/sys-login-log" />
+            <Route element={<OperaLogsPage api={api} />} path="/admin/sys-oper-log" />
+            <Route element={<ServerMonitorPage api={api} />} path="/sys-tools/monitor" />
+            <Route element={<SwaggerPage />} path="/dev-tools/swagger" />
+            <Route element={<BuildToolPage />} path="/dev-tools/build" />
+            <Route element={<CodegenPage />} path="/dev-tools/gen" />
+            <Route element={<CodegenPage />} path="/dev-tools/editTable" />
+            <Route element={<ScheduleJobsPage api={api} />} path="/schedule/manage" />
+            <Route element={<ScheduleLogsPage api={api} />} path="/schedule/log" />
+            <Route element={<OpsPage api={api} />} path="/ops-service" />
+            <Route element={<ProfilePage info={info} profile={profile} />} path="/profile" />
+            <Route element={<ModulePage currentMenu={currentMenu} />} path="*" />
+          </Routes>
+        </Suspense>
+      </AdminAppShell>
+    </>
   );
 }
 
 export function App() {
+  const { t } = useI18n();
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
   const [authenticated, setAuthenticated] = useState(Boolean(sessionManager.read()?.token));
@@ -254,7 +265,7 @@ export function App() {
               if (error instanceof ApiError) {
                 throw error;
               }
-              throw new Error("登录接口调用失败");
+              throw new Error(t("admin.workbench.loginError"));
             }
           }}
           tenantCode={tenant.tenantCode}

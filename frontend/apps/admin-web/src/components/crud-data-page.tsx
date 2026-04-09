@@ -1,6 +1,7 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { useI18n } from "@suiyuan/i18n";
 import {
   Button,
   ConfirmDialog,
@@ -90,6 +91,7 @@ export function CrudDataPage<T extends object>({
   renderAside,
   rowActions,
 }: CrudDataPageProps<T>) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [pageIndex, setPageIndex] = useState(1);
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -116,14 +118,14 @@ export function CrudDataPage<T extends object>({
       return null;
     },
     onSuccess: async () => {
-      toast.success(editingId !== null ? "记录已更新" : "记录已创建");
+      toast.success(editingId !== null ? t("admin.crud.saveSuccess.update") : t("admin.crud.saveSuccess.create"));
       setDialogOpen(false);
       setEditingId(null);
       setDraft(createDraft());
       await queryClient.invalidateQueries({ queryKey: ["admin-page", queryKey] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "记录保存失败");
+      toast.error(error instanceof Error ? error.message : t("admin.crud.saveError"));
     },
   });
 
@@ -135,12 +137,12 @@ export function CrudDataPage<T extends object>({
       return deleteItem(payload);
     },
     onSuccess: async () => {
-      toast.success("记录已删除");
+      toast.success(t("admin.crud.deleteSuccess"));
       setDeleteTarget(null);
       await queryClient.invalidateQueries({ queryKey: ["admin-page", queryKey] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "记录删除失败");
+      toast.error(error instanceof Error ? error.message : t("admin.crud.deleteError"));
     },
   });
 
@@ -169,7 +171,7 @@ export function CrudDataPage<T extends object>({
       />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-        <FilterPanel description="统一使用后台模板组织搜索、筛选和高频操作，不再由页面自行拼布局。">
+        <FilterPanel description={t("admin.crud.filter.description")}>
           {searchFields.length ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {searchFields.map((field) => (
@@ -192,7 +194,7 @@ export function CrudDataPage<T extends object>({
           <Toolbar>
             {createItem ? (
               <Button onClick={openCreateDialog} type="button">
-                新建记录
+                {t("admin.crud.actions.create")}
               </Button>
             ) : null}
             <Button
@@ -200,7 +202,7 @@ export function CrudDataPage<T extends object>({
               type="button"
               variant="outline"
             >
-              刷新数据
+              {t("admin.crud.actions.refresh")}
             </Button>
           </Toolbar>
         </FilterPanel>
@@ -208,10 +210,10 @@ export function CrudDataPage<T extends object>({
         {renderAside ? renderAside() : null}
       </div>
 
-      <DataTableSection description={`当前共 ${total} 条记录。`} title="数据列表">
-        {listQuery.isLoading ? <Loading label="正在加载数据" /> : null}
+      <DataTableSection description={t("admin.crud.list.description", undefined, { count: total })} title={t("admin.crud.list.title")}>
+        {listQuery.isLoading ? <Loading label={t("admin.crud.loading")} /> : null}
         {listQuery.isError ? (
-          <EmptyBlock description="请检查登录态、接口返回和筛选条件。" title="数据查询失败" />
+          <EmptyBlock description={t("admin.crud.loadError.description")} title={t("admin.crud.loadError.title")} />
         ) : null}
         {!listQuery.isLoading && !listQuery.isError ? (
           <>
@@ -221,7 +223,7 @@ export function CrudDataPage<T extends object>({
                   {columns.map((column) => (
                     <TableHead key={column.label}>{column.label}</TableHead>
                   ))}
-                  {(rowActions || createItem || updateItem || deleteItem) ? <TableHead>操作</TableHead> : null}
+                  {(rowActions || createItem || updateItem || deleteItem) ? <TableHead>{t("admin.common.actions")}</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -243,12 +245,12 @@ export function CrudDataPage<T extends object>({
                           <RowActions>
                             {updateItem ? (
                               <Button onClick={() => openEditDialog(item)} size="sm" type="button" variant="outline">
-                                编辑
+                                {t("admin.crud.actions.edit")}
                               </Button>
                             ) : null}
                             {deleteItem ? (
                               <Button onClick={() => setDeleteTarget(item)} size="sm" type="button" variant="destructive">
-                                删除
+                                {t("admin.crud.actions.delete")}
                               </Button>
                             ) : null}
                             {rowActions ? rowActions(item) : null}
@@ -260,7 +262,7 @@ export function CrudDataPage<T extends object>({
                 ) : (
                   <TableRow>
                     <TableCell className="py-8" colSpan={columns.length + 1}>
-                      <EmptyBlock description="当前没有匹配的记录。" title="暂无数据" />
+                      <EmptyBlock description={t("admin.crud.empty.description")} title={t("admin.crud.empty.title")} />
                     </TableCell>
                   </TableRow>
                 )}
@@ -273,10 +275,10 @@ export function CrudDataPage<T extends object>({
 
       {dialogOpen && formFields.length > 0 ? (
         <FormDialog
-          description="统一使用后台表单弹层，保持布局、反馈和操作区一致。"
+          description={t("admin.crud.dialog.description")}
           onOpenChange={setDialogOpen}
           open={dialogOpen}
-          title={editingId !== null ? "编辑记录" : "新建记录"}
+          title={editingId !== null ? t("admin.crud.dialog.editTitle") : t("admin.crud.dialog.createTitle")}
         >
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto pr-1">
@@ -309,7 +311,7 @@ export function CrudDataPage<T extends object>({
                           }));
                         }}
                         options={field.options || []}
-                        placeholder={field.placeholder || "请选择"}
+                        placeholder={field.placeholder || t("admin.crud.selectPlaceholder")}
                         value={String(draft[field.key] ?? "")}
                       />
                     ) : (
@@ -335,7 +337,7 @@ export function CrudDataPage<T extends object>({
               onClick={() => saveMutation.mutate(draft)}
               type="button"
             >
-              {saveMutation.isPending ? "保存中..." : "保存"}
+              {saveMutation.isPending ? t("admin.crud.actions.saving") : t("admin.crud.actions.save")}
             </Button>
             <Button
               onClick={() => {
@@ -346,7 +348,7 @@ export function CrudDataPage<T extends object>({
               type="button"
               variant="outline"
             >
-              取消
+              {t("admin.crud.actions.cancel")}
             </Button>
             </FormActions>
           </div>
@@ -354,7 +356,7 @@ export function CrudDataPage<T extends object>({
       ) : null}
 
       <ConfirmDialog
-        description="删除后无法恢复，请确认这次操作确实必要。"
+        description={t("admin.crud.confirm.description")}
         onConfirm={async () => {
           if (!deleteTarget) {
             return;
@@ -367,7 +369,7 @@ export function CrudDataPage<T extends object>({
             setDeleteTarget(null);
           }
         }}
-        title="确认删除这条记录？"
+        title={t("admin.crud.confirm.title")}
       />
     </div>
   );

@@ -15,6 +15,7 @@
     "@suiyuan/auth": "workspace:*",
     "@suiyuan/core": "workspace:*",
     "@suiyuan/design-tokens": "workspace:*",
+    "@suiyuan/i18n": "workspace:*",
     "@suiyuan/types": "workspace:*",
     "@suiyuan/ui-admin": "workspace:*",
     "@tanstack/react-query": "^5.90.3",

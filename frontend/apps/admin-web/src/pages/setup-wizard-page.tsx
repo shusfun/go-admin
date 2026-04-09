@@ -3,6 +3,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
+import { useI18n } from "@suiyuan/i18n";
 import {
   AsyncActionButton,
   AuthLayout,
@@ -15,47 +16,57 @@ import {
 } from "@suiyuan/ui-admin";
 import type { SetupApi } from "@suiyuan/api";
 
-const dbSchema = z.object({
-  host: z.string().min(1, "请输入主机地址"),
-  port: z.number().min(1).max(65535, "端口范围 1-65535"),
-  user: z.string().min(1, "请输入用户名"),
-  password: z.string(),
-  dbname: z.string().min(1, "请输入数据库名"),
-});
-
-const redisSchema = z.object({
-  host: z.string().min(1, "请输入主机地址"),
-  port: z.number().min(1).max(65535, "端口范围 1-65535"),
-  password: z.string(),
-  db: z.number().min(0).max(15, "数据库编号 0-15"),
-});
-
-const adminSchema = z
-  .object({
-    username: z.string().min(1, "请输入用户名"),
-    password: z.string().min(6, "密码至少 6 位"),
-    confirmPassword: z.string().min(6, "请确认密码"),
-    email: z.string().email("邮箱格式无效").or(z.literal("")),
-    phone: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "两次密码不一致",
-    path: ["confirmPassword"],
+function createDbSchema(t: ReturnType<typeof useI18n>["t"]) {
+  return z.object({
+    host: z.string().min(1, t("admin.setup.db.host.required")),
+    port: z.number().min(1).max(65535, t("admin.setup.db.port.invalid")),
+    user: z.string().min(1, t("admin.setup.db.user.required")),
+    password: z.string(),
+    dbname: z.string().min(1, t("admin.setup.db.dbname.required")),
   });
+}
 
-type DBFormValues = z.infer<typeof dbSchema>;
-type RedisFormValues = z.infer<typeof redisSchema>;
-type AdminFormValues = z.infer<typeof adminSchema>;
+function createRedisSchema(t: ReturnType<typeof useI18n>["t"]) {
+  return z.object({
+    host: z.string().min(1, t("admin.setup.redis.host.required")),
+    port: z.number().min(1).max(65535, t("admin.setup.redis.port.invalid")),
+    password: z.string(),
+    db: z.number().min(0).max(15, t("admin.setup.redis.db.invalid")),
+  });
+}
+
+function createAdminSchema(t: ReturnType<typeof useI18n>["t"]) {
+  return z
+    .object({
+      username: z.string().min(1, t("admin.setup.admin.username.required")),
+      password: z.string().min(6, t("admin.setup.admin.password.min")),
+      confirmPassword: z.string().min(6, t("admin.setup.admin.confirm.required")),
+      email: z.string().email(t("admin.setup.admin.email.invalid")).or(z.literal("")),
+      phone: z.string(),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t("admin.setup.schema.confirmMismatch"),
+      path: ["confirmPassword"],
+    });
+}
 
 const STEPS = ["database", "redis", "admin", "complete"] as const;
 type Step = (typeof STEPS)[number];
 
-const STEP_LABELS: Record<Step, string> = {
-  database: "数据库配置",
-  redis: "Redis 配置",
-  admin: "管理员账号",
-  complete: "安装完成",
-};
+type SetupStepLabels = Record<Step, string>;
+
+function getStepLabels(t: ReturnType<typeof useI18n>["t"]): SetupStepLabels {
+  return {
+    database: t("admin.setup.db.step"),
+    redis: t("admin.setup.redis.step"),
+    admin: t("admin.setup.admin.step"),
+    complete: t("admin.setup.complete.step"),
+  };
+}
+
+type DBFormValues = z.infer<ReturnType<typeof createDbSchema>>;
+type RedisFormValues = z.infer<ReturnType<typeof createRedisSchema>>;
+type AdminFormValues = z.infer<ReturnType<typeof createAdminSchema>>;
 
 type SetupWizardPageProps = {
   initialStatus: SetupStatus;
@@ -66,6 +77,7 @@ type SetupWizardPageProps = {
 type SetupStatus = Awaited<ReturnType<SetupApi["getStatus"]>>;
 
 export function SetupWizardPage({ initialStatus, setupApi, onComplete }: SetupWizardPageProps) {
+  const { t } = useI18n();
   const defaults = initialStatus.defaults;
   const [currentStep, setCurrentStep] = useState<Step>("database");
   const [dbValues, setDbValues] = useState<DBFormValues | null>(() => defaults.database);
@@ -74,8 +86,9 @@ export function SetupWizardPage({ initialStatus, setupApi, onComplete }: SetupWi
   const [installError, setInstallError] = useState("");
   const [completionHint, setCompletionHint] = useState("");
 
+  const stepLabels = getStepLabels(t);
   const stepIndex = STEPS.indexOf(currentStep);
-  const environmentLabel = getEnvironmentLabel(defaults.environment);
+  const environmentLabel = getEnvironmentLabel(defaults.environment, t);
 
   async function handleAdminComplete(values: AdminFormValues) {
     if (!dbValues || !redisValues) {
@@ -104,9 +117,9 @@ export function SetupWizardPage({ initialStatus, setupApi, onComplete }: SetupWi
         return;
       }
 
-      setCompletionHint("服务可能已重启，请刷新页面或检查后端状态。");
+      setCompletionHint(t("admin.setup.hint"));
     } catch (error) {
-      setInstallError(error instanceof Error ? error.message : "安装失败");
+      setInstallError(error instanceof Error ? error.message : t("admin.setup.fallbackError"));
     } finally {
       setInstalling(false);
     }
@@ -116,22 +129,22 @@ export function SetupWizardPage({ initialStatus, setupApi, onComplete }: SetupWi
     <AuthLayout
       aside={
         <div className="grid max-w-xl gap-4 rounded-[2rem] border border-border/70 bg-card/80 p-6 shadow-[var(--shadow-card)]">
-          <p className="text-sm font-semibold text-foreground">初始化说明</p>
+          <p className="text-sm font-semibold text-foreground">{t("admin.setup.summary.title")}</p>
           <div className="space-y-2 text-sm leading-7 text-muted-foreground">
-            <p>已按当前{environmentLabel}预填连接参数，你可以直接测试，也可以按实际部署环境修改。</p>
-            <p>安装成功后系统会自动重启，页面会在探测到安装完成后跳回登录态。</p>
+            <p>{t("admin.setup.summary.description", undefined, { environment: environmentLabel })}</p>
+            <p>{t("admin.setup.summary.note")}</p>
           </div>
         </div>
       }
-      description="首次使用需要配置数据库和 Redis 连接，并创建管理员账号。"
+      description={t("admin.setup.description")}
       kicker="Setup Wizard"
-      title="系统初始化配置"
+      title={t("admin.setup.title")}
     >
       <WizardLayout
         currentStep={stepIndex}
-        description={`步骤 ${stepIndex + 1} / ${STEPS.length}：${STEP_LABELS[currentStep]}`}
-        steps={STEPS.map((step) => ({ label: STEP_LABELS[step] }))}
-        title="安装向导"
+        description={t("admin.setup.step.description", undefined, { current: stepIndex + 1, total: STEPS.length, label: stepLabels[currentStep] })}
+        steps={STEPS.map((step) => ({ label: stepLabels[step] }))}
+        title={t("admin.setup.layout.title")}
       >
         {currentStep === "database" ? (
           <DatabaseStep defaultValues={dbValues} onComplete={(values) => {
@@ -174,6 +187,7 @@ function DatabaseStep({
   defaultValues: DBFormValues | null;
   onComplete: (values: DBFormValues) => void;
 }) {
+  const { t } = useI18n();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
@@ -185,7 +199,7 @@ function DatabaseStep({
       password: "",
       dbname: "go_admin",
     },
-    resolver: zodResolver(dbSchema),
+    resolver: zodResolver(createDbSchema(t)),
   });
 
   async function handleTest() {
@@ -197,9 +211,9 @@ function DatabaseStep({
     setTestResult(null);
     try {
       await setupApi.testDatabase(form.getValues());
-      setTestResult({ ok: true, msg: "数据库连接成功" });
+      setTestResult({ ok: true, msg: t("admin.setup.db.success") });
     } catch (error) {
-      setTestResult({ ok: false, msg: error instanceof Error ? error.message : "连接失败" });
+      setTestResult({ ok: false, msg: error instanceof Error ? error.message : t("admin.setup.testFailed") });
     } finally {
       setTesting(false);
     }
@@ -210,35 +224,35 @@ function DatabaseStep({
       className="grid gap-5"
       onSubmit={form.handleSubmit((values) => {
         if (!testResult?.ok) {
-          setTestResult({ ok: false, msg: "请先测试连接" });
+          setTestResult({ ok: false, msg: t("admin.setup.step.testFirst") });
           return;
         }
         onComplete(values);
       })}
     >
       <div className="grid gap-4 md:grid-cols-2">
-        <FormField error={form.formState.errors.host?.message} label="主机地址">
+        <FormField error={form.formState.errors.host?.message} label={t("admin.setup.db.host.label")}>
           <Input {...form.register("host")} placeholder="127.0.0.1" />
         </FormField>
-        <FormField error={form.formState.errors.port?.message} label="端口">
+        <FormField error={form.formState.errors.port?.message} label={t("admin.setup.db.port.label")}>
           <Input {...form.register("port", { valueAsNumber: true })} placeholder="5432" type="number" />
         </FormField>
-        <FormField error={form.formState.errors.user?.message} label="用户名">
-          <Input {...form.register("user")} placeholder="postgres" />
+        <FormField error={form.formState.errors.user?.message} label={t("admin.setup.db.user.label")}>
+          <Input {...form.register("user")} placeholder={t("admin.setup.db.user.placeholder")} />
         </FormField>
-        <FormField error={form.formState.errors.password?.message} label="密码">
-          <Input {...form.register("password")} placeholder="数据库密码" type="password" />
+        <FormField error={form.formState.errors.password?.message} label={t("admin.setup.db.password.label")}>
+          <Input {...form.register("password")} placeholder={t("admin.setup.db.password.placeholder")} type="password" />
         </FormField>
       </div>
-      <FormField error={form.formState.errors.dbname?.message} label="数据库名">
-        <Input {...form.register("dbname")} placeholder="go_admin" />
+      <FormField error={form.formState.errors.dbname?.message} label={t("admin.setup.db.dbname.label")}>
+        <Input {...form.register("dbname")} placeholder={t("admin.setup.db.dbname.placeholder")} />
       </FormField>
       {testResult ? <InlineNotice tone={testResult.ok ? "success" : "danger"}>{testResult.msg}</InlineNotice> : null}
       <FormActions>
         <Button disabled={testing} onClick={() => void handleTest()} type="button" variant="outline">
-          {testing ? "测试中..." : "测试连接"}
+          {testing ? t("admin.setup.db.testing") : t("admin.setup.db.test")}
         </Button>
-        <Button type="submit">下一步</Button>
+        <Button type="submit">{t("admin.setup.next")}</Button>
       </FormActions>
     </form>
   );
@@ -255,6 +269,7 @@ function RedisStep({
   onBack: () => void;
   onComplete: (values: RedisFormValues) => void;
 }) {
+  const { t } = useI18n();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
@@ -265,7 +280,7 @@ function RedisStep({
       password: "",
       db: 0,
     },
-    resolver: zodResolver(redisSchema),
+    resolver: zodResolver(createRedisSchema(t)),
   });
 
   async function handleTest() {
@@ -277,9 +292,9 @@ function RedisStep({
     setTestResult(null);
     try {
       await setupApi.testRedis(form.getValues());
-      setTestResult({ ok: true, msg: "Redis 连接成功" });
+      setTestResult({ ok: true, msg: t("admin.setup.redis.success") });
     } catch (error) {
-      setTestResult({ ok: false, msg: error instanceof Error ? error.message : "连接失败" });
+      setTestResult({ ok: false, msg: error instanceof Error ? error.message : t("admin.setup.testFailed") });
     } finally {
       setTesting(false);
     }
@@ -290,35 +305,35 @@ function RedisStep({
       className="grid gap-5"
       onSubmit={form.handleSubmit((values) => {
         if (!testResult?.ok) {
-          setTestResult({ ok: false, msg: "请先测试连接" });
+          setTestResult({ ok: false, msg: t("admin.setup.step.testFirst") });
           return;
         }
         onComplete(values);
       })}
     >
       <div className="grid gap-4 md:grid-cols-2">
-        <FormField error={form.formState.errors.host?.message} label="主机地址">
+        <FormField error={form.formState.errors.host?.message} label={t("admin.setup.redis.host.label")}>
           <Input {...form.register("host")} placeholder="127.0.0.1" />
         </FormField>
-        <FormField error={form.formState.errors.port?.message} label="端口">
+        <FormField error={form.formState.errors.port?.message} label={t("admin.setup.redis.port.label")}>
           <Input {...form.register("port", { valueAsNumber: true })} placeholder="6379" type="number" />
         </FormField>
-        <FormField error={form.formState.errors.password?.message} label="密码（可选）">
-          <Input {...form.register("password")} placeholder="Redis 密码" type="password" />
+        <FormField error={form.formState.errors.password?.message} label={t("admin.setup.redis.password.label")}>
+          <Input {...form.register("password")} placeholder={t("admin.setup.redis.password.placeholder")} type="password" />
         </FormField>
-        <FormField error={form.formState.errors.db?.message} label="数据库编号">
+        <FormField error={form.formState.errors.db?.message} label={t("admin.setup.redis.db.label")}>
           <Input {...form.register("db", { valueAsNumber: true })} max={15} min={0} placeholder="0" type="number" />
         </FormField>
       </div>
       {testResult ? <InlineNotice tone={testResult.ok ? "success" : "danger"}>{testResult.msg}</InlineNotice> : null}
       <FormActions>
         <Button onClick={onBack} type="button" variant="ghost">
-          上一步
+          {t("admin.setup.back")}
         </Button>
         <Button disabled={testing} onClick={() => void handleTest()} type="button" variant="outline">
-          {testing ? "测试中..." : "测试连接"}
+          {testing ? t("admin.setup.db.testing") : t("admin.setup.db.test")}
         </Button>
-        <Button type="submit">下一步</Button>
+        <Button type="submit">{t("admin.setup.next")}</Button>
       </FormActions>
     </form>
   );
@@ -337,6 +352,7 @@ function AdminStep({
   onBack: () => void;
   onComplete: (values: AdminFormValues) => void;
 }) {
+  const { t } = useI18n();
   const form = useForm<AdminFormValues>({
     defaultValues: {
       username: defaultValues.username || "admin",
@@ -345,35 +361,35 @@ function AdminStep({
       email: defaultValues.email || "",
       phone: defaultValues.phone || "",
     },
-    resolver: zodResolver(adminSchema),
+    resolver: zodResolver(createAdminSchema(t)),
   });
 
   return (
     <form className="grid gap-5" onSubmit={form.handleSubmit(onComplete)}>
-      <FormField error={form.formState.errors.username?.message} label="管理员用户名">
+      <FormField error={form.formState.errors.username?.message} label={t("admin.setup.admin.username.label")}>
         <Input {...form.register("username")} placeholder="admin" />
       </FormField>
       <div className="grid gap-4 md:grid-cols-2">
-        <FormField error={form.formState.errors.password?.message} label="密码">
-          <Input {...form.register("password")} placeholder="至少 6 位" type="password" />
+        <FormField error={form.formState.errors.password?.message} label={t("admin.setup.admin.password.label")}>
+          <Input {...form.register("password")} placeholder={t("admin.setup.admin.password.placeholder")} type="password" />
         </FormField>
-        <FormField error={form.formState.errors.confirmPassword?.message} label="确认密码">
-          <Input {...form.register("confirmPassword")} placeholder="再次输入密码" type="password" />
+        <FormField error={form.formState.errors.confirmPassword?.message} label={t("admin.setup.admin.confirm.label")}>
+          <Input {...form.register("confirmPassword")} placeholder={t("admin.setup.admin.confirm.placeholder")} type="password" />
         </FormField>
-        <FormField error={form.formState.errors.email?.message} label="邮箱（可选）">
-          <Input {...form.register("email")} placeholder="admin@example.com" type="email" />
+        <FormField error={form.formState.errors.email?.message} label={t("admin.setup.admin.email.label")}>
+          <Input {...form.register("email")} placeholder={t("admin.setup.admin.email.placeholder")} type="email" />
         </FormField>
-        <FormField error={form.formState.errors.phone?.message} label="手机号（可选）">
-          <Input {...form.register("phone")} placeholder="手机号码" />
+        <FormField error={form.formState.errors.phone?.message} label={t("admin.setup.admin.phone.label")}>
+          <Input {...form.register("phone")} placeholder={t("admin.setup.admin.phone.placeholder")} />
         </FormField>
       </div>
       {installError ? <InlineNotice tone="danger">{installError}</InlineNotice> : null}
       <FormActions>
         <Button disabled={installing} onClick={onBack} type="button" variant="ghost">
-          上一步
+          {t("admin.setup.back")}
         </Button>
-        <AsyncActionButton loading={installing} loadingLabel="正在安装..." type="submit">
-          开始安装
+        <AsyncActionButton loading={installing} loadingLabel={t("admin.setup.installing")} type="submit">
+          {t("admin.setup.install")}
         </AsyncActionButton>
       </FormActions>
     </form>
@@ -381,12 +397,14 @@ function AdminStep({
 }
 
 function CompleteStep({ hint }: { hint: string }) {
+  const { t } = useI18n();
+
   return (
     <div className="grid gap-4 py-6 text-center">
       <div className="text-5xl text-primary">✓</div>
       <div className="space-y-2">
-        <h2 className="text-2xl font-semibold text-foreground">安装完成</h2>
-        <p className="text-sm leading-7 text-muted-foreground">系统正在重启中，请稍候。重启完成后将自动跳转到登录页面。</p>
+        <h2 className="text-2xl font-semibold text-foreground">{t("admin.setup.complete.title")}</h2>
+        <p className="text-sm leading-7 text-muted-foreground">{t("admin.setup.complete.description")}</p>
       </div>
       {hint ? <InlineNotice tone="warning">{hint}</InlineNotice> : null}
     </div>
@@ -397,14 +415,14 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function getEnvironmentLabel(environment: string) {
+function getEnvironmentLabel(environment: string, t: ReturnType<typeof useI18n>["t"]) {
   switch (environment) {
     case "prod":
-      return "生产环境";
+      return t("admin.setup.environment.prod");
     case "test":
-      return "测试环境";
+      return t("admin.setup.environment.test");
     default:
-      return "开发环境";
+      return t("admin.setup.environment.dev");
   }
 }
 
