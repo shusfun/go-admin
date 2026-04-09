@@ -5,12 +5,13 @@
 
 ## Build, Test, and Development Commands
 - `go mod tidy`：提交前同步并清理模块依赖。
-- `make build`：构建主程序，输出 `./go-admin`。
+- `go build -o ./devctl ./tools/devctl`：构建开发与运维工具入口。
+- `./devctl build backend`：构建主程序，输出 `./go-admin`。
 - `go build -tags sqlite3 -o go-admin .`：需要 SQLite 时使用该命令本地编译。
-- `./go-admin migrate -c config/settings.yml`：初始化或迁移数据库资源。
+- `./devctl migrate`：初始化或迁移数据库资源。
 - `./go-admin server -c config/settings.yml`：本地启动 API 服务。
 - `./go-admin server -c config/settings.yml -a true`：启动时自动补齐缺失的 `sys_api` 记录。
-- `go test ./...`：运行全部 Go 测试。
+- `./devctl test backend`：运行全部 Go 测试。
 - `go generate`：重新生成 Swagger 等派生文件。
 
 ## Coding Style & Naming Conventions

@@ -321,7 +321,7 @@ func shouldProcessRenameFile(path string) bool {
 	case ".go", ".mod", ".sum", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".ts", ".tsx", ".js", ".mjs", ".cjs", ".css", ".html", ".env":
 		return true
 	default:
-		return base == "Makefile"
+		return false
 	}
 }
 

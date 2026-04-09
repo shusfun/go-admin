@@ -63,3 +63,23 @@ func (a *App) captureCommand(name string, args []string, opts RunOptions) (strin
 	}
 	return output, nil
 }
+
+func (a *App) captureCombinedCommand(name string, args []string, opts RunOptions) (string, error) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if opts.Stdout == nil {
+		opts.Stdout = &stdout
+	}
+	if opts.Stderr == nil {
+		opts.Stderr = &stderr
+	}
+	err := a.runCommand(name, args, opts)
+	parts := make([]string, 0, 2)
+	if text := strings.TrimSpace(stdout.String()); text != "" {
+		parts = append(parts, text)
+	}
+	if text := strings.TrimSpace(stderr.String()); text != "" {
+		parts = append(parts, text)
+	}
+	return strings.Join(parts, "\n"), err
+}

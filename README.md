@@ -262,16 +262,16 @@ pnpm typecheck            # 全工作区 TypeScript 类型检查
 
 ```bash
 # 构建镜像
-docker build -t go-admin:latest .
+./devctl build docker
 
 # 启动开发基础设施
 ./devctl service start postgres redis
 
 # 启动应用容器
-docker compose up -d
+./devctl docker-up
 
 # 停止应用容器
-docker compose down
+./devctl docker-down
 ```
 
 容器首次启动时同样会进入 Setup Wizard 模式，通过浏览器完成安装即可。

@@ -212,7 +212,7 @@ func (a *App) runBuild(target string) error {
 	case "frontend":
 		return a.runCommand("pnpm", []string{"build"}, RunOptions{Dir: a.RepoRoot})
 	case "docker":
-		return a.runCommand("docker", []string{"build", "-t", a.PackageName + ":latest", "."}, RunOptions{Dir: a.RepoRoot})
+		return a.runDockerBuild(nil, "Dockerfile", false)
 	case "all":
 		for _, item := range []string{"backend", "frontend"} {
 			if err := a.runBuild(item); err != nil {
@@ -223,6 +223,40 @@ func (a *App) runBuild(target string) error {
 	default:
 		return fmt.Errorf("未知构建目标：%s", target)
 	}
+}
+
+func (a *App) runDockerBuild(tags []string, dockerFile string, push bool) error {
+	if dockerFile == "" {
+		dockerFile = "Dockerfile"
+	}
+	if len(tags) == 0 {
+		tags = []string{a.PackageName + ":latest"}
+	}
+
+	args := []string{"build", "-f", dockerFile}
+	for _, tag := range tags {
+		if strings.TrimSpace(tag) == "" {
+			continue
+		}
+		args = append(args, "-t", tag)
+	}
+	args = append(args, ".")
+	if err := a.runCommand("docker", args, RunOptions{Dir: a.RepoRoot}); err != nil {
+		return err
+	}
+
+	if !push {
+		return nil
+	}
+	for _, tag := range tags {
+		if strings.TrimSpace(tag) == "" {
+			continue
+		}
+		if err := a.runCommand("docker", []string{"push", tag}, RunOptions{Dir: a.RepoRoot}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *App) runTypecheck() error {

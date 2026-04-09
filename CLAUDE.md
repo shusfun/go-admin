@@ -12,18 +12,20 @@ go-admin 是一个基于 **Go (Gin + GORM + Casbin)** 后端和 **React 19 + Typ
 
 ```bash
 # 构建
-make build                                      # CGO_ENABLED=0，输出 ./go-admin
+go build -o ./devctl ./tools/devctl            # 构建 devctl 工具
+./devctl build backend                         # CGO_ENABLED=0，输出 ./go-admin
 go build -tags sqlite3 -o go-admin .            # 需要 SQLite 时使用
 
 # 运行
 ./go-admin server -c config/settings.yml        # 启动 API 服务（默认端口 8000）
 ./go-admin server -c config/settings.yml -a true # 启动并自动同步 sys_api 记录
-./go-admin migrate -c config/settings.yml       # 数据库迁移
+./devctl migrate                                # 数据库迁移
 
 # 测试与工具
-go test ./...                                   # 运行全部测试
-go mod tidy                                     # 提交前同步依赖
+./devctl test backend                           # 运行全部测试
+./devctl deps backend                           # 提交前同步依赖
 go generate                                     # 重新生成 Swagger 文档
+./devctl openapi                                # 生成 Swagger 并同步前端 client/types
 gofmt -w .                                      # 提交前格式化
 ```
 
@@ -46,9 +48,10 @@ pnpm --filter @suiyuan/core test
 ### Docker
 
 ```bash
-make build-linux                # docker build -t go-admin:latest
-make run                        # docker-compose up -d
-make stop                       # docker-compose down
+./devctl build docker           # docker build -t go-admin:latest
+./devctl docker-up              # docker compose up -d
+./devctl docker-down            # docker compose down
+./devctl deploy                 # 构建镜像并启动应用栈
 ```
 
 ## 架构

@@ -12,35 +12,30 @@ env:
   IMAGE_NAME_TAG: registry.ap-northeast-1.aliyuncs.com/go-admin/go-admin-api:${{ github.sha }}
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.24
+          go-version-file: go.mod
 
       - name: Tidy
         run: go mod tidy
 
-      - name: Build
-        run: env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -tags "sqlite3,json1" --ldflags "-extldflags -static" -o main .
+      - name: Build devctl
+        run: go build -o ./devctl ./tools/devctl
 
       - name: Build the Docker image and push
         run: |
           docker login --username=${{ secrets.DOCKER_USERNAME }} registry.ap-northeast-1.aliyuncs.com --password=${{ secrets.DOCKER_PASSWORD }}
           echo "************ docker login end"
-          docker build -t go-admin-api:latest .
-          echo "************ docker build end"
-          docker tag go-admin-api ${{ env.IMAGE_NAME_TAG }}
-          echo "************ docker tag end"
+          ./devctl build docker --tag go-admin-api:latest --tag ${{ env.IMAGE_NAME_TAG }} --push
+          echo "************ devctl docker build and push end"
           docker images
           echo "************ docker images end"
-          docker push ${{ env.IMAGE_NAME_TAG }}  # 推送
-          echo "************ docker push end"
 
       - name: Restart server   # 第五步，重启服务
         uses: appleboy/ssh-action@master

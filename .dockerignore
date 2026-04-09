@@ -1,0 +1,17 @@
+.git
+.github
+.idea
+.vscode
+.pnpm-store
+.tmp
+temp
+dist
+node_modules
+frontend/node_modules
+frontend/apps/*/dist
+frontend/packages/*/dist
+coverage
+devctl
+go-admin
+main
+*.log

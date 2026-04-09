@@ -1,19 +1,32 @@
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /src
+
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories \
+  && apk add --no-cache build-base git
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+  go build -tags "sqlite3,json1" --ldflags "-extldflags -static" -o /out/go-admin .
+
 FROM alpine
 
-# ENV GOPROXY https://goproxy.cn/
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories \
+  && apk add --no-cache ca-certificates tzdata
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories
+ENV TZ=Asia/Shanghai
 
-RUN apk update --no-cache
-RUN apk add --update gcc g++ libc6-compat
-RUN apk add --no-cache ca-certificates
-RUN apk add --no-cache tzdata
-ENV TZ Asia/Shanghai
-
-COPY ./main /main
+COPY --from=builder /out/go-admin /go-admin
 # settings.yml 仅作为容器内示例配置；真正的安装完成标志是同目录下的 .installed。
 COPY ./config/settings.demo.yml /config/settings.yml
 COPY ./go-admin-db.db /go-admin-db.db
+RUN chmod +x /go-admin \
+  && sed -i 's/port: 18123/port: 8000/' /config/settings.yml
+
 EXPOSE 8000
-RUN  chmod +x /main
-CMD ["/main","server","-c", "/config/settings.yml"]
+
+CMD ["/go-admin", "server", "-c", "/config/settings.yml"]

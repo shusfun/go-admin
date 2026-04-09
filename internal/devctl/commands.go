@@ -6,6 +6,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func withAppRun(run func(*App, *cobra.Command, []string) error) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		app, err := loadApp()
+		if err != nil {
+			return err
+		}
+		return run(app, cmd, args)
+	}
+}
+
 func newDoctorCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
@@ -80,6 +90,52 @@ func newSetupCommand() *cobra.Command {
 	}
 	command.Flags().BoolVar(&withOpenAPI, "with-openapi", false, "初始化时额外执行 openapi 同步")
 	command.Flags().BoolVar(&skipInfra, "skip-infra", false, "跳过 PostgreSQL / Redis 开发基础设施启动")
+	return command
+}
+
+func newRenameCommand() *cobra.Command {
+	var dryRun bool
+	var yes bool
+	command := &cobra.Command{
+		Use:   "rename <brand>",
+		Short: "批量重命名仓库内品牌与命名空间",
+		Args:  cobra.ExactArgs(1),
+		RunE: withAppRun(func(app *App, cmd *cobra.Command, args []string) error {
+			return app.runBrandRename(args[0], renameOptions{
+				DryRun: dryRun,
+				Yes:    yes,
+				Out:    cmd.OutOrStdout(),
+			})
+		}),
+	}
+	command.Flags().BoolVar(&dryRun, "dry-run", false, "仅预览将修改的文件，不实际写入")
+	command.Flags().BoolVar(&yes, "yes", false, "跳过确认直接执行")
+	return command
+}
+
+func newSetPrefixCommand() *cobra.Command {
+	var reset bool
+	command := &cobra.Command{
+		Use:   "set-prefix <project-prefix>",
+		Short: "设置或重置本地默认项目前缀",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if reset {
+				return nil
+			}
+			if len(args) != 1 {
+				return errors.New("请传入新的 project prefix，或使用 --reset")
+			}
+			return nil
+		},
+		RunE: withAppRun(func(app *App, cmd *cobra.Command, args []string) error {
+			next := ""
+			if len(args) > 0 {
+				next = args[0]
+			}
+			return app.renameProjectPrefix(next, reset, cmd.OutOrStdout())
+		}),
+	}
+	command.Flags().BoolVar(&reset, "reset", false, "清除本地默认项目前缀覆盖")
 	return command
 }
 
@@ -190,7 +246,10 @@ func newDepsCommand() *cobra.Command {
 }
 
 func newBuildCommand() *cobra.Command {
-	return &cobra.Command{
+	var dockerFile string
+	var dockerTags []string
+	var dockerPush bool
+	command := &cobra.Command{
 		Use:   "build backend|admin|mobile|showcase|frontend|docker|all",
 		Short: "执行构建",
 		Args:  cobra.ExactArgs(1),
@@ -199,9 +258,16 @@ func newBuildCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if args[0] == "docker" {
+				return app.runDockerBuild(dockerTags, dockerFile, dockerPush)
+			}
 			return app.runBuild(args[0])
 		},
 	}
+	command.Flags().StringVar(&dockerFile, "file", "Dockerfile", "Docker 构建使用的 Dockerfile 路径")
+	command.Flags().StringArrayVar(&dockerTags, "tag", nil, "Docker 镜像标签，可重复传入")
+	command.Flags().BoolVar(&dockerPush, "push", false, "构建完成后推送镜像")
+	return command
 }
 
 func newTestCommand() *cobra.Command {
@@ -216,6 +282,16 @@ func newTestCommand() *cobra.Command {
 			}
 			return app.runTest(args[0])
 		},
+	}
+}
+
+func newTypecheckCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "typecheck",
+		Short: "执行前端类型检查",
+		RunE: withAppRun(func(app *App, cmd *cobra.Command, args []string) error {
+			return app.runTypecheck()
+		}),
 	}
 }
 
@@ -258,6 +334,36 @@ func newMigrateCommand() *cobra.Command {
 			}
 			return app.runMigrate()
 		},
+	}
+}
+
+func newDockerUpCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "docker-up",
+		Short: "启动应用 compose 栈",
+		RunE: withAppRun(func(app *App, cmd *cobra.Command, args []string) error {
+			return app.runDockerUp()
+		}),
+	}
+}
+
+func newDockerDownCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "docker-down",
+		Short: "停止应用 compose 栈",
+		RunE: withAppRun(func(app *App, cmd *cobra.Command, args []string) error {
+			return app.runDockerDown()
+		}),
+	}
+}
+
+func newDeployCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "deploy",
+		Short: "构建 Docker 镜像并启动应用栈",
+		RunE: withAppRun(func(app *App, cmd *cobra.Command, args []string) error {
+			return app.runDeploy()
+		}),
 	}
 }
 
