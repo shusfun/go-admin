@@ -5,8 +5,15 @@
 static/uploadfile
 main.exe
 *.exe
+*~
 go-admin
 go-admin.exe
+devctl
+devctl.exe
+!internal/devctl/
+!internal/devctl/**
+!tools/devctl/
+!tools/devctl/**
 temp/
 !temp
 vendor
@@ -16,11 +23,10 @@ config/settings.dev.*.yml.log
 temp/logs
 config/settings.dev.yml.log
 config/settings.b.dev.yml
+config/.installed
 cmd/migrate/migration/version-local/*
 !cmd/migrate/migration/version-local/doc.go
 
-# go sum
-go.sum
 config/settings.deva.yml
 .ace-tool/
 node_modules/
