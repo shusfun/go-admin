@@ -6,6 +6,10 @@ import { dispatchCommand } from "./commands/index.mjs";
 
 export async function main(argv = process.argv.slice(2)) {
   const parsed = parseGlobalOptions(argv);
+  if (parsed.args[0] === "help") {
+    await dispatchCommand({ context: null, args: parsed.args });
+    return;
+  }
   const context = createRepoContext(parsed.options);
   await dispatchCommand({ context, args: parsed.args });
 }
@@ -36,7 +40,7 @@ export function parseGlobalOptions(argv) {
   }
 
   if (args.length === 0) {
-    throw new Error("用法: repo <command> [args...]");
+    return { options, args: ["help"] };
   }
 
   return { options, args };

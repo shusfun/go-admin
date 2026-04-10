@@ -26,6 +26,20 @@ type devEnvDefaults struct {
 	postgresPassword string
 }
 
+type repoProfile struct {
+	Infra struct {
+		Provider string `json:"provider"`
+		Postgres struct {
+			Host string `json:"host"`
+			Port int    `json:"port"`
+		} `json:"postgres"`
+		Redis struct {
+			Host string `json:"host"`
+			Port int    `json:"port"`
+		} `json:"redis"`
+	} `json:"infra"`
+}
+
 func ReadApplicationMode(defaultMode string) string {
 	settings, err := ReadCurrentSettings()
 	if err != nil {
@@ -188,7 +202,36 @@ func readDevEnvDefaults() devEnvDefaults {
 		}
 	}
 
+	if profile, err := readRepoProfile(); err == nil {
+		if validatePort(profile.Infra.Postgres.Port) {
+			defaults.postgresPort = profile.Infra.Postgres.Port
+		}
+		if validatePort(profile.Infra.Redis.Port) {
+			defaults.redisPort = profile.Infra.Redis.Port
+		}
+	}
+
 	return defaults
+}
+
+func readRepoProfile() (*repoProfile, error) {
+	packageJSONPath, err := findProjectPackageJSONPath()
+	if err != nil {
+		return nil, err
+	}
+
+	repoRoot := filepath.Dir(packageJSONPath)
+	profilePath := filepath.Join(repoRoot, "temp", "repo-cli", "profile.json")
+	content, err := os.ReadFile(profilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var profile repoProfile
+	if err := json.Unmarshal(content, &profile); err != nil {
+		return nil, err
+	}
+	return &profile, nil
 }
 
 func readProjectName() string {

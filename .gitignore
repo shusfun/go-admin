@@ -8,8 +8,10 @@ main.exe
 *~
 go-admin
 go-admin.exe
+devctl
 temp/
 !temp
+temp/devctl/
 temp/repo-cli/
 vendor
 config/settings.dev.yml

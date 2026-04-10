@@ -1,9 +1,9 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { composeBaseArgs, composeEnv, goEnv, localServicePort } from "./context.mjs";
+import { goEnv, localServicePort } from "./context.mjs";
 import { loadState, nowRFC3339 } from "./state.mjs";
-import { isProcessAlive, portOpen, portOwnerPid, runCommandOrThrow, startDetachedCommand, stopProcess, waitForPortClosed } from "../../shared/process.mjs";
+import { isProcessAlive, portOpen, portOwnerPid, startDetachedCommand, stopProcess, waitForPortClosed } from "../../shared/process.mjs";
 
 export function allServices(context) {
   return [
@@ -59,28 +59,12 @@ export function allServices(context) {
         env: process.env,
       }),
     },
-    {
-      name: "postgres",
-      label: "PostgreSQL",
-      kind: "docker",
-      port: localServicePort(context, "postgres"),
-      mode: "docker",
-      composeName: "postgres",
-    },
-    {
-      name: "redis",
-      label: "Redis",
-      kind: "docker",
-      port: localServicePort(context, "redis"),
-      mode: "docker",
-      composeName: "redis",
-    },
   ];
 }
 
 export function normalizeServiceList(context, names) {
   if (names.length === 0) {
-    throw new Error("至少指定一个服务，可选值：backend, admin, mobile, showcase, postgres, redis");
+    throw new Error("至少指定一个服务，可选值：backend, admin, mobile, showcase");
   }
   if (names.length === 1 && names[0] === "all") {
     return allServices(context);
@@ -122,13 +106,6 @@ export async function reconcileState(context) {
     current.port = service.port;
     current.mode = service.mode;
 
-    if (service.kind === "docker") {
-      current.status = (await portOpen(service.port)) ? "running" : "stopped";
-      current.updatedAt = nowRFC3339();
-      state.services[service.name] = current;
-      continue;
-    }
-
     const pidAlive = isProcessAlive(current.pid);
     const serving = await portOpen(service.port);
     if (serving) {
@@ -152,12 +129,6 @@ export async function reconcileState(context) {
 
 export async function startServices(context, services) {
   await ensureServicesStartable(context, services);
-
-  const dockerTargets = services.filter((item) => item.kind === "docker");
-  if (dockerTargets.length > 0) {
-    const args = [...composeBaseArgs(context, true), "up", "-d", ...dockerTargets.map((item) => item.composeName ?? item.name)];
-    runCommandOrThrow("docker", args, { cwd: context.repoRoot, env: composeEnv(context), stdio: "inherit" });
-  }
 
   for (const service of services.filter((item) => item.kind === "local")) {
     if (!service.command) {
@@ -185,30 +156,9 @@ export async function startServices(context, services) {
     persistState(context, latest);
     console.log(`已发起启动：${service.label}`);
   }
-
-  for (const service of dockerTargets) {
-    const latest = loadState(context);
-    latest.services[service.name] = {
-      name: service.name,
-      status: "running",
-      mode: service.mode,
-      port: service.port,
-      pid: 0,
-      logPath: "",
-      startedAt: latest.services[service.name]?.startedAt || nowRFC3339(),
-      updatedAt: nowRFC3339(),
-    };
-    persistState(context, latest);
-  }
 }
 
 export async function stopServices(context, services) {
-  const dockerTargets = services.filter((item) => item.kind === "docker");
-  if (dockerTargets.length > 0) {
-    const args = [...composeBaseArgs(context, true), "stop", ...dockerTargets.map((item) => item.composeName ?? item.name)];
-    runCommandOrThrow("docker", args, { cwd: context.repoRoot, env: composeEnv(context), stdio: "inherit" });
-  }
-
   const state = await reconcileState(context);
   for (const service of services.filter((item) => item.kind === "local")) {
     const current = state.services[service.name];
@@ -231,29 +181,6 @@ export async function stopServices(context, services) {
       port: service.port,
       pid: 0,
       logPath: path.join(context.logsDir, `${service.name}.log`),
-      updatedAt: nowRFC3339(),
-      exitedAt: nowRFC3339(),
-    };
-    persistState(context, latest);
-    console.log(`已停止：${service.label}`);
-  }
-
-  for (const service of dockerTargets) {
-    const latest = loadState(context);
-    latest.services[service.name] = {
-      ...(latest.services[service.name] ?? {
-        name: service.name,
-        mode: service.mode,
-        port: service.port,
-        pid: 0,
-        logPath: "",
-      }),
-      name: service.name,
-      status: "stopped",
-      mode: service.mode,
-      port: service.port,
-      pid: 0,
-      logPath: "",
       updatedAt: nowRFC3339(),
       exitedAt: nowRFC3339(),
     };
@@ -307,9 +234,6 @@ function requireText(filePath) {
 }
 
 function displayMode(mode) {
-  if (mode === "docker") {
-    return "docker";
-  }
   if (mode === "detached") {
     return "后台";
   }

@@ -1,4 +1,6 @@
 import { normalizeServiceList, restartServices, startServices, stopServices } from "../domains/runtime/services.mjs";
+import { printHelp } from "../domains/help/index.mjs";
+import { printInfraStatus, startInfra, stopInfra } from "../domains/infra/index.mjs";
 import { runBuild } from "../domains/build/index.mjs";
 import { runDeps } from "../domains/deps/index.mjs";
 import { dockerDown, dockerUp, deploy } from "../domains/docker/index.mjs";
@@ -13,6 +15,9 @@ export async function dispatchCommand(env) {
   switch (command) {
     case "doctor":
       runDoctor(env.context);
+      return;
+    case "help":
+      printHelp();
       return;
     case "env":
       await printEnv(env.context);
@@ -72,6 +77,9 @@ export async function dispatchCommand(env) {
     case "service":
       await runServiceCommand(env);
       return;
+    case "infra":
+      await runInfraCommand(env);
+      return;
     case "fmt":
       throw new Error("repo fmt 暂未提供，请直接执行 gofmt -w");
     default:
@@ -120,6 +128,23 @@ async function runServiceCommand(env) {
     }
     default:
       throw new Error("用法: repo service start|stop|restart|logs ...");
+  }
+}
+
+async function runInfraCommand(env) {
+  const action = env.args[1];
+  switch (action) {
+    case "start":
+      await startInfra(env.context);
+      return;
+    case "stop":
+      await stopInfra(env.context);
+      return;
+    case "status":
+      await printInfraStatus(env.context);
+      return;
+    default:
+      throw new Error("用法: repo infra start|stop|status");
   }
 }
 

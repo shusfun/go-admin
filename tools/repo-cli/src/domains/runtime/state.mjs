@@ -28,9 +28,32 @@ export function updateState(context, mutator) {
   return state;
 }
 
-export function saveProfile(context, projectPrefix) {
+export function loadProfileData(context) {
   ensureDir(path.dirname(context.profilePath));
-  writeFileSync(context.profilePath, `${JSON.stringify({ project_prefix: projectPrefix }, null, 2)}\n`, "utf8");
+  if (!existsSync(context.profilePath)) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(readFileSync(context.profilePath, "utf8"));
+  } catch (error) {
+    const brokenPath = `${context.profilePath}.broken-${Date.now()}`;
+    renameSync(context.profilePath, brokenPath);
+    console.error(`检测到损坏的 profile 文件，已迁移到 ${brokenPath}: ${error instanceof Error ? error.message : String(error)}`);
+    return {};
+  }
+}
+
+export function saveProfile(context, projectPrefix) {
+  const current = loadProfileData(context);
+  current.project_prefix = projectPrefix;
+  writeProfile(context, current);
+}
+
+export function saveInfraProfile(context, profile) {
+  const current = loadProfileData(context);
+  current.infra = profile;
+  writeProfile(context, current);
 }
 
 export function removeProfile(context) {
@@ -46,6 +69,11 @@ export function nowRFC3339() {
 function writeState(context, state) {
   ensureDir(path.dirname(context.statePath));
   writeFileSync(context.statePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+}
+
+function writeProfile(context, profile) {
+  ensureDir(path.dirname(context.profilePath));
+  writeFileSync(context.profilePath, `${JSON.stringify(profile, null, 2)}\n`, "utf8");
 }
 
 function ensureDir(dirPath) {

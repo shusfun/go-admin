@@ -1,0 +1,54 @@
+export function printHelp() {
+  const sections = [
+    {
+      title: "基础设施",
+      lines: [
+        "repo infra start          自动探测并启动开发基础设施（Homebrew / Docker）",
+        "repo infra stop           停止当前基础设施来源",
+        "repo infra status         查看基础设施来源、运行状态和健康状态",
+      ],
+    },
+    {
+      title: "应用服务",
+      lines: [
+        "repo service start backend   启动后端",
+        "repo service start admin     启动管理端",
+        "repo service start mobile    启动移动端",
+        "repo service stop all        停止全部应用服务",
+        "repo service logs <service>  查看服务日志",
+      ],
+    },
+    {
+      title: "常用命令",
+      lines: [
+        "repo doctor               检查 go/node/pnpm/brew/docker",
+        "repo env                  打印当前配置文件、端口和工作目录",
+        "repo status               查看应用服务和基础设施状态",
+        "repo setup                安装依赖并准备开发环境",
+        "repo setup-status         查看是否会进入 Setup Wizard",
+        "repo migrate              执行数据库迁移",
+        "repo openapi              生成 OpenAPI 与前端类型",
+        "repo reinit --yes         重置本地产物和安装态",
+      ],
+    },
+    {
+      title: "全局参数",
+      lines: [
+        "--config <path>           指定后端配置文件",
+        "--project-prefix <name>   指定 Docker 项目前缀",
+        "--repo-root <path>        指定仓库根目录",
+      ],
+    },
+  ];
+
+  console.log("用法: repo <command> [args...]");
+  console.log("");
+  for (const section of sections) {
+    console.log(section.title);
+    for (const line of section.lines) {
+      console.log(`  ${line}`);
+    }
+    console.log("");
+  }
+  console.log("快捷入口：pnpm repo:help");
+}

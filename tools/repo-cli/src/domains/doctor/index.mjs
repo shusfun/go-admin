@@ -5,6 +5,7 @@ export function doctorReport(_context) {
     { name: "go", command: "go", args: ["version"] },
     { name: "node", command: "node", args: ["--version"] },
     { name: "pnpm", command: "pnpm", args: ["--version"] },
+    { name: "brew", command: "brew", args: ["--version"] },
     { name: "docker", command: "docker", args: ["--version"] },
     { name: "docker compose", command: "docker", args: ["compose", "version"] },
   ];

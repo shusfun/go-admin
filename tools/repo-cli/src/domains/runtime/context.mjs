@@ -1,14 +1,18 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { loadProfileData } from "./state.mjs";
+
 export function createRepoContext(options) {
   const repoRoot = findRepoRoot(options.repoRoot);
   const packageName = readPackageName(path.join(repoRoot, "package.json"));
   const ports = loadPorts(path.join(repoRoot, "config", "dev-ports.env"));
   const runtimeDir = path.join(repoRoot, "temp", "repo-cli");
   const profilePath = path.join(runtimeDir, "profile.json");
-  const profile = loadProfile(profilePath);
-  const projectPrefix = normalizeProjectPrefix(options.projectPrefix || profile.projectPrefix || packageName);
+  const configFile = path.resolve(repoRoot, options.configFile || "config/settings.pg.yml");
+  const configDir = path.dirname(configFile);
+  const profile = loadProfileData({ profilePath });
+  const projectPrefix = normalizeProjectPrefix(options.projectPrefix || profile.project_prefix || packageName);
   const goTmpDir = path.join(repoRoot, ".tmp", "go");
   const goBinDir = path.join(repoRoot, ".tmp", "bin");
 
@@ -17,10 +21,12 @@ export function createRepoContext(options) {
 
   return {
     repoRoot,
-    configFile: path.resolve(repoRoot, options.configFile || "config/settings.pg.yml"),
+    configFile,
+    configDir,
     projectPrefix,
     packageName,
     ports,
+    profile,
     goCacheDir: path.join(goTmpDir, "cache"),
     goBinDir,
     runtimeDir,
@@ -36,8 +42,8 @@ export function createRepoContext(options) {
     mobileDistDir: path.join(repoRoot, "frontend", "apps", "mobile-h5", "dist"),
     showcaseDistDir: path.join(repoRoot, "frontend", "apps", "ui-showcase", "dist"),
     rootDistDir: path.join(repoRoot, "dist"),
-    installLockFile: path.join(repoRoot, "config", ".installed"),
-    settingsFile: path.join(repoRoot, "config", "settings.yml"),
+    installLockFile: path.join(configDir, ".installed"),
+    settingsFile: configFile,
   };
 }
 
@@ -142,14 +148,6 @@ function loadPorts(portsPath) {
     result[key.trim()] = value;
   }
   return result;
-}
-
-function loadProfile(profilePath) {
-  if (!existsSync(profilePath)) {
-    return {};
-  }
-  const payload = JSON.parse(readFileSync(profilePath, "utf8"));
-  return { projectPrefix: payload.project_prefix };
 }
 
 function ensureDir(dirPath) {

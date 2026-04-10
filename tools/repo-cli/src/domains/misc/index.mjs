@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import readline from "node:readline/promises";
 
-import { normalizeServiceList, printStatusTable, reconcileState, tailServiceLog } from "../runtime/services.mjs";
+import { printStatusTable, reconcileState, tailServiceLog } from "../runtime/services.mjs";
+import { printInfraStatus, startInfra } from "../infra/index.mjs";
 import { commandExists, runCommandOrThrow } from "../../shared/process.mjs";
 import { composeBaseArgs, composeEnv, goEnv } from "../runtime/context.mjs";
 
@@ -40,6 +41,8 @@ export function printSetupStatus(context) {
 export async function printStatus(context) {
   const state = await reconcileState(context);
   printStatusTable(context, state);
+  console.log("");
+  await printInfraStatus(context);
 }
 
 export function printServiceLogs(context, serviceName, lines) {
@@ -129,18 +132,18 @@ export async function runReinit(context, yes) {
 export async function runSetup(context, withOpenAPI, skipInfra) {
   const doctor = await import("../doctor/index.mjs");
   const deps = await import("../deps/index.mjs");
-  const runtime = await import("../runtime/services.mjs");
 
   console.log("==> 环境检查");
   const report = doctor.doctorReport(context);
   const missing = [];
+  const required = new Set(["go", "node", "pnpm"]);
   for (const item of report) {
     if (item.ok) {
       console.log(`  [OK] ${item.name.padEnd(15, " ")} ${item.output}`);
       continue;
     }
     console.log(`  [缺失] ${item.name}`);
-    if (skipInfra && (item.name === "docker" || item.name === "docker compose")) {
+    if (!required.has(item.name)) {
       continue;
     }
     missing.push(item.name);
@@ -161,7 +164,7 @@ export async function runSetup(context, withOpenAPI, skipInfra) {
     console.log("\n==> 跳过基础设施启动");
   } else {
     console.log("\n==> 启动基础设施");
-    await runtime.startServices(context, normalizeServiceList(context, ["postgres", "redis"]));
+    await startInfra(context);
   }
 
   console.log("\n==> 安装状态");
@@ -169,7 +172,7 @@ export async function runSetup(context, withOpenAPI, skipInfra) {
 
   console.log("\n==> 完成");
   if (skipInfra) {
-    console.log("  可继续执行：pnpm repo:service:infra");
+    console.log("  可继续执行：pnpm repo:infra:start");
   }
   console.log("  然后执行：pnpm repo:service:backend");
   console.log("  如需前端：pnpm repo:service:admin");
