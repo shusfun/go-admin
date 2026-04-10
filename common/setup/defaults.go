@@ -33,6 +33,8 @@ type repoProfile struct {
 	} `json:"infra"`
 }
 
+var repoProfileReader = readRepoProfile
+
 func ReadApplicationMode(defaultMode string) string {
 	settings, err := ReadCurrentSettings()
 	if err != nil {
@@ -59,6 +61,13 @@ func ReadApplicationMode(defaultMode string) string {
 
 func ReadSetupDefaults() SetupDefaults {
 	mode := normalizeEnvironment(ReadApplicationMode("dev"))
+
+	if profile, err := repoProfileReader(); err == nil && hasLocalInfraProfile(profile) && NeedsSetup() {
+		defaults := defaultSetupDefaults("dev")
+		applyRepoProfileDefaults(&defaults.Database, profile)
+		return defaults
+	}
+
 	defaults := defaultSetupDefaults(mode)
 
 	settings, err := ReadCurrentSettings()
@@ -76,6 +85,30 @@ func ReadSetupDefaults() SetupDefaults {
 		defaults.Database.Password = ""
 	}
 	return defaults
+}
+
+func hasLocalInfraProfile(profile *repoProfile) bool {
+	if profile == nil {
+		return false
+	}
+	switch strings.TrimSpace(strings.ToLower(profile.Infra.Provider)) {
+	case "docker", "global":
+		return true
+	default:
+		return false
+	}
+}
+
+func applyRepoProfileDefaults(target *DatabaseConfig, profile *repoProfile) {
+	if profile == nil {
+		return
+	}
+	if host := strings.TrimSpace(profile.Infra.Postgres.Host); host != "" {
+		target.Host = host
+	}
+	if validatePort(profile.Infra.Postgres.Port) {
+		target.Port = profile.Infra.Postgres.Port
+	}
 }
 
 func normalizeEnvironment(mode string) string {
@@ -178,7 +211,7 @@ func readDevEnvDefaults() devEnvDefaults {
 		}
 	}
 
-	if profile, err := readRepoProfile(); err == nil {
+	if profile, err := repoProfileReader(); err == nil {
 		if validatePort(profile.Infra.Postgres.Port) {
 			defaults.postgresPort = profile.Infra.Postgres.Port
 		}

@@ -41,6 +41,16 @@ func TestNeedsSetupUsesInstallLockOnly(t *testing.T) {
 	}
 }
 
+func withRepoProfileReader(t *testing.T, reader func() (*repoProfile, error)) {
+	t.Helper()
+
+	previous := repoProfileReader
+	repoProfileReader = reader
+	t.Cleanup(func() {
+		repoProfileReader = previous
+	})
+}
+
 func TestRegisterStatusRouteReflectsInstallState(t *testing.T) {
 	t.Helper()
 
@@ -99,6 +109,9 @@ func TestRegisterStatusRouteReflectsInstallState(t *testing.T) {
 
 func TestReadSetupDefaultsUsesDevFallbacks(t *testing.T) {
 	t.Helper()
+	withRepoProfileReader(t, func() (*repoProfile, error) {
+		return nil, os.ErrNotExist
+	})
 
 	previous := GetConfigPath()
 	t.Cleanup(func() {
@@ -138,6 +151,9 @@ settings:
 
 func TestReadSetupDefaultsParsesProdSettings(t *testing.T) {
 	t.Helper()
+	withRepoProfileReader(t, func() (*repoProfile, error) {
+		return nil, os.ErrNotExist
+	})
 
 	previous := GetConfigPath()
 	t.Cleanup(func() {
@@ -175,6 +191,52 @@ settings:
 	}
 	if defaults.Database.Password != "" {
 		t.Fatalf("expected prod database password to stay empty, got %+v", defaults.Database)
+	}
+}
+
+func TestReadSetupDefaultsPrefersRepoInfraWhenNeedsSetup(t *testing.T) {
+	t.Helper()
+	withRepoProfileReader(t, func() (*repoProfile, error) {
+		profile := &repoProfile{}
+		profile.Infra.Provider = "global"
+		profile.Infra.Postgres.Host = "127.0.0.1"
+		profile.Infra.Postgres.Port = 5432
+		return profile, nil
+	})
+
+	previous := GetConfigPath()
+	t.Cleanup(func() {
+		SetConfigPath(previous)
+	})
+
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "settings.pg.yml")
+	content := []byte(`
+settings:
+  application:
+    mode: prod
+  database:
+    driver: postgres
+    source: host=127.0.0.1 port=15432 user=dev_user password=dev_pass dbname=dev_db sslmode=disable
+`)
+	if err := os.WriteFile(configFile, content, 0600); err != nil {
+		t.Fatalf("write config failed: %v", err)
+	}
+
+	SetConfigPath(configFile)
+
+	defaults := ReadSetupDefaults()
+	if defaults.Environment != "dev" {
+		t.Fatalf("expected local infra setup to force dev defaults, got %q", defaults.Environment)
+	}
+	if defaults.Database.Host != "127.0.0.1" || defaults.Database.Port != 5432 {
+		t.Fatalf("expected repo infra postgres defaults, got %+v", defaults.Database)
+	}
+	if defaults.Database.User != "go_admin_dev" || defaults.Database.DBName != "go_admin_dev" {
+		t.Fatalf("expected project-based database defaults, got %+v", defaults.Database)
+	}
+	if defaults.Database.Password != "go_admin_dev" {
+		t.Fatalf("expected local database password to be prefilled, got %+v", defaults.Database)
 	}
 }
 
