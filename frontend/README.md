@@ -34,7 +34,7 @@
 ```bash
 pnpm repo:deps:all
 pnpm repo:setup
-pnpm repo:service:infra
+pnpm repo:infra:start
 pnpm repo:service:backend
 pnpm repo:service:admin
 pnpm repo:service:mobile
@@ -63,7 +63,7 @@ pnpm build
 
 ```bash
 pnpm repo:deps:all
-pnpm repo:service:infra
+pnpm repo:infra:start
 pnpm repo:service:backend
 pnpm repo:service:admin
 ```
@@ -71,7 +71,7 @@ pnpm repo:service:admin
 这些 `pnpm repo:*` 命令会直接执行 `tools/repo-cli/src/*.mjs`，不依赖额外的 CLI 编译步骤。
 
 - Docker 项目前缀默认取仓库根 `package.json.name`，当前仓库默认值为 `go-admin`
-- `pnpm repo:service:infra`、`pnpm repo:reinit` 等命令都会读取同一个前缀
+- `pnpm repo:infra:start`、`pnpm repo:reinit` 等命令都会读取同一个前缀
 - 如需覆盖，可使用 `pnpm run repo -- --project-prefix 你的前缀 ...`
 - 如需回到全新安装状态，再执行 `pnpm repo:reinit`
 

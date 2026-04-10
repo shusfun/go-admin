@@ -99,12 +99,18 @@ cd go-admin
 ```bash
 pnpm repo:doctor
 pnpm repo:deps:all
-pnpm repo:service:infra
+pnpm repo:infra:start
 pnpm repo:service:backend
 pnpm repo:service:admin
 ```
 
-这套流程默认使用以下端口：
+这套流程会自动探测可用的开发基础设施：
+
+- 若项目级 Docker 基础设施已在运行，优先复用 `15432 / 16379`
+- 若检测到 Homebrew 全局 PostgreSQL / Redis，则优先复用 `5432 / 6379`
+- 实际探测结果可通过 `pnpm repo:infra:status` 查看
+
+项目级 Docker 基础设施默认使用以下端口：
 
 - 后端 API：`18123`
 - 管理端：`26173`
@@ -126,37 +132,38 @@ pnpm repo:env
 - 如需覆盖，可在命令前传入 `--project-prefix`
 
 ```bash
-pnpm run repo -- --project-prefix my-local-env service start postgres redis
+pnpm run repo -- --project-prefix my-local-env infra start
 pnpm run repo -- --project-prefix my-local-env reinit --yes
 ```
 
 ### 四个核心命令
 
 ```bash
-pnpm repo:service:infra
+pnpm repo:infra:start
 pnpm repo:service:backend
 pnpm repo:service:admin
 pnpm repo:reinit
 ```
 
-- `repo service start postgres redis`：启动 PostgreSQL 和 Redis 开发容器
+- `repo infra start`：自动探测并启动开发基础设施，优先复用当前可用的 Docker / Homebrew 服务
+- `repo infra stop`：停止当前选中的开发基础设施来源
+- `repo infra status`：查看当前基础设施来源、安装状态、运行状态和健康状态
 - `repo service start backend`：启动后端，默认读取 `config/settings.pg.yml`
 - `repo service start admin`：启动管理端开发服务器
-- `repo reinit --yes`：按当前前缀清理应用栈、开发容器、工作区数据目录、安装锁和本地产物
+- `repo reinit --yes`：按当前前缀清理应用栈、项目级 Docker 数据目录、安装锁和本地产物
 - 所有受管服务日志和状态文件都会写到项目内 `temp/repo-cli/`：
   - `temp/repo-cli/logs/<service>.log`
   - `temp/repo-cli/state.json`
 
 - Windows / macOS：`backend`、`admin`、`mobile` 默认在独立终端窗口启动
 - Linux：本地服务保持在当前终端体系内运行，不依赖额外图形窗口
-- `postgres` / `redis` 始终通过 `docker compose up -d` 后台运行
 
 ### Setup Wizard 说明
 
 - 首次执行 `repo service start backend` 时，如果 `config/.installed` 不存在，后端会进入 Setup Wizard 模式
 - Setup 模式下只暴露 `/api/v1/setup/*` 接口，不会托管前端静态资源
 - 启动 `repo service start admin` 后，前端会自动检测安装状态并引导初始化数据库、Redis 和管理员账号
-- 安装完成后会写入 `config/settings.yml` 与 `config/.installed`
+- 安装完成后会写入当前启动使用的配置文件（默认 `config/settings.pg.yml`）与同目录下的 `.installed`
 - 容器部署时请持久化 `config/` 目录，否则重启后会重新进入安装流程
 
 ### OpenAPI 到前端类型

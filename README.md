@@ -115,18 +115,19 @@ pnpm repo:deps:all
 ### 4. 启动开发基础设施
 
 ```bash
-pnpm repo:service:infra
+pnpm repo:infra:start
 ```
 
-默认会启动：
+The repo CLI now auto-detects available local infrastructure:
 
-- PostgreSQL：`127.0.0.1:15432`
-- Redis：`127.0.0.1:16379`
+- If project Docker infra is already running, it reuses `15432 / 16379`
+- If Homebrew PostgreSQL / Redis are available, it can reuse `5432 / 6379`
+- You can inspect the current choice with `pnpm repo:infra:status`
 
 Docker 项目前缀默认取仓库根 `package.json.name`，当前仓库默认值为 `go-admin`。如果需要自定义容器前缀，可覆盖：
 
 ```bash
-pnpm run repo -- --project-prefix my-local-env service start postgres redis
+pnpm run repo -- --project-prefix my-local-env infra start
 ```
 
 ### 5. 启动后端与前端
@@ -146,8 +147,6 @@ pnpm repo:service:mobile
 
 - Windows / macOS：`backend`、`admin`、`mobile` 默认在独立终端窗口启动
 - Linux：本地服务保持在当前终端体系内运行，不依赖额外图形窗口
-- `postgres` / `redis` 始终通过 `docker compose up -d` 后台运行
-
 首次启动时，后端检测到系统未安装，会进入 **Setup Wizard 模式**：仅暴露 `/api/v1/setup/*` 路由，不连接数据库，等待前端引导完成初始化配置。
 
 所有受管服务日志和状态文件都会写入项目内的 `temp/repo-cli/`，便于直接排查：
@@ -166,7 +165,7 @@ pnpm repo:service:mobile
 3. **管理员账号** — 设置管理员用户名、密码、邮箱（可选）、手机号（可选）
 
 点击「开始安装」后，后端将自动：
-- 生成 `config/settings.yml` 配置文件
+- 生成当前启动使用的配置文件（默认 `config/settings.pg.yml`）
 - 创建数据库表并导入初始化数据
 - 创建管理员账号
 - 写入 `.installed` 锁文件
@@ -210,9 +209,7 @@ pnpm run repo -- --project-prefix my-local-env reinit --yes
 
 ### 判定逻辑
 
-`NeedsSetup()` 在以下**任一**条件满足时返回 `true`：
-- `config/settings.yml` 文件不存在
-- 同目录下的 `.installed` 锁文件不存在
+`NeedsSetup()` 目前仅以当前配置文件同目录下的 `.installed` 锁文件为准。
 
 ### 注意事项
 
@@ -230,7 +227,9 @@ pnpm run repo -- --project-prefix my-local-env reinit --yes
 pnpm repo:doctor                                  # 检查 go/node/pnpm/docker/docker compose
 pnpm repo:env                                     # 打印当前端口、前缀、日志目录和状态文件
 pnpm repo:setup-status                            # 检查是否会进入 Setup Wizard
-pnpm repo:service:infra                           # 启动 PostgreSQL + Redis 开发基础设施
+pnpm repo:infra:start                             # 自动探测并启动开发基础设施
+pnpm repo:infra:stop                              # 停止当前开发基础设施来源
+pnpm repo:infra:status                            # 查看当前基础设施来源与健康状态
 pnpm repo:service:backend                         # 启动 API 服务（默认使用 config/settings.pg.yml）
 pnpm repo:service:admin                           # 启动 admin-web 开发服务器
 pnpm repo:service:mobile                          # 启动 mobile-h5 开发服务器
@@ -263,7 +262,7 @@ pnpm typecheck            # 全工作区 TypeScript 类型检查
 pnpm repo:build:docker
 
 # 启动开发基础设施
-pnpm repo:service:infra
+pnpm repo:infra:start
 
 # 启动应用容器
 pnpm repo:docker:up
@@ -298,7 +297,7 @@ GOOS=windows GOARCH=amd64 go build -o go-admin.exe .
 
 ## 配置文件
 
-主配置文件由 Setup Wizard 自动生成，存放于 `config/settings.yml`。手动配置可参考：
+主配置文件由 Setup Wizard 自动生成，默认由 `repo-cli` 启动链路写入 `config/settings.pg.yml`。手动配置可参考：
 
 | 文件 | 说明 |
 |---|---|
