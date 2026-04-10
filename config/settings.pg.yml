@@ -8,9 +8,7 @@ settings:
         readtimeout: 1
         writertimeout: 300
     cache:
-        redis:
-            addr: 127.0.0.1:16379
-            db: 0
+        memory: ""
     database:
         driver: postgres
         source: host=127.0.0.1 port=15432 user=go_admin_dev password=go_admin_dev dbname=go_admin_dev sslmode=disable TimeZone=Asia/Shanghai
@@ -26,8 +24,6 @@ settings:
     jwt:
         secret: b6e17a3cfbdd6980c3c05edf7f621c0241ffd1b8eb20c5ab59b2fcb071e7df00
         timeout: 3600
-    locker:
-        redis: {}
     logger:
         enableddb: false
         level: info
