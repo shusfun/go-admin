@@ -174,8 +174,8 @@ export async function runSetup(context, withOpenAPI, skipInfra) {
   if (skipInfra) {
     console.log("  可继续执行：pnpm repo:infra:start");
   }
-  console.log("  然后执行：pnpm repo:service:backend");
-  console.log("  如需前端：pnpm repo:service:admin");
+  console.log("  然后执行：pnpm repo:service:start backend");
+  console.log("  如需前端：pnpm repo:service:start admin");
 }
 
 function toPosixPath(filePath) {

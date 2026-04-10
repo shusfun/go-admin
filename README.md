@@ -99,16 +99,16 @@ cd go-admin
 
 ```bash
 pnpm repo:doctor
-pnpm repo:deps:all
-pnpm repo:build:backend
-pnpm repo:verify:all
+pnpm repo:deps all
+pnpm repo:build backend
+pnpm repo:verify all
 ```
 
 ### 3. 检查环境并安装依赖
 
 ```bash
 pnpm repo:doctor
-pnpm repo:deps:all
+pnpm repo:deps all
 ```
 
 ### 4. 启动开发基础设施
@@ -133,13 +133,13 @@ pnpm run repo -- --project-prefix my-local-env infra start
 
 ```bash
 pnpm repo:service:backend
-pnpm repo:service:admin
+pnpm repo:service:start admin
 ```
 
 如需移动端开发：
 
 ```bash
-pnpm repo:service:mobile
+pnpm repo:service:start mobile
 ```
 
 `repo service start backend` 默认读取 `config/settings.pg.yml`，与本地 PostgreSQL 开发基础设施配套。
@@ -228,13 +228,13 @@ pnpm repo:setup-status                            # 检查是否会进入 Setup 
 pnpm repo:infra:start                             # 自动探测并启动开发基础设施
 pnpm repo:infra:stop                              # 停止当前开发基础设施来源
 pnpm repo:infra:status                            # 查看当前基础设施来源与健康状态
-pnpm repo:service:backend                         # 启动 API 服务（默认使用 config/settings.pg.yml）
-pnpm repo:service:admin                           # 启动 admin-web 开发服务器
-pnpm repo:service:mobile                          # 启动 mobile-h5 开发服务器
-pnpm repo:service:stop:all                        # 停止全部受管服务
+pnpm repo:service:start backend                   # 启动 API 服务（默认使用 config/settings.pg.yml）
+pnpm repo:service:start admin                     # 启动 admin-web 开发服务器
+pnpm repo:service:start mobile                    # 启动 mobile-h5 开发服务器
+pnpm repo:service:stop all                        # 停止全部受管服务
 pnpm repo:reinit                                  # 重置应用栈、开发数据卷与安装态
-pnpm repo:build:backend                           # CGO_ENABLED=0，输出 ./go-admin
-pnpm repo:verify:backend                          # 运行后端测试与校验
+pnpm repo:build backend                           # CGO_ENABLED=0，输出 ./go-admin
+pnpm repo:verify backend                          # 运行后端测试与校验
 pnpm repo:migrate                                 # 数据库迁移
 pnpm repo:rename -- go-admin --dry-run            # 预览品牌重命名
 ./go-admin server -c config/settings.yml -a true  # 启动并自动同步 sys_api 记录
@@ -243,11 +243,11 @@ pnpm repo:rename -- go-admin --dry-run            # 预览品牌重命名
 ### 前端
 
 ```bash
-pnpm repo:deps:frontend   # 安装 pnpm 工作区依赖
-pnpm repo:service:admin
-pnpm repo:service:mobile
+pnpm repo:deps frontend      # 安装 pnpm 工作区依赖
+pnpm repo:service:start admin
+pnpm repo:service:start mobile
 pnpm repo:openapi         # 生成 Swagger，并同步前端 client + types
-pnpm repo:verify:frontend # 运行前端依赖安装与类型检查
+pnpm repo:verify frontend # 运行前端依赖安装与类型检查
 pnpm build                # 构建所有包和应用
 pnpm test                 # 运行全部测试 (vitest)
 pnpm typecheck            # 全工作区 TypeScript 类型检查

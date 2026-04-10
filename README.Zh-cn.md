@@ -98,10 +98,10 @@ cd go-admin
 
 ```bash
 pnpm repo:doctor
-pnpm repo:deps:all
+pnpm repo:deps all
 pnpm repo:infra:start
-pnpm repo:service:backend
-pnpm repo:service:admin
+pnpm repo:service:start backend
+pnpm repo:service:start admin
 ```
 
 这套流程会自动探测可用的开发基础设施：
@@ -140,8 +140,8 @@ pnpm run repo -- --project-prefix my-local-env reinit --yes
 
 ```bash
 pnpm repo:infra:start
-pnpm repo:service:backend
-pnpm repo:service:admin
+pnpm repo:service:start backend
+pnpm repo:service:start admin
 pnpm repo:reinit
 ```
 
@@ -183,13 +183,13 @@ pnpm repo:openapi
 
 ```bash
 pnpm repo:doctor
-pnpm repo:deps:all
+pnpm repo:deps all
 pnpm repo:setup-status
-pnpm repo:build:backend
+pnpm repo:build backend
 pnpm repo:migrate
-pnpm repo:service:mobile
-pnpm repo:service:stop:all
-pnpm repo:verify:backend
+pnpm repo:service:start mobile
+pnpm repo:service:stop all
+pnpm repo:verify backend
 pnpm repo:rename -- go-admin --dry-run
 ```
 

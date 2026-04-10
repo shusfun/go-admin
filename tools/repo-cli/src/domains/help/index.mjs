@@ -1,7 +1,23 @@
 export function printHelp() {
   const sections = [
     {
-      title: "基础设施",
+      title: "推荐快捷入口",
+      lines: [
+        "pnpm repo:infra:start               启动基础设施",
+        "pnpm repo:infra:stop                停止基础设施",
+        "pnpm repo:infra:status              查看基础设施状态",
+        "pnpm repo:service:start backend     启动后端",
+        "pnpm repo:service:start admin       启动管理端",
+        "pnpm repo:service:start mobile      启动移动端",
+        "pnpm repo:service:stop all          停止全部应用服务",
+        "pnpm repo:service:logs backend      查看后端日志",
+        "pnpm repo:deps all                  安装全部依赖",
+        "pnpm repo:build backend             构建指定目标",
+        "pnpm repo:verify backend            校验指定目标",
+      ],
+    },
+    {
+      title: "等价原生命令",
       lines: [
         "repo infra start          自动探测并启动开发基础设施（Homebrew / Docker）",
         "repo infra stop           停止当前基础设施来源",
@@ -42,6 +58,8 @@ export function printHelp() {
   ];
 
   console.log("用法: repo <command> [args...]");
+  console.log("规则: 固定命令链使用 ':' 连接，最后的动态参数保持空格传入");
+  console.log("例如: repo service start backend => pnpm repo:service:start backend");
   console.log("");
   for (const section of sections) {
     console.log(section.title);
@@ -50,5 +68,5 @@ export function printHelp() {
     }
     console.log("");
   }
-  console.log("快捷入口：pnpm repo:help");
+  console.log("查看帮助：pnpm repo:help");
 }

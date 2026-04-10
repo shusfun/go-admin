@@ -32,13 +32,13 @@
 在仓库根目录执行：
 
 ```bash
-pnpm repo:deps:all
+pnpm repo:deps all
 pnpm repo:setup
 pnpm repo:infra:start
-pnpm repo:service:backend
-pnpm repo:service:admin
-pnpm repo:service:mobile
-pnpm repo:build:backend
+pnpm repo:service:start backend
+pnpm repo:service:start admin
+pnpm repo:service:start mobile
+pnpm repo:build backend
 pnpm typecheck
 pnpm test
 pnpm build
@@ -62,10 +62,10 @@ pnpm build
 本地开发推荐先执行：
 
 ```bash
-pnpm repo:deps:all
+pnpm repo:deps all
 pnpm repo:infra:start
-pnpm repo:service:backend
-pnpm repo:service:admin
+pnpm repo:service:start backend
+pnpm repo:service:start admin
 ```
 
 这些 `pnpm repo:*` 命令会直接执行 `tools/repo-cli/src/*.mjs`，不依赖额外的 CLI 编译步骤。
