@@ -9,8 +9,8 @@ import (
 type Login struct {
 	Username string `form:"UserName" json:"username" binding:"required"`
 	Password string `form:"Password" json:"password" binding:"required"`
-	Code     string `form:"Code" json:"code" binding:"required"`
-	UUID     string `form:"UUID" json:"uuid" binding:"required"`
+	Code     string `form:"Code" json:"code"`
+	UUID     string `form:"UUID" json:"uuid"`
 }
 
 func (u *Login) GetUser(tx *gorm.DB) (user SysUser, role SysRole, err error) {
