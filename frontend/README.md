@@ -54,6 +54,7 @@ pnpm build
 - 局部滚动区域默认使用公共滚动组件，不直接以 `overflow-y-auto`、`overflow-x-auto`、`overflow-auto` 作为实现。
 - `apps/admin-web` 优先通过 `@go-admin/ui-admin` 公共组件获得滚动行为；`apps/mobile-h5` 优先通过 `@go-admin/ui-mobile` 公共组件承接布局。
 - 页面主内容区和浏览器窗口滚动保持原生，不纳入统一滚动组件规则。
+- 若页面主内容区必须显式声明原生滚动，请在代码旁标注 `scroll-rule: allow-page-content-overflow`，避免检查脚本误报。
 - 仓库提供滚动规则检查脚本，提交前可执行 `pnpm check:local-scrollbars`。
 
 ## 环境变量

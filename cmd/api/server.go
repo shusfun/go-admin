@@ -23,6 +23,7 @@ import (
 	"go-admin/app/admin/router"
 	"go-admin/app/jobs"
 	opsService "go-admin/app/ops/service"
+	"go-admin/common/bootstrap"
 	"go-admin/common/database"
 	"go-admin/common/global"
 	common "go-admin/common/middleware"
@@ -40,16 +41,16 @@ var (
 		Short:        "Start API server",
 		Example:      "go-admin server -c config/settings.yml",
 		SilenceUsage: true,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// 同步配置路径到 setup 包
 			setupPkg.SetConfigPath(configYml)
 
 			// 两阶段启动：检测是否需要初始化安装
 			if setupPkg.NeedsSetup() {
 				log.Info("System not configured, entering Setup Wizard mode...")
-				return // 不执行正常初始化
+				return nil // 不执行正常初始化
 			}
-			setup()
+			return setup()
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if setupPkg.NeedsSetup() {
@@ -61,6 +62,21 @@ var (
 )
 
 var AppRouters = make([]func(), 0)
+var loadRuntimeConfig = func() {
+	config.Setup(
+		file.NewSource(file.WithPath(configYml)),
+		database.Setup,
+		storage.Setup,
+	)
+}
+var runStartupDatabaseBootstrap = bootstrap.RunRuntimeDatabaseBootstrapAll
+var startRuntimeQueue = func() {
+	queue := sdk.Runtime.GetMemoryQueue("")
+	queue.Register(global.LoginLog, models.SaveLoginLog)
+	queue.Register(global.OperateLog, models.SaveOperaLog)
+	queue.Register(global.ApiCheck, models.SaveSysApi)
+	go queue.Run()
+}
 
 func init() {
 	StartCmd.PersistentFlags().StringVarP(&configYml, "config", "c", "config/settings.yml", "Start server with provided configuration file")
@@ -70,24 +86,26 @@ func init() {
 	AppRouters = append(AppRouters, router.InitRouter)
 }
 
-func setup() {
+func setup() error {
 	// 注入配置扩展项
 	config.ExtendConfig = &ext.ExtConfig
 	//1. 读取配置
-	config.Setup(
-		file.NewSource(file.WithPath(configYml)),
-		database.Setup,
-		storage.Setup,
-	)
-	//注册监听函数
-	queue := sdk.Runtime.GetMemoryQueue("")
-	queue.Register(global.LoginLog, models.SaveLoginLog)
-	queue.Register(global.OperateLog, models.SaveOperaLog)
-	queue.Register(global.ApiCheck, models.SaveSysApi)
-	go queue.Run()
+	loadRuntimeConfig()
+	if len(ext.ExtConfig.Ops.Environments) == 0 {
+		log.Warn("ops 环境未配置，运维服务页面将显示为空")
+	}
+	if ext.ExtConfig.Runtime.AutoMigrateOnStart {
+		log.Info("Startup database bootstrap enabled, checking migrations...")
+		if err := runStartupDatabaseBootstrap(); err != nil {
+			return fmt.Errorf("startup database bootstrap failed: %w", err)
+		}
+		log.Info("Startup database bootstrap completed")
+	}
+	startRuntimeQueue()
 
 	usageStr := `starting api server...`
 	log.Info(usageStr)
+	return nil
 }
 
 func run() error {

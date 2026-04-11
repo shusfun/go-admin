@@ -44,6 +44,7 @@ export function createRepoContext(options) {
     dockerEnvFile: path.join(repoRoot, "config", "dev-ports.env"),
     dockerDevFile: path.join(repoRoot, "docker-compose.dev.yml"),
     dockerAppFile: path.join(repoRoot, "docker-compose.yml"),
+    dockerPostgresDataDir: path.join(repoRoot, ".tmp", "docker", "postgres"),
     backendBinary: path.join(repoRoot, executableName(normalizeProjectPrefix(packageName))),
     backendRoot: repoRoot,
     adminDistDir: path.join(repoRoot, "frontend", "apps", "admin-web", "dist"),

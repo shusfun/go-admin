@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"strings"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -85,19 +85,24 @@ func ReadApplicationPort(defaultPort int) int {
 
 // getInstallLockPath 返回锁文件路径（和配置文件同目录）
 func getInstallLockPath() string {
-	dir := "."
-	if idx := strings.LastIndexAny(configPath, "/\\"); idx >= 0 {
-		dir = configPath[:idx]
+	return filepath.Join(getConfigDir(), InstallLockFile)
+}
+
+func getConfigDir() string {
+	dir := filepath.Dir(configPath)
+	if dir == "" || dir == "." {
+		return "."
 	}
-	return dir + "/" + InstallLockFile
+	return dir
 }
 
 // ─── 请求/配置结构体 ───
 
 // SetupConfig 汇总所有 Setup 阶段需要的配置
 type SetupConfig struct {
-	Database DatabaseConfig `json:"database" yaml:"-"`
-	Admin    AdminConfig    `json:"admin" yaml:"-"`
+	Environment string         `json:"environment" yaml:"-"`
+	Database    DatabaseConfig `json:"database" yaml:"-"`
+	Admin       AdminConfig    `json:"admin" yaml:"-"`
 }
 
 // DatabaseConfig PostgreSQL 连接参数
@@ -154,6 +159,12 @@ func TestPgConnection(cfg *DatabaseConfig) error {
 // installMutex 防止并发安装（TOCTOU 保护）
 var installMutex sync.Mutex
 
+var runSetupConnectionTest = TestPgConnection
+var runSetupDatabaseInitialization = initializeDatabase
+var runSetupAdminCreation = createAdminUser
+var writeSetupSettings = writeSettingsYml
+var createSetupInstallLock = createInstallLock
+
 // Install 执行完整安装流程
 func Install(cfg *SetupConfig) error {
 	installMutex.Lock()
@@ -165,27 +176,27 @@ func Install(cfg *SetupConfig) error {
 	}
 
 	// 1. 测试 PG 连接
-	if err := TestPgConnection(&cfg.Database); err != nil {
+	if err := runSetupConnectionTest(&cfg.Database); err != nil {
 		return fmt.Errorf("数据库连接失败: %w", err)
 	}
 
 	// 2. 初始化数据库表结构 + 种子数据
-	if err := initializeDatabase(cfg); err != nil {
+	if err := runSetupDatabaseInitialization(cfg); err != nil {
 		return fmt.Errorf("数据库初始化失败: %w", err)
 	}
 
 	// 3. 创建管理员
-	if err := createAdminUser(cfg); err != nil {
+	if err := runSetupAdminCreation(cfg); err != nil {
 		return fmt.Errorf("管理员创建失败: %w", err)
 	}
 
 	// 4. 生成 settings.yml
-	if err := writeSettingsYml(cfg); err != nil {
+	if err := writeSetupSettings(cfg); err != nil {
 		return fmt.Errorf("配置文件写入失败: %w", err)
 	}
 
 	// 5. 写入锁文件
-	if err := createInstallLock(); err != nil {
+	if err := createSetupInstallLock(); err != nil {
 		return fmt.Errorf("锁文件创建失败: %w", err)
 	}
 
@@ -306,10 +317,11 @@ func writeSettingsYml(cfg *SetupConfig) error {
 	// 构建和现有 settings.yml 格式一致的结构
 	port := ReadApplicationPort(18123)
 	projectName := readProjectName()
+	environment := resolveSetupEnvironment(cfg.Environment)
 	settings := map[string]interface{}{
 		"settings": map[string]interface{}{
 			"application": map[string]interface{}{
-				"mode":          "prod",
+				"mode":          environment,
 				"host":          "0.0.0.0",
 				"name":          projectName,
 				"port":          port,
@@ -339,6 +351,9 @@ func writeSettingsYml(cfg *SetupConfig) error {
 				"demo": map[string]interface{}{
 					"name": "data",
 				},
+				"runtime": map[string]interface{}{
+					"autoMigrateOnStart": isLocalEnvironment(environment),
+				},
 				"ops": map[string]interface{}{
 					"taskTimeoutSeconds": 900,
 					"environments":       []interface{}{},
@@ -359,10 +374,7 @@ func writeSettingsYml(cfg *SetupConfig) error {
 	}
 
 	// 确保目录存在
-	dir := "."
-	if idx := strings.LastIndexAny(configPath, "/\\"); idx >= 0 {
-		dir = configPath[:idx]
-	}
+	dir := getConfigDir()
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("创建目录失败: %w", err)
 	}

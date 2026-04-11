@@ -361,8 +361,9 @@ func (r *TaskRunner) backendSteps(restartOnly bool) []taskStep {
 	if restartOnly {
 		steps = append(steps, taskStep{
 			Name:       "重启服务",
-			Suggestion: "请检查 Docker 和 Compose 配置",
+			Suggestion: "请检查 Docker、Compose 配置以及服务启动日志",
 			Run: func(ctx context.Context) error {
+				r.appendLog("[info] 重启后端服务，服务启动阶段会按配置自动执行幂等迁移检查")
 				return r.runCmd(ctx, repoDir, nil, "docker", "compose", "-f", composeFile, "restart", serviceName)
 			},
 		})
@@ -391,8 +392,9 @@ func (r *TaskRunner) backendSteps(restartOnly bool) []taskStep {
 			},
 			taskStep{
 				Name:       "重启服务",
-				Suggestion: "请检查 Docker 和 Compose 配置",
+				Suggestion: "请检查 Docker、Compose 配置以及服务启动日志",
 				Run: func(ctx context.Context) error {
+					r.appendLog("[info] 重启后端服务，服务启动阶段会按配置自动执行幂等迁移检查")
 					return r.runCmd(ctx, repoDir, nil, "docker", "compose", "-f", composeFile, "up", "-d", serviceName)
 				},
 			},
@@ -400,7 +402,7 @@ func (r *TaskRunner) backendSteps(restartOnly bool) []taskStep {
 	}
 	steps = append(steps, taskStep{
 		Name:       "健康检查",
-		Suggestion: "服务启动失败，请检查服务日志",
+		Suggestion: "服务启动失败，请检查容器日志，确认是否为启动迁移、配置或应用初始化失败",
 		Run: func(ctx context.Context) error {
 			return waitForHealth(ctx, r.env.Backend.HealthURL, r.appendLog)
 		},
@@ -445,7 +447,7 @@ func (r *TaskRunner) frontendSteps() []taskStep {
 			},
 		},
 		{
-			Name:       "发布文件",
+			Name:       "同步文件",
 			Suggestion: "请检查静态目录权限和构建产物",
 			Run: func(ctx context.Context) error {
 				srcDir := filepath.Join(repoDir, distDir)
@@ -583,10 +585,48 @@ func (r *TaskRunner) broadcastStatus() {
 	})
 }
 
+func sanitizeTaskErrorMessage(stepName string, err error) string {
+	if err == nil {
+		if stepName == "" {
+			return "任务未完成"
+		}
+		return stepName + "未完成"
+	}
+
+	raw := strings.TrimSpace(err.Error())
+	if raw == "" {
+		return sanitizeTaskErrorMessage(stepName, nil)
+	}
+
+	switch {
+	case strings.Contains(raw, "健康检查未通过"):
+		return "服务发布后校验未通过"
+	case strings.Contains(raw, "仓库未配置上游分支"):
+		return "代码仓库同步信息不完整，请先检查仓库配置"
+	case strings.Contains(raw, "仓库存在未提交变更"):
+		return "部署目录存在未提交变更，请先清理后再发布"
+	case strings.Contains(raw, "前端项目缺少必需文件"), strings.Contains(raw, "vite.config"):
+		return "前端构建配置不完整，请检查项目文件"
+	case strings.Contains(raw, "同步目录配置不完整"):
+		return "部署目录配置不完整，请检查环境设置"
+	case strings.Contains(raw, "构建产物目录不存在"):
+		return "构建产物未找到，请先确认构建结果"
+	case strings.Contains(raw, "目标目录不安全"):
+		return "部署目标目录配置无效，请检查环境设置"
+	case strings.Contains(raw, "\n"), strings.Contains(raw, "\r"), strings.Contains(strings.ToLower(raw), "dial tcp"), strings.Contains(strings.ToLower(raw), "panic"), strings.Contains(strings.ToLower(raw), "permission denied"):
+		if stepName == "" {
+			return "任务未完成，请稍后重试"
+		}
+		return stepName + "未完成，请稍后重试"
+	default:
+		return raw
+	}
+}
+
 func (r *TaskRunner) failTask(stepName, suggestion string, err error) {
 	r.stopLogFlusher()
 	now := time.Now()
-	errMsg := err.Error()
+	errMsg := sanitizeTaskErrorMessage(stepName, err)
 	r.updateTask(map[string]interface{}{
 		"status":      appModels.TaskStatusFailed,
 		"step_name":   stepName,
@@ -612,7 +652,7 @@ func (r *TaskRunner) succeedTask() {
 	now := time.Now()
 	r.updateTask(map[string]interface{}{
 		"status":      appModels.TaskStatusSuccess,
-		"summary":     "发布完成",
+		"summary":     successSummaryByTaskType(r.task.Type),
 		"finished_at": &now,
 	})
 	GetTaskManager().Broadcast(r.taskID, TaskEvent{
@@ -626,12 +666,27 @@ func (r *TaskRunner) succeedTask() {
 	})
 }
 
+func successSummaryByTaskType(taskType string) string {
+	switch taskType {
+	case appModels.TaskTypeDeployBackend:
+		return "后端更新完成"
+	case appModels.TaskTypeDeployFrontend:
+		return "前端更新完成"
+	case appModels.TaskTypeDeployAll:
+		return "代码更新完成"
+	case appModels.TaskTypeRestart:
+		return "后端重启完成"
+	default:
+		return "任务执行完成"
+	}
+}
+
 func (r *TaskRunner) cancelTask(stepName, suggestion string, err error) {
 	r.stopLogFlusher()
 	now := time.Now()
 	errMsg := "任务已取消"
 	if err != nil {
-		errMsg = errMsg + ": " + err.Error()
+		errMsg = errMsg + "：" + sanitizeTaskErrorMessage(stepName, err)
 	}
 	r.updateTask(map[string]interface{}{
 		"status":      appModels.TaskStatusCancelled,
@@ -1055,7 +1110,7 @@ func syncDir(srcDir, dstDir string) error {
 
 func syncDirWithCopy(srcDir, dstDir string, copyContents func(string, string) error) error {
 	if srcDir == "" || dstDir == "" {
-		return errors.New("发布目录配置不完整")
+		return errors.New("同步目录配置不完整")
 	}
 	srcInfo, err := os.Stat(srcDir)
 	if err != nil {
@@ -1066,11 +1121,11 @@ func syncDirWithCopy(srcDir, dstDir string, copyContents func(string, string) er
 	}
 	cleanDst := filepath.Clean(dstDir)
 	if cleanDst == "/" || cleanDst == "." {
-		return errors.New("发布目录不安全")
+		return errors.New("目标目录不安全")
 	}
 	parentDir := filepath.Dir(cleanDst)
 	if parentDir == "/" {
-		return errors.New("发布目录不安全")
+		return errors.New("目标目录不安全")
 	}
 	if err = os.MkdirAll(parentDir, 0o755); err != nil {
 		return err

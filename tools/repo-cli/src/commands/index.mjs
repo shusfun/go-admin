@@ -5,7 +5,7 @@ import { runBuild } from "../domains/build/index.mjs";
 import { runDeps } from "../domains/deps/index.mjs";
 import { dockerDown, dockerUp, deploy } from "../domains/docker/index.mjs";
 import { runDoctor } from "../domains/doctor/index.mjs";
-import { printEnv, printServiceLogs, printSetupStatus, printStatus, runMigrate, runOpenAPI, runReinit, runSetup } from "../domains/misc/index.mjs";
+import { printEnv, printServiceLogs, printSetupStatus, printStatus, runDatabaseReset, runMigrate, runOpenAPI, runReinit, runSetup } from "../domains/misc/index.mjs";
 import { setProjectPrefix } from "../domains/project-prefix/index.mjs";
 import { runRename } from "../domains/rename/index.mjs";
 import { runTest, runTypecheck, runVerify } from "../domains/verify/index.mjs";
@@ -52,6 +52,9 @@ export async function dispatchCommand(env) {
       return;
     case "migrate":
       runMigrate(env.context);
+      return;
+    case "db":
+      await runDatabaseCommand(env);
       return;
     case "docker-up":
       dockerUp(env.context);
@@ -150,6 +153,17 @@ async function runInfraCommand(env) {
       return;
     default:
       throw new Error("用法: repo infra start|stop|status");
+  }
+}
+
+async function runDatabaseCommand(env) {
+  const action = env.args[1];
+  switch (action) {
+    case "reset":
+      await runDatabaseReset(env.context);
+      return;
+    default:
+      throw new Error("用法: repo db reset");
   }
 }
 

@@ -10,12 +10,17 @@ var ExtConfig Extend
 //
 // 使用方法： config.ExtConfig......即可！！
 type Extend struct {
-	AMap AMap      // 这里配置对应配置文件的结构即可
-	Ops  OpsConfig `yaml:"ops"`
+	AMap    AMap          // 这里配置对应配置文件的结构即可
+	Runtime RuntimeConfig `yaml:"runtime"`
+	Ops     OpsConfig     `yaml:"ops"`
 }
 
 type AMap struct {
 	Key string
+}
+
+type RuntimeConfig struct {
+	AutoMigrateOnStart bool `yaml:"autoMigrateOnStart"`
 }
 
 type OpsConfig struct {

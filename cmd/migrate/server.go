@@ -3,7 +3,6 @@ package migrate
 import (
 	"bytes"
 	"fmt"
-	"github.com/go-admin-team/go-admin-core/sdk"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg"
 	"strconv"
 	"text/template"
@@ -58,28 +57,7 @@ func run() {
 }
 
 func migrateModel() error {
-	if host == "" {
-		host = "*"
-	}
-	db := sdk.Runtime.GetDbByKey(host)
-	if db == nil {
-		if len(sdk.Runtime.GetDb()) == 1 && host == "*" {
-			for k, v := range sdk.Runtime.GetDb() {
-				db = v
-				host = k
-				break
-			}
-		}
-	}
-	if db == nil {
-		return fmt.Errorf("未找到数据库配置")
-	}
-	workingDB := db.Debug()
-	if config.DatabasesConfig[host].Driver == "mysql" {
-		//初始化数据库时候用
-		workingDB = workingDB.Set("gorm:table_options", "ENGINE=InnoDB CHARSET=utf8mb4")
-	}
-	return bootstrap.RunDatabaseBootstrap(workingDB)
+	return bootstrap.RunRuntimeDatabaseBootstrap(host)
 }
 func initDB() {
 	//3. 初始化数据库链接

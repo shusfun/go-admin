@@ -4,10 +4,12 @@ import path from "node:path";
 import { goEnv, localServicePort } from "./context.mjs";
 import { resolveBackendCommand } from "./backend-dev.mjs";
 import { loadState, nowRFC3339 } from "./state.mjs";
-import { isProcessAlive, portOpen, portOwnerPid, startDetachedCommand, stopProcess, waitForPortClosed } from "../../shared/process.mjs";
+import { isProcessAlive, portListening, portOpen, portOwnerPid, startDetachedCommand, stopProcess, waitForPortClosed } from "../../shared/process.mjs";
 import { formatCommand, printDivider, printField, printFields, printHint, printSection, toRepoRelative } from "../../shared/output.mjs";
 
-const SERVICE_START_TIMEOUT_MS = 15000;
+const DEFAULT_SERVICE_START_TIMEOUT_MS = 15000;
+const BACKEND_HOT_RELOAD_START_TIMEOUT_MS = 60000;
+const SERVICE_START_PROGRESS_INTERVAL_MS = 1000;
 
 export function allServices(context) {
   return [
@@ -107,13 +109,19 @@ export async function reconcileState(context) {
     current.runner = current.runner || defaultRunner(service.name);
 
     const pidAlive = isProcessAlive(current.pid);
-    const serving = await portOpen(service.port);
+    const listeningPid = await portOwnerPid(service.port);
+    const serving = (await portOpen(service.port)) || listeningPid > 0;
     if (serving) {
       current.status = "running";
       current.lastError = "";
       current.readyAt = current.readyAt || nowRFC3339();
+      current.exitedAt = "";
+      if (!pidAlive || current.pid <= 0) {
+        current.pid = listeningPid;
+      }
     } else if (pidAlive) {
       current.status = "starting";
+      current.exitedAt = "";
     } else {
       if (current.status === "failed") {
         current.status = "failed";
@@ -144,8 +152,11 @@ export async function startServices(context, services) {
       continue;
     }
     printSection(`启动 ${service.label}`);
+    printField("阶段", "准备启动命令");
     const spec = service.command(context);
     const logPath = path.join(context.logsDir, `${service.name}.log`);
+    resetServiceLog(logPath);
+    printField("阶段", "启动后台进程");
     const pid = startDetachedCommand(spec.name, spec.args, {
       cwd: spec.cwd,
       env: spec.env,
@@ -170,8 +181,23 @@ export async function startServices(context, services) {
     };
     persistState(context, latest);
 
-    const ready = await waitForServiceReady(service, pid);
+    const startTimeoutMs = resolveServiceStartTimeoutMs(service, spec);
+    printFields([
+      ["运行器", formatRunner(spec.runner || defaultRunner(service.name), spec.toolScope, spec.toolVersion)],
+      ["说明", spec.note || ""],
+      ["日志", toRepoRelative(context, logPath)],
+      ["超时", `${Math.round(startTimeoutMs / 1000)}s`],
+    ]);
+    const progress = createServiceStartProgressReporter(context, service, logPath);
+    progress(0);
+    const ready = await waitForServiceReady(service, pid, startTimeoutMs, {
+      onProgress(elapsedMs) {
+        progress(elapsedMs);
+      },
+    });
     if (!ready.ok) {
+      const pidStillAlive = isProcessAlive(pid);
+      const listeningPid = await portOwnerPid(service.port);
       const failed = loadState(context);
       failed.services[service.name] = {
         ...(failed.services[service.name] ?? {}),
@@ -180,14 +206,14 @@ export async function startServices(context, services) {
         mode: spec.mode || service.mode,
         runner: spec.runner || defaultRunner(service.name),
         port: service.port,
-        pid: 0,
+        pid: pidStillAlive ? pid : listeningPid,
         logPath,
         command: formatCommand(spec.name, spec.args),
         note: spec.note || "",
         toolVersion: spec.toolVersion || "",
         toolScope: spec.toolScope || "",
         updatedAt: nowRFC3339(),
-        exitedAt: nowRFC3339(),
+        exitedAt: pidStillAlive ? "" : nowRFC3339(),
         lastError: ready.reason,
       };
       persistState(context, failed);
@@ -219,7 +245,7 @@ export async function startServices(context, services) {
       mode: spec.mode || service.mode,
       runner: spec.runner || defaultRunner(service.name),
       port: service.port,
-      pid,
+      pid: ready.pid || pid,
       logPath,
       command: formatCommand(spec.name, spec.args),
       note: spec.note || "",
@@ -234,7 +260,7 @@ export async function startServices(context, services) {
     printField("结果", "运行中");
     printFields([
       ["地址", serviceAccessUrl(service)],
-      ["PID", String(pid)],
+      ["PID", String(ready.pid || pid)],
       ["端口", String(service.port)],
       ["模式", displayMode(spec.mode || service.mode)],
       ["运行器", formatRunner(spec.runner || defaultRunner(service.name), spec.toolScope, spec.toolVersion)],
@@ -360,25 +386,121 @@ export function tailServiceLog(context, serviceName, lines) {
   return chunks.slice(Math.max(0, chunks.length - lines)).join("\n");
 }
 
-async function waitForServiceReady(service, pid, timeoutMs = SERVICE_START_TIMEOUT_MS) {
+async function waitForServiceReady(service, pid, timeoutMs = DEFAULT_SERVICE_START_TIMEOUT_MS, options = {}) {
   const deadline = Date.now() + timeoutMs;
+  let nextProgressAt = Date.now();
   while (Date.now() < deadline) {
-    if (await portOpen(service.port)) {
-      return { ok: true };
+    const listeningPid = await portOwnerPid(service.port);
+    if ((await portOpen(service.port)) || listeningPid > 0) {
+      return { ok: true, pid: listeningPid || pid };
     }
     if (!isProcessAlive(pid)) {
       return { ok: false, reason: "进程已退出，端口未就绪" };
+    }
+    if (typeof options.onProgress === "function" && Date.now() >= nextProgressAt) {
+      options.onProgress(timeoutMs - Math.max(0, deadline - Date.now()));
+      nextProgressAt = Date.now() + SERVICE_START_PROGRESS_INTERVAL_MS;
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   return { ok: false, reason: `等待端口 ${service.port} 就绪超时（${Math.round(timeoutMs / 1000)}s）` };
 }
 
+export function resolveServiceStartTimeoutMs(service, spec = {}) {
+  if (service.name === "backend" && ((spec.runner || "") === "air" || (spec.mode || "") === "hot-reload")) {
+    return BACKEND_HOT_RELOAD_START_TIMEOUT_MS;
+  }
+  return DEFAULT_SERVICE_START_TIMEOUT_MS;
+}
+
+export function extractLatestLogLineForProgress(content) {
+  for (const rawLine of String(content || "").replaceAll("\r\n", "\n").split("\n").reverse()) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+    return line;
+  }
+  return "";
+}
+
+export function summarizeServiceStartupProgress(service, latestLogLine) {
+  const line = String(latestLogLine || "");
+  if (!line) {
+    return "进程已启动，等待端口就绪";
+  }
+
+  if (service.name === "backend") {
+    if (line.includes("building...")) {
+      return "正在编译后端";
+    }
+    if (line.includes("running...")) {
+      return "编译完成，正在拉起后端进程";
+    }
+    if (line.includes("Setup Wizard Mode") || line.includes("Setup API running at:") || line.includes("entering Setup Wizard mode")) {
+      return "已进入 Setup Wizard 模式";
+    }
+    if (line.includes("Startup database bootstrap enabled") || line.includes("Startup database bootstrap completed")) {
+      return "正在执行启动迁移检查";
+    }
+    if (line.includes("Server run at:") || line.includes("swagger/admin/index.html")) {
+      return "业务路由已加载，等待端口确认";
+    }
+  }
+
+  if (line.includes("ready in") || line.includes("Local:")) {
+    return "开发服务器已启动，等待端口确认";
+  }
+  return "进程已启动，等待端口就绪";
+}
+
+function createServiceStartProgressReporter(context, service, logPath) {
+  let lastSnapshot = "";
+
+  return (elapsedMs) => {
+    const latestLogLine = extractLatestLogLineForProgress(readProgressLog(logPath));
+    const stage = summarizeServiceStartupProgress(service, latestLogLine);
+    const waitedSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+    const snapshot = `${waitedSeconds}|${stage}|${latestLogLine}`;
+    if (snapshot === lastSnapshot) {
+      return;
+    }
+    lastSnapshot = snapshot;
+
+    printField("进度", `已等待 ${waitedSeconds}s，${stage}`);
+    if (latestLogLine) {
+      printField("最近日志", truncateProgressLogLine(latestLogLine), "    ");
+    }
+  };
+}
+
+function readProgressLog(logPath) {
+  if (!existsSync(logPath)) {
+    return "";
+  }
+  return readFileSync(logPath, "utf8");
+}
+
+function truncateProgressLogLine(line) {
+  const normalized = String(line || "").trim();
+  if (normalized.length <= 120) {
+    return normalized;
+  }
+  return `${normalized.slice(0, 117)}...`;
+}
+
+function resetServiceLog(logPath) {
+  writeFileSync(logPath, "", "utf8");
+}
+
 async function ensureServicesStartable(context, services) {
   const state = await reconcileState(context);
   for (const service of services.filter((item) => item.kind === "local")) {
-    if ((await portOpen(service.port)) || isProcessAlive(state.services[service.name]?.pid ?? 0)) {
-      throw new Error(`${service.label} 已在运行或启动中`);
+    const currentPid = state.services[service.name]?.pid ?? 0;
+    const listeningPid = await portOwnerPid(service.port);
+    if ((await portListening(service.port)) || isProcessAlive(currentPid)) {
+      const occupantPid = listeningPid || currentPid;
+      throw new Error(occupantPid > 0 ? `${service.label} 端口 ${service.port} 已被占用（PID ${occupantPid}）` : `${service.label} 已在运行或启动中`);
     }
   }
 }

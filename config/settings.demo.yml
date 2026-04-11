@@ -11,9 +11,6 @@ settings:
   database:
     driver: sqlite3
     source: ./go-admin-db.db
-  gen:
-    dbname: testhhh
-    frontpath: ../go-admin-ui/src
   jwt:
     secret: go-admin
     timeout: 3600
@@ -32,3 +29,5 @@ settings:
   extend:
     amap:
       key: de7a062c984bf828d5d1b3a631a517e4
+    runtime:
+      autoMigrateOnStart: false

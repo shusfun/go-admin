@@ -12,6 +12,31 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+var installSetup = Install
+var prepareSetupRestart = buildSetupRestartPlan
+var executeSetupRestart = execSetupRestartPlan
+var sleepBeforeSetupRestart = func() {
+	time.Sleep(500 * time.Millisecond)
+}
+var exitSetupProcess = os.Exit
+
+var scheduleSetupRestart = func() error {
+	plan, err := prepareSetupRestart()
+	if err != nil {
+		return err
+	}
+	go func() {
+		sleepBeforeSetupRestart()
+		if err := executeSetupRestart(plan); err != nil {
+			fmt.Fprintf(os.Stderr, "setup restart failed: %v\n", err)
+			exitSetupProcess(1)
+			return
+		}
+		exitSetupProcess(0)
+	}()
+	return nil
+}
+
 // ─── 路由注册 ───
 
 // RegisterRoutes 注册 Setup Wizard 路由到 Gin 引擎
@@ -49,6 +74,20 @@ func setupError(c *gin.Context, httpCode int, msg string) {
 		"data": nil,
 		"msg":  msg,
 	})
+}
+
+func sanitizeSetupErrorMessage(msg, fallback string) string {
+	cleaned := strings.TrimSpace(msg)
+	if cleaned == "" {
+		return fallback
+	}
+	if strings.Contains(cleaned, "请求参数错误") {
+		return "提交的信息不完整或格式不正确，请检查后重试"
+	}
+	if strings.Contains(cleaned, "数据库连接失败") {
+		return "数据库连接失败，请检查地址、端口和账号信息"
+	}
+	return fallback
 }
 
 // ─── 中间件 ───
@@ -124,8 +163,9 @@ type testDBRequest struct {
 }
 
 type installRequest struct {
-	Database DatabaseConfig `json:"database" binding:"required"`
-	Admin    AdminConfig    `json:"admin" binding:"required"`
+	Environment string         `json:"environment"`
+	Database    DatabaseConfig `json:"database" binding:"required"`
+	Admin       AdminConfig    `json:"admin" binding:"required"`
 }
 
 // ─── Handler ───
@@ -141,7 +181,7 @@ func getStatus(c *gin.Context) {
 func testDatabase(c *gin.Context) {
 	var req testDBRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		setupError(c, http.StatusBadRequest, "请求参数错误: "+err.Error())
+		setupError(c, http.StatusBadRequest, sanitizeSetupErrorMessage("请求参数错误: "+err.Error(), "提交的信息不完整或格式不正确，请检查后重试"))
 		return
 	}
 
@@ -172,7 +212,7 @@ func testDatabase(c *gin.Context) {
 	}
 
 	if err := TestPgConnection(cfg); err != nil {
-		setupError(c, http.StatusBadRequest, "数据库连接失败: "+err.Error())
+		setupError(c, http.StatusBadRequest, sanitizeSetupErrorMessage("数据库连接失败: "+err.Error(), "数据库连接失败，请检查地址、端口和账号信息"))
 		return
 	}
 
@@ -188,11 +228,17 @@ func install(c *gin.Context) {
 
 	var req installRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		setupError(c, http.StatusBadRequest, "请求参数错误: "+err.Error())
+		setupError(c, http.StatusBadRequest, sanitizeSetupErrorMessage("请求参数错误: "+err.Error(), "提交的信息不完整或格式不正确，请检查后重试"))
 		return
 	}
 
 	// ========== 全面输入校验 ==========
+
+	req.Environment = strings.TrimSpace(req.Environment)
+	if !isSupportedEnvironment(req.Environment) {
+		setupError(c, http.StatusBadRequest, "安装环境无效，仅支持 dev / test / prod")
+		return
+	}
 
 	// 数据库
 	req.Database.Host = strings.TrimSpace(req.Database.Host)
@@ -238,23 +284,50 @@ func install(c *gin.Context) {
 	// ========== 执行安装 ==========
 
 	cfg := &SetupConfig{
-		Database: req.Database,
-		Admin:    req.Admin,
+		Environment: req.Environment,
+		Database:    req.Database,
+		Admin:       req.Admin,
 	}
 
-	if err := Install(cfg); err != nil {
-		setupError(c, http.StatusInternalServerError, "安装失败: "+err.Error())
+	if err := installSetup(cfg); err != nil {
+		setupError(c, http.StatusInternalServerError, "安装未完成，请检查配置后重试")
 		return
 	}
 
-	// 安装完成后在后台延迟退出进程，让 systemd/Docker 自动重启
-	go func() {
-		time.Sleep(500 * time.Millisecond)
-		os.Exit(0)
-	}()
+	// 安装完成后延迟自重启，切换到正式模式。
+	// 不能依赖 air/docker/systemd 猜测外部会自动拉起新进程，否则本地开发会卡死在 setup 模式。
+	if err := scheduleSetupRestart(); err != nil {
+		setupError(c, http.StatusInternalServerError, "安装已完成，请手动重启服务后继续")
+		return
+	}
 
 	setupOK(c, gin.H{
 		"message": "安装成功！服务将自动重启...",
 		"restart": true,
 	})
+}
+
+type setupRestartPlan struct {
+	executable string
+	args       []string
+	env        []string
+}
+
+func buildSetupRestartPlan() (*setupRestartPlan, error) {
+	executable, err := os.Executable()
+	if err != nil {
+		return nil, fmt.Errorf("解析当前可执行文件失败: %w", err)
+	}
+
+	args := make([]string, 0, len(os.Args))
+	args = append(args, executable)
+	if len(os.Args) > 1 {
+		args = append(args, os.Args[1:]...)
+	}
+
+	return &setupRestartPlan{
+		executable: executable,
+		args:       args,
+		env:        append([]string{}, os.Environ()...),
+	}, nil
 }

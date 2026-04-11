@@ -1,6 +1,8 @@
 # 运维服务一期 - 实施方案
 
 > 本文档是面向实施者的完整技术规格，可直接按本文档编码实现。
+>
+> 与 `Setup Wizard`、`git pull` 更新链、启动自动迁移相关的统一约束，以 [docs/setup-update-migration-architecture.md](/Users/wangshangbin/My/OrderProject/suiyuan/docs/setup-update-migration-architecture.md) 为准；若本文档与该文档冲突，后者优先。
 
 ## 1. 项目背景
 

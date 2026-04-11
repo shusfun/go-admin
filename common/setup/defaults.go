@@ -60,7 +60,7 @@ func ReadApplicationMode(defaultMode string) string {
 }
 
 func ReadSetupDefaults() SetupDefaults {
-	mode := normalizeEnvironment(ReadApplicationMode("dev"))
+	mode := normalizeKnownEnvironment(ReadApplicationMode("prod"), "prod")
 
 	if profile, err := repoProfileReader(); err == nil && hasLocalInfraProfile(profile) && NeedsSetup() {
 		defaults := defaultSetupDefaults("dev")
@@ -85,6 +85,33 @@ func ReadSetupDefaults() SetupDefaults {
 		defaults.Database.Password = ""
 	}
 	return defaults
+}
+
+func resolveSetupEnvironment(requested string) string {
+	if strings.TrimSpace(requested) != "" {
+		return normalizeKnownEnvironment(requested, "prod")
+	}
+	if profile, err := repoProfileReader(); err == nil && hasLocalInfraProfile(profile) && NeedsSetup() {
+		return "dev"
+	}
+	return normalizeKnownEnvironment(ReadApplicationMode("prod"), "prod")
+}
+
+func normalizeKnownEnvironment(mode string, fallback string) string {
+	normalized := normalizeEnvironment(mode)
+	if isSupportedEnvironment(normalized) {
+		return normalized
+	}
+	return normalizeEnvironment(fallback)
+}
+
+func isSupportedEnvironment(mode string) bool {
+	switch normalizeEnvironment(mode) {
+	case "dev", "test", "prod":
+		return true
+	default:
+		return false
+	}
 }
 
 func hasLocalInfraProfile(profile *repoProfile) bool {

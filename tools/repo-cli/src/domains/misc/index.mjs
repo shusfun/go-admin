@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import readline from "node:readline/promises";
 
 import { printStatusTable, reconcileState, tailServiceLog } from "../runtime/services.mjs";
 import { inspectProjectAir } from "../runtime/backend-dev.mjs";
 import { printInfraStatus, startInfra } from "../infra/index.mjs";
-import { commandExists, runCommandOrThrow } from "../../shared/process.mjs";
+import { commandExists, runCommand, runCommandOrThrow } from "../../shared/process.mjs";
 import { composeBaseArgs, composeEnv, goEnv } from "../runtime/context.mjs";
 import { printDivider, printField, printFields, printHint, printSection, toRepoRelative } from "../../shared/output.mjs";
 
@@ -95,6 +95,28 @@ export function runMigrate(context) {
   printField("结果", "迁移完成");
 }
 
+export async function runDatabaseReset(context) {
+  const plan = resolveDatabaseResetPlan(context);
+
+  printSection("重置项目数据库");
+  printField("来源", plan.provider);
+  printField("目标库", plan.databaseName);
+  if (plan.host) {
+    printField("地址", `${plan.host}:${plan.port}`);
+  }
+  printDivider();
+
+  const result = executeDatabaseReset(context, plan);
+
+  printSection("数据库已重置");
+  if (result.databaseMissing) {
+    printField("结果", `目标库 ${plan.databaseName} 不存在，已视为无内容可清理`);
+  } else {
+    printField("结果", `已清空当前项目数据库 ${plan.databaseName}`);
+  }
+  printHint("如需重新初始化，请执行 pnpm repo:service:start backend 并重新走 Setup Wizard");
+}
+
 export async function runReinit(context, yes) {
   if (!yes) {
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
@@ -108,28 +130,9 @@ export async function runReinit(context, yes) {
     }
   }
 
-  if (commandExists("docker") && existsSync(context.dockerDevFile)) {
-    try {
-      runCommandOrThrow("docker", [...composeBaseArgs(context, true), "down", "--volumes", "--remove-orphans"], {
-        cwd: context.repoRoot,
-        env: composeEnv(context),
-        stdio: "inherit",
-      });
-    } catch (error) {
-      console.error(`开发基础设施清理失败：${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-  if (commandExists("docker") && existsSync(context.dockerAppFile)) {
-    try {
-      runCommandOrThrow("docker", [...composeBaseArgs(context, false), "down", "--volumes", "--remove-orphans"], {
-        cwd: context.repoRoot,
-        env: composeEnv(context),
-        stdio: "inherit",
-      });
-    } catch (error) {
-      console.error(`应用容器清理失败：${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
+  cleanupActiveInfraForReinit(context);
+
+  await runDatabaseResetAction(context);
 
   const targets = [
     path.join(context.repoRoot, ".tmp", "go"),
@@ -144,10 +147,10 @@ export async function runReinit(context, yes) {
     context.installLockFile,
   ];
   for (const target of targets) {
-    rmSync(target, { recursive: true, force: true });
+    removeRepoPath(context, target);
   }
   printSection("环境重置");
-  printField("结果", "已清理本地产物、安装锁与 repo-cli 状态");
+  printField("结果", "已清理项目数据库、本地产物、安装锁与 repo-cli 状态");
 }
 
 export async function runSetup(context, withOpenAPI, skipInfra) {
@@ -201,4 +204,286 @@ export async function runSetup(context, withOpenAPI, skipInfra) {
 
 function toPosixPath(filePath) {
   return filePath.split(path.sep).join("/");
+}
+
+export let runDatabaseResetAction = runDatabaseReset;
+
+export function setRunDatabaseResetActionForTest(handler) {
+  runDatabaseResetAction = handler;
+}
+
+export function resetRunDatabaseResetActionForTest() {
+  runDatabaseResetAction = runDatabaseReset;
+}
+
+export function resolveDatabaseResetPlan(context) {
+  const provider = resolveActiveInfraProvider(context);
+  if (provider === "docker") {
+    return {
+      provider: "docker",
+      databaseName: composeEnv(context).DEV_POSTGRES_DB,
+      dataDir: context.dockerPostgresDataDir,
+    };
+  }
+
+  const settings = readSettingsFile(context);
+  const database = parseDatabaseSource(settings.database.source);
+  if (settings.database.driver !== "postgres") {
+    throw new Error(`当前仅支持重置 PostgreSQL，实际驱动为 ${settings.database.driver || "(空)"}`);
+  }
+  assertResettableDatabaseName(database.dbname);
+
+  return {
+    provider: "global",
+    databaseName: database.dbname,
+    host: database.host || "127.0.0.1",
+    port: database.port || 5432,
+    user: database.user,
+    password: database.password,
+  };
+}
+
+export function parseDatabaseSource(source) {
+  const result = {};
+  for (const chunk of String(source || "").trim().split(/\s+/)) {
+    const [key, ...rest] = chunk.split("=");
+    if (!key || rest.length === 0) {
+      continue;
+    }
+    result[key] = rest.join("=");
+  }
+  if (result.port) {
+    const port = Number.parseInt(result.port, 10);
+    result.port = Number.isFinite(port) ? port : 0;
+  }
+  return result;
+}
+
+function executeDatabaseReset(context, plan) {
+  if (plan.provider === "docker") {
+    resetDockerDatabase(context, plan);
+    return { databaseMissing: false };
+  }
+  return resetGlobalPostgres(context, plan);
+}
+
+function resetDockerDatabase(context, plan) {
+  if (commandExists("docker") && existsSync(context.dockerDevFile)) {
+    try {
+      runCommandOrThrow("docker", [...composeBaseArgs(context, true), "stop", "postgres"], {
+        cwd: context.repoRoot,
+        env: composeEnv(context),
+        stdio: "inherit",
+      });
+    } catch (error) {
+      console.error(`停止 docker postgres 失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  removeRepoPath(context, plan.dataDir);
+
+  if (commandExists("docker") && existsSync(context.dockerDevFile)) {
+    runCommandOrThrow("docker", [...composeBaseArgs(context, true), "up", "-d", "postgres"], {
+      cwd: context.repoRoot,
+      env: composeEnv(context),
+      stdio: "inherit",
+    });
+  }
+}
+
+function resetGlobalPostgres(context, plan) {
+  ensurePostgresCommand();
+  const adminDatabase = "postgres";
+  if (!postgresDatabaseExists(context, plan, adminDatabase)) {
+    return { databaseMissing: true };
+  }
+  const terminateArgs = buildPsqlArgs(
+    plan,
+    adminDatabase,
+    `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${escapeSQLString(plan.databaseName)}' AND pid <> pg_backend_pid();`,
+  );
+  const resetArgs = buildPsqlArgs(plan, plan.databaseName, buildProjectDatabaseResetSQL());
+
+  runCommandOrThrow("psql", terminateArgs, {
+    cwd: context.repoRoot,
+    env: postgresEnv(plan),
+    stdio: "inherit",
+  });
+  runCommandOrThrow("psql", resetArgs, {
+    cwd: context.repoRoot,
+    env: postgresEnv(plan),
+    stdio: "inherit",
+  });
+  return { databaseMissing: false };
+}
+
+function postgresEnv(plan) {
+  const env = { ...process.env };
+  if (plan.password) {
+    env.PGPASSWORD = plan.password;
+  }
+  return env;
+}
+
+function buildPsqlArgs(plan, databaseName, sql) {
+  return [
+    "-h", plan.host,
+    "-p", String(plan.port),
+    "-U", plan.user,
+    "-d", databaseName,
+    "-v", "ON_ERROR_STOP=1",
+    "-c", sql,
+  ];
+}
+
+function ensurePostgresCommand() {
+  if (!commandExists("psql")) {
+    throw new Error("未找到 psql，无法重置全局 PostgreSQL 数据库");
+  }
+}
+
+function postgresDatabaseExists(context, plan, adminDatabase) {
+  const existsArgs = buildPsqlArgs(
+    plan,
+    adminDatabase,
+    `SELECT 1 FROM pg_database WHERE datname = '${escapeSQLString(plan.databaseName)}';`,
+  );
+  const result = runCommand("psql", existsArgs, {
+    cwd: context.repoRoot,
+    env: postgresEnv(plan),
+  });
+  if (result.code !== 0) {
+    throw new Error(result.stderr.trim() || `检查数据库 ${plan.databaseName} 是否存在失败`);
+  }
+  return /\b1\b/.test(result.stdout);
+}
+
+function readSettingsFile(context) {
+  if (!existsSync(context.configFile)) {
+    throw new Error(`未找到配置文件 ${toRepoRelative(context, context.configFile)}，无法定位当前项目数据库`);
+  }
+  const content = readFileSync(context.configFile, "utf8");
+  const driverMatch = content.match(/^\s*driver:\s*([^\s#]+)\s*$/m);
+  const sourceMatch = content.match(/^\s*source:\s*(.+?)\s*$/m);
+  return {
+    database: {
+      driver: driverMatch?.[1] ?? "",
+      source: sourceMatch?.[1] ?? "",
+    },
+  };
+}
+
+function assertResettableDatabaseName(databaseName) {
+  const normalized = String(databaseName || "").trim().toLowerCase();
+  if (!normalized) {
+    throw new Error("当前配置缺少数据库名称，无法执行重置");
+  }
+  if (["postgres", "template0", "template1"].includes(normalized)) {
+    throw new Error(`拒绝重置系统数据库 ${databaseName}`);
+  }
+}
+
+function normalizeInfraProvider(provider) {
+  const normalized = String(provider || "").trim().toLowerCase();
+  if (normalized === "docker" || normalized === "global") {
+    return normalized;
+  }
+  return "";
+}
+
+function escapeSQLString(value) {
+  return String(value || "").replaceAll("'", "''");
+}
+
+function resolveActiveInfraProvider(context) {
+  return normalizeInfraProvider(context.profile?.infra?.provider || "");
+}
+
+function cleanupActiveInfraForReinit(context) {
+  if (resolveActiveInfraProvider(context) !== "docker") {
+    return;
+  }
+  if (!commandExists("docker")) {
+    return;
+  }
+
+  if (existsSync(context.dockerDevFile)) {
+    try {
+      runCommandOrThrow("docker", [...composeBaseArgs(context, true), "down", "--volumes", "--remove-orphans"], {
+        cwd: context.repoRoot,
+        env: composeEnv(context),
+        stdio: "inherit",
+      });
+    } catch (error) {
+      console.error(`开发基础设施清理失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  if (existsSync(context.dockerAppFile)) {
+    try {
+      runCommandOrThrow("docker", [...composeBaseArgs(context, false), "down", "--volumes", "--remove-orphans"], {
+        cwd: context.repoRoot,
+        env: composeEnv(context),
+        stdio: "inherit",
+      });
+    } catch (error) {
+      console.error(`应用容器清理失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+
+function buildProjectDatabaseResetSQL() {
+  return [
+    "DO $$",
+    "DECLARE item record;",
+    "BEGIN",
+    "  FOR item IN (SELECT schemaname, tablename FROM pg_tables WHERE schemaname = current_schema()) LOOP",
+    "    EXECUTE format('DROP TABLE IF EXISTS %I.%I CASCADE', item.schemaname, item.tablename);",
+    "  END LOOP;",
+    "  FOR item IN (SELECT sequence_schema, sequence_name FROM information_schema.sequences WHERE sequence_schema = current_schema()) LOOP",
+    "    EXECUTE format('DROP SEQUENCE IF EXISTS %I.%I CASCADE', item.sequence_schema, item.sequence_name);",
+    "  END LOOP;",
+    "  FOR item IN (SELECT table_schema, table_name FROM information_schema.views WHERE table_schema = current_schema()) LOOP",
+    "    EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', item.table_schema, item.table_name);",
+    "  END LOOP;",
+    "  FOR item IN (SELECT schemaname, matviewname FROM pg_matviews WHERE schemaname = current_schema()) LOOP",
+    "    EXECUTE format('DROP MATERIALIZED VIEW IF EXISTS %I.%I CASCADE', item.schemaname, item.matviewname);",
+    "  END LOOP;",
+    "END $$;",
+  ].join(" ");
+}
+
+function removeRepoPath(context, targetPath) {
+  assertPathInsideRepo(context, targetPath);
+  if (!existsSync(targetPath)) {
+    return;
+  }
+  makePathWritableRecursive(targetPath);
+  rmSync(targetPath, { recursive: true, force: true });
+}
+
+function assertPathInsideRepo(context, targetPath) {
+  const resolvedRoot = path.resolve(context.repoRoot);
+  const resolvedTarget = path.resolve(targetPath);
+  const relative = path.relative(resolvedRoot, resolvedTarget);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error(`拒绝操作仓库外路径: ${targetPath}`);
+  }
+}
+
+function makePathWritableRecursive(targetPath) {
+  const stat = lstatSync(targetPath);
+  if (stat.isSymbolicLink()) {
+    return;
+  }
+
+  if (stat.isDirectory()) {
+    for (const childName of readdirSync(targetPath)) {
+      makePathWritableRecursive(path.join(targetPath, childName));
+    }
+    chmodSync(targetPath, stat.mode | 0o700);
+    return;
+  }
+
+  chmodSync(targetPath, stat.mode | 0o600);
 }

@@ -24,7 +24,6 @@
 - JWT 认证
 - Swagger 接口文档（基于 swaggo）
 - 基于 GORM 的数据库存储，支持 PostgreSQL / MySQL / SQLite / SQL Server
-- 代码生成工具 —— 根据数据表结构自动生成增删改查业务代码
 - 运维任务执行 —— 支持 SSE 实时推流
 - 定时任务调度（robfig/cron）
 - **Setup Wizard** —— 浏览器引导式初始化安装
@@ -43,7 +42,6 @@
 | 操作日志 | 系统正常操作与异常信息的记录与查询 |
 | 登录日志 | 登录记录查询，包含登录异常 |
 | 接口文档 | 根据业务代码自动生成 API 文档 |
-| 代码生成 | 根据数据表结构生成完整 CRUD 业务，零代码实现基础功能 |
 | 服务监控 | 查看服务器基本信息 |
 
 ## 项目结构
@@ -54,7 +52,7 @@ go-admin/
 │   ├── admin/          # 核心 RBAC：用户、角色、菜单、部门、岗位、字典、配置、日志
 │   ├── jobs/           # 定时任务调度
 │   ├── ops/            # 运维任务执行（部署、重启），SSE 实时推流
-│   └── other/          # 文件上传、代码生成、服务器监控
+│   └── other/          # 文件上传、服务器监控
 ├── cmd/                # Cobra CLI 子命令
 ├── common/             # 公共层：中间件、模型、DTO、数据库初始化、文件存储
 │   └── setup/          # Setup Wizard 后端逻辑
@@ -145,6 +143,8 @@ pnpm repo:service:start mobile
 
 `repo service start backend` now prefers project-scoped `air` hot reload and reads `config/settings.pg.yml` by default. The first run prepares `./.tmp/bin/air` inside the repository, and `pnpm repo:service:start:backend` is available as an all-colon alias.
 
+When `settings.extend.runtime.autoMigrateOnStart=true`, every backend start and `air` restart also performs the existing idempotent database bootstrap check automatically.
+
 - `backend`, `admin`, and `mobile` are managed by `repo-cli` as detached background processes.
 - Use `pnpm repo:service:status <service>` and `pnpm repo:service:logs <service>` to inspect the actual state.
 首次启动时，后端检测到系统未安装，会进入 **Setup Wizard 模式**：仅暴露 `/api/v1/setup/*` 路由，不连接数据库，等待前端引导完成初始化配置。
@@ -165,6 +165,7 @@ pnpm repo:service:start mobile
 
 点击「开始安装」后，后端将自动：
 - 生成当前启动使用的配置文件（默认 `config/settings.pg.yml`）
+- `extend.runtime.autoMigrateOnStart` is derived from the install environment: `dev/test=true`, `prod=false`
 - 创建数据库表并导入初始化数据
 - 创建管理员账号
 - 写入 `.installed` 锁文件

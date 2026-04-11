@@ -47,10 +47,6 @@ antd体验：[https://antd.go-admin.pro](https://antd.go-admin.pro/)
 
 - 配置文件简单的模型映射，快速能够得到想要的配置
 
-- 代码生成工具
-
-- 表单构建工具
-
 - 多指令模式
 
 - 多租户的支持
@@ -70,8 +66,6 @@ antd体验：[https://antd.go-admin.pro](https://antd.go-admin.pro/)
 8. 操作日志：系统正常操作日志记录和查询；系统异常信息日志记录和查询。
 9. 登录日志：系统登录日志记录查询包含登录异常。
 1. 接口文档：根据业务代码自动生成相关的api接口文档。
-1. 代码生成：根据数据表结构生成对应的增删改查相对应业务，全程可视化操作，让基本业务可以零代码实现。
-1. 表单构建：自定义页面样式，拖拉拽实现页面布局。
 1. 服务监控：查看一些服务器的基本信息。
 1. 内容管理：demo功能，下设分类管理、内容管理。可以参考使用方便快速入门。
 1. 定时任务：自动化任务，目前支持接口调用和函数调用。
@@ -150,6 +144,7 @@ pnpm repo:reinit
 - `repo infra stop`：停止当前选中的开发基础设施来源
 - `repo infra status`：查看当前基础设施来源、安装状态、运行状态和健康状态
 - `repo service start backend`：启动后端，默认优先使用项目级 `air` 热更新并读取 `config/settings.pg.yml`
+  - 若 `settings.extend.runtime.autoMigrateOnStart=true`，服务启动与 `air` 重启时都会自动执行幂等迁移检查
 - `repo service start admin`：启动管理端开发服务器
 - `repo reinit --yes`：按当前前缀清理应用栈、项目级 Docker 数据目录、安装锁和本地产物
 - 所有受管服务日志和状态文件都会写到项目内 `temp/repo-cli/`：
@@ -168,6 +163,7 @@ pnpm repo:reinit
 - Setup 模式下只暴露 `/api/v1/setup/*` 接口，不会托管前端静态资源
 - 启动 `repo service start admin` 后，前端会自动检测安装状态并引导初始化数据库和管理员账号
 - 安装完成后会写入当前启动使用的配置文件（默认 `config/settings.pg.yml`）与同目录下的 `.installed`
+  - `extend.runtime.autoMigrateOnStart` 会按安装环境决定：`dev/test=true`，`prod=false`
 - 容器部署时请持久化 `config/` 目录，否则重启后会重新进入安装流程
 
 ### OpenAPI 到前端类型
@@ -282,9 +278,6 @@ pnpm repo:rename -- go-admin --dry-run
 9. [jwt-go](https://github.com/dgrijalva/jwt-go)
 10. [vue-element-admin](https://github.com/PanJiaChen/vue-element-admin)
 11. [ruoyi-vue](https://gitee.com/y_project/RuoYi-Vue)
-12. [form-generator](https://github.com/JakHuang/form-generator)
-
-
 ## 🤟 打赏
 
 > 如果你觉得这个项目帮助到了你，你可以帮作者买一杯果汁表示鼓励 :tropical_drink:

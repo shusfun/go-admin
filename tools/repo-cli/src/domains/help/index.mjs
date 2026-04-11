@@ -45,9 +45,10 @@ export function printHelp() {
         "repo status               查看应用服务和基础设施状态",
         "repo setup                安装依赖并准备开发环境",
         "repo setup-status         查看是否会进入 Setup Wizard",
+        "repo db reset             重置当前项目数据库内容",
         "repo migrate              执行数据库迁移",
         "repo openapi              生成 OpenAPI 与前端类型",
-        "repo reinit --yes         重置本地产物和安装态",
+        "repo reinit --yes         重置本地产物、安装态和项目数据库",
       ],
     },
     {

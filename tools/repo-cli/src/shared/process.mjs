@@ -143,6 +143,16 @@ export async function portOpen(port) {
   });
 }
 
+export async function portListening(port) {
+  if (!port) {
+    return false;
+  }
+  if (await portOpen(port)) {
+    return true;
+  }
+  return (await portOwnerPid(port)) > 0;
+}
+
 export async function portOwnerPid(port) {
   if (!port) {
     return 0;
@@ -161,8 +171,16 @@ export async function portOwnerPid(port) {
   if (lsof.code === 0) {
     return parsePid(lsof.stdout);
   }
+  if (process.platform === "darwin") {
+    return 0;
+  }
 
-  const ss = runCommand("ss", ["-ltnp", `sport = :${port}`]);
+  let ss;
+  try {
+    ss = runCommand("ss", ["-ltnp", `sport = :${port}`]);
+  } catch {
+    return 0;
+  }
   if (ss.code !== 0) {
     return 0;
   }
@@ -173,12 +191,12 @@ export async function portOwnerPid(port) {
 export async function waitForPortClosed(port, timeoutMs = 10000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (!(await portOpen(port))) {
+    if (!(await portListening(port))) {
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  return !(await portOpen(port));
+  return !(await portListening(port));
 }
 
 function parsePid(output) {

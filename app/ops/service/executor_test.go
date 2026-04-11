@@ -14,9 +14,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/glebarez/sqlite"
 	appModels "go-admin/app/ops/models"
 	"go-admin/app/ops/service/dto"
 	cfg "go-admin/config"
+	"gorm.io/gorm"
 )
 
 func TestLimitLogSizeKeepsLatestContent(t *testing.T) {
@@ -225,6 +227,152 @@ func TestResolveTaskTimeoutUsesOverride(t *testing.T) {
 	}
 }
 
+func TestTaskRunnerRunDeployBackendCompletesFullUpdateChain(t *testing.T) {
+	fixture := createGitFixture(t, 1, true)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	dockerLogDir := mustMkdirTempDir(t)
+	dockerLog, err := filepath.Abs(filepath.Join(dockerLogDir, "docker.log"))
+	if err != nil {
+		t.Fatalf("resolve docker log path failed: %v", err)
+	}
+	installFakeCommand(t, "docker", "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \""+dockerLog+"\"\n")
+
+	db := openOpsTestDB(t)
+	task := &appModels.OpsTask{
+		Env:    "dev",
+		Type:   appModels.TaskTypeDeployBackend,
+		Status: appModels.TaskStatusQueued,
+	}
+	if err := db.Create(task).Error; err != nil {
+		t.Fatalf("create task failed: %v", err)
+	}
+
+	runner := &TaskRunner{
+		db:     db,
+		taskID: task.Id,
+		env: cfg.OpsEnvironment{
+			Key:    "dev",
+			Domain: "https://dev.example.com",
+			Backend: cfg.OpsBackendTarget{
+				RepoDir:     fixture.localRepo,
+				ComposeFile: filepath.Join(fixture.localRepo, "docker-compose.yml"),
+				ServiceName: "backend",
+				HealthURL:   server.URL,
+			},
+		},
+		fetchedRepos: make(map[string]struct{}),
+	}
+
+	runner.Run(context.Background())
+
+	stored := &appModels.OpsTask{}
+	if err := db.First(stored, task.Id).Error; err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if stored.Status != appModels.TaskStatusSuccess {
+		t.Fatalf("expected success status, got %s, err=%q log=%q", stored.Status, stored.ErrMsg, stored.Log)
+	}
+	if stored.Summary != "后端更新完成" {
+		t.Fatalf("expected backend success summary, got %q", stored.Summary)
+	}
+	if stored.TotalSteps != 4 {
+		t.Fatalf("expected 4 backend steps, got %d", stored.TotalSteps)
+	}
+	if stored.StepName != "健康检查" {
+		t.Fatalf("expected final step to be health check, got %q", stored.StepName)
+	}
+	if !strings.Contains(stored.Log, "git pull --ff-only") {
+		t.Fatalf("expected log to include git pull, got %q", stored.Log)
+	}
+	if !strings.Contains(stored.Log, "按配置自动执行幂等迁移检查") {
+		t.Fatalf("expected restart migration reminder in log, got %q", stored.Log)
+	}
+	if !strings.Contains(stored.Log, "[健康检查] 服务已就绪") {
+		t.Fatalf("expected health success log, got %q", stored.Log)
+	}
+
+	dockerOutput, err := os.ReadFile(dockerLog)
+	if err != nil {
+		t.Fatalf("read docker log failed: %v", err)
+	}
+	dockerCalls := string(dockerOutput)
+	if !strings.Contains(dockerCalls, "compose -f "+filepath.Join(fixture.localRepo, "docker-compose.yml")+" build backend") {
+		t.Fatalf("expected docker build call, got %q", dockerCalls)
+	}
+	if !strings.Contains(dockerCalls, "compose -f "+filepath.Join(fixture.localRepo, "docker-compose.yml")+" up -d backend") {
+		t.Fatalf("expected docker up call, got %q", dockerCalls)
+	}
+}
+
+func TestTaskRunnerRunRestartBackendCompletesRestartChain(t *testing.T) {
+	repoDir := mustMkdirTempDir(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	dockerLogDir := mustMkdirTempDir(t)
+	dockerLog, err := filepath.Abs(filepath.Join(dockerLogDir, "docker.log"))
+	if err != nil {
+		t.Fatalf("resolve docker log path failed: %v", err)
+	}
+	installFakeCommand(t, "docker", "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \""+dockerLog+"\"\n")
+
+	db := openOpsTestDB(t)
+	task := &appModels.OpsTask{
+		Env:    "dev",
+		Type:   appModels.TaskTypeRestart,
+		Status: appModels.TaskStatusQueued,
+	}
+	if err := db.Create(task).Error; err != nil {
+		t.Fatalf("create task failed: %v", err)
+	}
+
+	runner := &TaskRunner{
+		db:     db,
+		taskID: task.Id,
+		env: cfg.OpsEnvironment{
+			Key:    "dev",
+			Domain: "https://dev.example.com",
+			Backend: cfg.OpsBackendTarget{
+				RepoDir:     repoDir,
+				ComposeFile: filepath.Join(repoDir, "docker-compose.yml"),
+				ServiceName: "backend",
+				HealthURL:   server.URL,
+			},
+		},
+		fetchedRepos: make(map[string]struct{}),
+	}
+
+	runner.Run(context.Background())
+
+	stored := &appModels.OpsTask{}
+	if err := db.First(stored, task.Id).Error; err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if stored.Status != appModels.TaskStatusSuccess {
+		t.Fatalf("expected success status, got %s, err=%q log=%q", stored.Status, stored.ErrMsg, stored.Log)
+	}
+	if stored.Summary != "后端重启完成" {
+		t.Fatalf("expected restart success summary, got %q", stored.Summary)
+	}
+	if stored.TotalSteps != 2 {
+		t.Fatalf("expected restart flow to have 2 steps, got %d", stored.TotalSteps)
+	}
+
+	dockerOutput, err := os.ReadFile(dockerLog)
+	if err != nil {
+		t.Fatalf("read docker log failed: %v", err)
+	}
+	if !strings.Contains(string(dockerOutput), "compose -f "+filepath.Join(repoDir, "docker-compose.yml")+" restart backend") {
+		t.Fatalf("expected docker restart call, got %q", string(dockerOutput))
+	}
+}
+
 type gitFixture struct {
 	localRepo string
 }
@@ -317,4 +465,32 @@ func ensureGitMainBranch(t *testing.T, dir string) {
 		return
 	}
 	runGitCommand(t, dir, "checkout", "-b", "main", "origin/main")
+}
+
+func openOpsTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite failed: %v", err)
+	}
+	if err := db.AutoMigrate(&appModels.OpsTask{}); err != nil {
+		t.Fatalf("migrate ops_task failed: %v", err)
+	}
+	return db
+}
+
+func installFakeCommand(t *testing.T, name string, script string) {
+	t.Helper()
+
+	binDir := mustMkdirTempDir(t)
+	absBinDir, err := filepath.Abs(binDir)
+	if err != nil {
+		t.Fatalf("resolve fake bin dir failed: %v", err)
+	}
+	commandPath := filepath.Join(absBinDir, name)
+	if err := os.WriteFile(commandPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake command failed: %v", err)
+	}
+	t.Setenv("PATH", absBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }

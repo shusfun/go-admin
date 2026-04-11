@@ -2,7 +2,7 @@ settings:
     application:
         enabledp: false
         host: 0.0.0.0
-        mode: prod
+        mode: dev
         name: go-admin
         port: 18123
         readtimeout: 1
@@ -18,14 +18,13 @@ settings:
         ops:
             environments: []
             taskTimeoutSeconds: 900
-    gen:
-        dbname: go_admin_dev
-        frontpath: ../go-admin-ui/src
+        runtime:
+            autoMigrateOnStart: true
     jwt:
-        secret: b6e17a3cfbdd6980c3c05edf7f621c0241ffd1b8eb20c5ab59b2fcb071e7df00
+        secret: 4c38b00088c2736c6c943f4e67205fc3f9360a4ffe0280b0241ed8596735e8f2
         timeout: 3600
     logger:
-        enableddb: false
+        enableddb: true
         level: info
         path: temp/logs
         stdout: ""
