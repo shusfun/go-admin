@@ -9,6 +9,29 @@ export const AIR_VERSION = "v1.65.0";
 
 export function resolveBackendCommand(context, options = {}) {
   const ensureAir = options.ensureAirBinary ?? ensureAirBinary;
+  const platform = options.platform ?? process.platform;
+
+  if (platform === "win32") {
+    return {
+      name: process.execPath,
+      args: [
+        context.backendWatcherScript,
+        "--repoRoot",
+        context.repoRoot,
+        "--configFile",
+        context.configFile,
+        "--backendBinary",
+        context.backendDevBinary,
+      ],
+      cwd: context.backendRoot,
+      env: goEnv(context, { GOWORK: "off" }),
+      mode: "hot-reload",
+      runner: "repo-cli",
+      toolVersion: "",
+      toolScope: "project",
+      note: "Windows 下使用 repo-cli 原生热更新，直接静默拉起 backend-dev.exe，避免 air 重启时弹出 PowerShell。",
+    };
+  }
 
   try {
     const air = ensureAir(context);

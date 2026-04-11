@@ -8,8 +8,9 @@ import (
 	"github.com/go-admin-team/go-admin-core/sdk/config"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg/jwtauth/user"
-	"github.com/go-admin-team/go-admin-core/sdk/pkg/response"
 	"gorm.io/gorm"
+
+	"go-admin/common/responsex"
 )
 
 type DataPermission struct {
@@ -24,6 +25,7 @@ func PermissionAction() gin.HandlerFunc {
 		db, err := pkg.GetOrm(c)
 		if err != nil {
 			log.Error(err)
+			responsex.Error(c, 500, err, "数据库连接获取失败")
 			return
 		}
 
@@ -33,7 +35,7 @@ func PermissionAction() gin.HandlerFunc {
 			p, err = newDataPermission(db, userId)
 			if err != nil {
 				log.Errorf("MsgID[%s] PermissionAction error: %s", msgID, err)
-				response.Error(c, 500, err, "权限范围鉴定错误")
+				responsex.Error(c, 500, err, "权限范围鉴定错误")
 				c.Abort()
 				return
 			}

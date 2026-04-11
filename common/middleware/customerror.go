@@ -4,12 +4,33 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-admin-team/go-admin-core/sdk/config"
 )
+
+func shouldExposePanicDetail() bool {
+	mode := strings.ToLower(strings.TrimSpace(config.ApplicationConfig.Mode))
+	return mode == "" || mode == "dev" || mode == "test"
+}
+
+func buildPanicPayload(code int, message string) gin.H {
+	payload := gin.H{
+		"code": code,
+		"msg":  message,
+	}
+	if shouldExposePanicDetail() {
+		payload["debug"] = gin.H{
+			"error": message,
+			"stack": string(debug.Stack()),
+		}
+	}
+	return payload
+}
 
 func CustomError(c *gin.Context) {
 	defer func() {
@@ -37,21 +58,14 @@ func CustomError(c *gin.Context) {
 						c.ClientIP(),
 						p[2],
 					)
-					c.JSON(http.StatusOK, gin.H{
-						"code": statusCode,
-						"msg":  p[2],
-					})
+					c.JSON(http.StatusOK, buildPanicPayload(statusCode, p[2]))
 				} else {
-					c.JSON(http.StatusOK, gin.H{
-						"code": 500,
-						"msg":  errStr,
-					})
+					c.JSON(http.StatusOK, buildPanicPayload(500, errStr))
 				}
+			case error:
+				c.JSON(http.StatusOK, buildPanicPayload(500, errStr.Error()))
 			case runtime.Error:
-				c.JSON(http.StatusOK, gin.H{
-					"code": 500,
-					"msg":  errStr.Error(),
-				})
+				c.JSON(http.StatusOK, buildPanicPayload(500, errStr.Error()))
 			default:
 				panic(err)
 			}

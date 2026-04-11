@@ -794,20 +794,36 @@ export function EmptyBlock({
 }
 
 export function FormDialog({
-  children,
-  description,
-  onOpenChange,
-  open,
-  title,
-}: PropsWithChildren<{ description?: ReactNode; onOpenChange: (open: boolean) => void; open: boolean; title: ReactNode }>) {
-  const descriptionId = useId();
+	children,
+	description,
+	onOpenChange,
+	open,
+	size = "default",
+	title,
+}: PropsWithChildren<{
+	description?: ReactNode;
+	onOpenChange: (open: boolean) => void;
+	open: boolean;
+	size?: "default" | "wide" | "fullscreen";
+	title: ReactNode;
+}>) {
+	const descriptionId = useId();
+	const sizeClassName =
+		size === "fullscreen"
+			? "left-0 top-0 h-[100dvh] w-[100vw] max-h-none max-w-none translate-x-0 translate-y-0 rounded-none border-0"
+			: size === "wide"
+				? "w-[min(98vw,72rem)]"
+				: "w-[min(96vw,52rem)]";
 
-  return (
-    <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent aria-describedby={description ? descriptionId : undefined} className="flex max-h-[calc(100dvh-2rem)] w-[min(96vw,52rem)] flex-col overflow-hidden p-0">
-        <DialogHeader className="shrink-0 px-6 pb-0 pt-6 pr-12">
-          <DialogTitle>{title}</DialogTitle>
-          {description ? <DialogDescription id={descriptionId}>{description}</DialogDescription> : null}
+	return (
+		<Dialog onOpenChange={onOpenChange} open={open}>
+			<DialogContent
+				aria-describedby={description ? descriptionId : undefined}
+				className={cn("flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden p-0", sizeClassName)}
+			>
+				<DialogHeader className="shrink-0 px-6 pb-0 pt-6 pr-12">
+					<DialogTitle>{title}</DialogTitle>
+					{description ? <DialogDescription id={descriptionId}>{description}</DialogDescription> : null}
         </DialogHeader>
         <div className="flex min-h-0 flex-1 flex-col px-6 pb-6 pt-4">{children}</div>
       </DialogContent>
@@ -1650,28 +1666,32 @@ function TreeSelectorNode({
 }
 
 export function TreeSelectorPanel({
-  checkedIds,
-  description,
-  disabled = false,
-  emptyLabel = "暂无可选节点",
-  nodes,
-  onChange,
-  title,
+	checkedIds,
+	className,
+	description,
+	disabled = false,
+	emptyLabel = "暂无可选节点",
+	nodes,
+	onChange,
+	scrollClassName,
+	title,
 }: {
-  checkedIds: number[];
-  description?: ReactNode;
-  disabled?: boolean;
-  emptyLabel?: ReactNode;
-  nodes: TreeLikeNode[];
-  onChange: (next: number[]) => void;
-  title: ReactNode;
+	checkedIds: number[];
+	className?: string;
+	description?: ReactNode;
+	disabled?: boolean;
+	emptyLabel?: ReactNode;
+	nodes: TreeLikeNode[];
+	onChange: (next: number[]) => void;
+	scrollClassName?: string;
+	title: ReactNode;
 }) {
-  return (
-    <Card className="h-full">
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <CardTitle>{title}</CardTitle>
+	return (
+		<Card className={cn("flex h-full min-h-0 flex-col", className)}>
+			<CardHeader>
+				<div className="flex flex-wrap items-start justify-between gap-3">
+					<div className="space-y-1">
+						<CardTitle>{title}</CardTitle>
             {description ? <CardDescription>{description}</CardDescription> : null}
           </div>
           <div className="flex items-center gap-2">
@@ -1681,16 +1701,16 @@ export function TreeSelectorPanel({
             <Button disabled={disabled || checkedIds.length === 0} onClick={() => onChange([])} size="sm" type="button" variant="ghost">
               清空
             </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        <Badge tone="muted">当前选中 {checkedIds.length} 项</Badge>
-        {nodes.length ? (
-          <AppScrollbar className="max-h-[24rem]" viewportClassName="pr-1">
-            <ul className="grid gap-3">
-              {nodes.map((node) => (
-                <TreeSelectorNode checkedIds={checkedIds} disabled={disabled} key={node.id} node={node} onChange={onChange} />
+					</div>
+				</div>
+			</CardHeader>
+			<CardContent className="flex min-h-0 flex-1 flex-col gap-4">
+				<Badge tone="muted">当前选中 {checkedIds.length} 项</Badge>
+				{nodes.length ? (
+					<AppScrollbar className={cn("min-h-0 flex-1 max-h-[24rem]", scrollClassName)} viewportClassName="pr-1">
+						<ul className="grid gap-3">
+							{nodes.map((node) => (
+								<TreeSelectorNode checkedIds={checkedIds} disabled={disabled} key={node.id} node={node} onChange={onChange} />
               ))}
             </ul>
           </AppScrollbar>

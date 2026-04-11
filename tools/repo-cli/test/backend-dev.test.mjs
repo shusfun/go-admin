@@ -16,6 +16,7 @@ test("resolveBackendCommand prefers project air hot reload", () => {
   try {
     const context = createRepoContext({ repoRoot });
     const command = resolveBackendCommand(context, {
+      platform: "linux",
       ensureAirBinary() {
         return {
           binaryPath: context.airBinary,
@@ -42,6 +43,7 @@ test("resolveBackendCommand falls back to go run when air bootstrap fails", () =
   try {
     const context = createRepoContext({ repoRoot });
     const command = resolveBackendCommand(context, {
+      platform: "linux",
       ensureAirBinary() {
         throw new Error("network unavailable");
       },
@@ -52,6 +54,34 @@ test("resolveBackendCommand falls back to go run when air bootstrap fails", () =
     assert.equal(command.mode, "detached");
     assert.equal(command.runner, "go");
     assert.match(command.note, /network unavailable/);
+  } finally {
+    removeFixtureRepo(repoRoot);
+  }
+});
+
+test("resolveBackendCommand uses native Windows watcher to avoid PowerShell popups", () => {
+  const repoRoot = createFixtureRepo("repo-cli-backend-win");
+
+  try {
+    const context = createRepoContext({ repoRoot });
+    const command = resolveBackendCommand(context, {
+      platform: "win32",
+    });
+
+    assert.equal(command.name, process.execPath);
+    assert.deepEqual(command.args, [
+      context.backendWatcherScript,
+      "--repoRoot",
+      context.repoRoot,
+      "--configFile",
+      context.configFile,
+      "--backendBinary",
+      context.backendDevBinary,
+    ]);
+    assert.equal(command.mode, "hot-reload");
+    assert.equal(command.runner, "repo-cli");
+    assert.equal(command.toolScope, "project");
+    assert.match(command.note, /PowerShell/);
   } finally {
     removeFixtureRepo(repoRoot);
   }

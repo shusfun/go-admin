@@ -89,6 +89,16 @@ type CrudDataPageProps<T extends object> = {
     description?: string;
     columnKeys: string[];
   }>;
+  labels?: {
+    createAction?: string;
+    createTitle?: string;
+    editTitle?: string;
+    createSuccess?: string;
+    updateSuccess?: string;
+    saveError?: string;
+    deleteSuccess?: string;
+    deleteError?: string;
+  };
 };
 
 const EMPTY_SEARCH_FIELDS: SearchField[] = [];
@@ -150,6 +160,7 @@ export function CrudDataPage<T extends object>({
   renderAside,
   rowActions,
   viewPresets = EMPTY_VIEW_PRESETS as NonNullable<CrudDataPageProps<T>["viewPresets"]>,
+  labels,
 }: CrudDataPageProps<T>) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
@@ -197,14 +208,18 @@ export function CrudDataPage<T extends object>({
       return null;
     },
     onSuccess: async () => {
-      toast.success(editingId !== null ? t("admin.crud.saveSuccess.update") : t("admin.crud.saveSuccess.create"));
+      toast.success(
+        editingId !== null
+          ? (labels?.updateSuccess ?? t("admin.crud.saveSuccess.update"))
+          : (labels?.createSuccess ?? t("admin.crud.saveSuccess.create")),
+      );
       setDialogOpen(false);
       setEditingId(null);
       setDraft(createDraft());
       await queryClient.invalidateQueries({ queryKey: ["admin-page", queryKey] });
     },
     onError: (error) => {
-      toast.error(toUserFacingErrorMessage(error, t("admin.crud.saveError")));
+      toast.error(toUserFacingErrorMessage(error, labels?.saveError ?? t("admin.crud.saveError")));
     },
   });
 
@@ -216,12 +231,12 @@ export function CrudDataPage<T extends object>({
       return deleteItem(payload);
     },
     onSuccess: async () => {
-      toast.success(t("admin.crud.deleteSuccess"));
+      toast.success(labels?.deleteSuccess ?? t("admin.crud.deleteSuccess"));
       setDeleteTarget(null);
       await queryClient.invalidateQueries({ queryKey: ["admin-page", queryKey] });
     },
     onError: (error) => {
-      toast.error(toUserFacingErrorMessage(error, t("admin.crud.deleteError")));
+      toast.error(toUserFacingErrorMessage(error, labels?.deleteError ?? t("admin.crud.deleteError")));
     },
   });
 
@@ -305,7 +320,7 @@ export function CrudDataPage<T extends object>({
           <Toolbar>
             {createItem ? (
               <Button onClick={openCreateDialog} type="button">
-                {t("admin.crud.actions.create")}
+                {labels?.createAction ?? t("admin.crud.actions.create")}
               </Button>
             ) : null}
             <Button
@@ -539,10 +554,14 @@ export function CrudDataPage<T extends object>({
           description={t("admin.crud.dialog.description")}
           onOpenChange={setDialogOpen}
           open={dialogOpen}
-          title={editingId !== null ? t("admin.crud.dialog.editTitle") : t("admin.crud.dialog.createTitle")}
+          title={
+            editingId !== null
+              ? (labels?.editTitle ?? t("admin.crud.dialog.editTitle"))
+              : (labels?.createTitle ?? t("admin.crud.dialog.createTitle"))
+          }
         >
           <div className="flex min-h-0 flex-1 flex-col">
-            <AppScrollbar className="min-h-0 flex-1" viewportClassName="pr-1">
+            <AppScrollbar className="min-h-0 flex-1" viewportClassName="px-1 py-1">
               <div className="grid gap-4 md:grid-cols-2">
                 {formFields.map((field) => (
                   <FormField

@@ -2,16 +2,17 @@ package actions
 
 import (
 	"errors"
-	"github.com/go-admin-team/go-admin-core/sdk/pkg/response"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/go-admin-team/go-admin-core/logger"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg"
+	"github.com/go-admin-team/go-admin-core/sdk/pkg/response"
 	"gorm.io/gorm"
 
 	"go-admin/common/dto"
 	"go-admin/common/models"
+	"go-admin/common/responsex"
 )
 
 // ViewAction 通用详情动作
@@ -20,6 +21,7 @@ func ViewAction(control dto.Control, f func() interface{}) gin.HandlerFunc {
 		db, err := pkg.GetOrm(c)
 		if err != nil {
 			log.Error(err)
+			responsex.Error(c, 500, err, "数据库连接获取失败")
 			return
 		}
 
@@ -28,13 +30,13 @@ func ViewAction(control dto.Control, f func() interface{}) gin.HandlerFunc {
 		req := control.Generate()
 		err = req.Bind(c)
 		if err != nil {
-			response.Error(c, http.StatusUnprocessableEntity, err, "参数验证失败")
+			responsex.Error(c, http.StatusUnprocessableEntity, err, "参数验证失败")
 			return
 		}
 		var object models.ActiveRecord
 		object, err = req.GenerateM()
 		if err != nil {
-			response.Error(c, 500, err, "数据准备失败，请稍后重试")
+			responsex.Error(c, 500, err, "数据准备失败，请稍后重试")
 			return
 		}
 
@@ -58,7 +60,7 @@ func ViewAction(control dto.Control, f func() interface{}) gin.HandlerFunc {
 		}
 		if err != nil {
 			log.Errorf("MsgID[%s] View error: %s", msgID, err)
-			response.Error(c, 500, err, "查看失败")
+			responsex.Error(c, 500, err, "查看失败")
 			return
 		}
 		response.OK(c, rsp, "查询成功")

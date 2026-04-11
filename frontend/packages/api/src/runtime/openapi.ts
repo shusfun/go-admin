@@ -26,6 +26,10 @@ type MaybeEnvelope = {
   code?: number;
   data?: unknown;
   msg?: string;
+  debug?: {
+    error?: string;
+    stack?: string;
+  };
 };
 
 type CancelablePromise<T> = Promise<T> & {

@@ -3,6 +3,7 @@ import { fetchEventSource } from "@microsoft/fetch-event-source";
 
 import { isSessionExpired, toAuthorizationToken } from "@go-admin/auth";
 import type {
+  ApiDebugInfo,
   ApiEnvelope,
   AppSession,
   CaptchaResponse,
@@ -47,11 +48,17 @@ import type {
 
 export class ApiError extends Error {
   code: number;
+  debugError?: string;
+  debugStack?: string;
+  rawBody?: unknown;
 
-  constructor(message: string, code = 500) {
+  constructor(message: string, code = 500, options?: { debug?: ApiDebugInfo; rawBody?: unknown }) {
     super(message);
     this.name = "ApiError";
     this.code = code;
+    this.debugError = options?.debug?.error;
+    this.debugStack = options?.debug?.stack;
+    this.rawBody = options?.rawBody;
   }
 }
 
@@ -96,6 +103,7 @@ type StreamTaskOptions = {
 type PlainBody = {
   code: number;
   msg?: string;
+  debug?: ApiDebugInfo;
 };
 
 function normalizeMessage(message: string) {
@@ -110,6 +118,59 @@ function looksMostlyAscii(message: string) {
 
 function isEngineeringMessage(message: string) {
   return engineeringMessagePatterns.some((pattern) => pattern.test(message)) || looksMostlyAscii(message);
+}
+
+function shouldExposeDebugDetails() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const host = window.location.hostname.trim().toLowerCase();
+  return host === "localhost" || host === "127.0.0.1" || host === "::1";
+}
+
+function getDebugInfo(value: unknown): ApiDebugInfo | undefined {
+  if (!value || typeof value !== "object" || !("debug" in value)) {
+    return undefined;
+  }
+  const debug = (value as { debug?: ApiDebugInfo }).debug;
+  if (!debug || typeof debug !== "object") {
+    return undefined;
+  }
+  return debug;
+}
+
+function buildApiErrorMessage(body: { msg?: string; debug?: ApiDebugInfo }, fallback: string) {
+  const normalizedMessage = normalizeMessage(body.msg || "");
+  const normalizedDebugError = normalizeMessage(body.debug?.error || "");
+
+  if (shouldExposeDebugDetails()) {
+    if (normalizedMessage && normalizedDebugError && normalizedMessage !== normalizedDebugError) {
+      return `${normalizedMessage}：${normalizedDebugError}`;
+    }
+    if (normalizedDebugError) {
+      return normalizedDebugError;
+    }
+    if (normalizedMessage) {
+      return normalizedMessage;
+    }
+    return fallback;
+  }
+
+  return sanitizeUserFacingMessage(normalizedMessage, fallback);
+}
+
+function logDebugDetails(body: { code?: number; debug?: ApiDebugInfo; msg?: string }) {
+  if (!shouldExposeDebugDetails() || !body.debug) {
+    return;
+  }
+  const label = `[API ${body.code ?? "ERR"}] ${normalizeMessage(body.msg || "请求失败") || "请求失败"}`;
+  if (body.debug.stack) {
+    console.error(label, "\n", body.debug.stack);
+    return;
+  }
+  if (body.debug.error) {
+    console.error(label, body.debug.error);
+  }
 }
 
 function sanitizeUserFacingMessage(message: string | undefined, fallback: string) {
@@ -133,11 +194,18 @@ function sanitizeUserFacingMessage(message: string | undefined, fallback: string
 }
 
 export function toUserFacingErrorMessage(error: unknown, fallback = "请求未完成，请稍后重试") {
+  if (error instanceof ApiError) {
+    return normalizeMessage(error.message) || fallback;
+  }
   if (axios.isAxiosError(error)) {
     if (error.code === "ECONNABORTED" || !error.response) {
       return "网络连接异常，请稍后重试";
     }
     const body = error.response?.data;
+    const debug = getDebugInfo(body);
+    if (shouldExposeDebugDetails() && debug?.error) {
+      return normalizeMessage(debug.error) || fallback;
+    }
     const message = body && typeof body === "object" && "msg" in body ? String(body.msg || "") : error.message;
     return sanitizeUserFacingMessage(message, fallback);
   }
@@ -206,7 +274,11 @@ async function unwrapPlain<T extends PlainBody>(
     }
 
     if (body.code !== 200) {
-      throw new ApiError(sanitizeUserFacingMessage(body.msg, "请求失败"), body.code);
+      logDebugDetails(body);
+      throw new ApiError(buildApiErrorMessage(body, "请求失败"), body.code, {
+        debug: body.debug,
+        rawBody: body,
+      });
     }
 
     return body;
@@ -235,7 +307,11 @@ async function unwrapEnvelope<T>(
     }
 
     if (body.code !== 200) {
-      throw new ApiError(sanitizeUserFacingMessage(body.msg, "请求失败"), body.code);
+      logDebugDetails(body);
+      throw new ApiError(buildApiErrorMessage(body, "请求失败"), body.code, {
+        debug: body.debug,
+        rawBody: body,
+      });
     }
 
     return body.data;
@@ -714,7 +790,11 @@ export function createSetupApi(baseURL: string) {
     const response = await request();
     const body = response.data;
     if (body.code !== 200) {
-      throw new ApiError(sanitizeUserFacingMessage(body.msg, "请求失败"), body.code);
+      logDebugDetails(body);
+      throw new ApiError(buildApiErrorMessage(body, "请求失败"), body.code, {
+        debug: body.debug,
+        rawBody: body,
+      });
     }
     return body.data;
   }

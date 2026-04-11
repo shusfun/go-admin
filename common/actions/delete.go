@@ -11,6 +11,7 @@ import (
 
 	"go-admin/common/dto"
 	"go-admin/common/models"
+	"go-admin/common/responsex"
 )
 
 // DeleteAction 通用删除动作
@@ -19,6 +20,7 @@ func DeleteAction(control dto.Control) gin.HandlerFunc {
 		db, err := pkg.GetOrm(c)
 		if err != nil {
 			log.Error(err)
+			responsex.Error(c, 500, err, "数据库连接获取失败")
 			return
 		}
 
@@ -28,13 +30,13 @@ func DeleteAction(control dto.Control) gin.HandlerFunc {
 		err = req.Bind(c)
 		if err != nil {
 			log.Errorf("MsgID[%s] Bind error: %s", msgID, err)
-			response.Error(c, http.StatusUnprocessableEntity, err, "参数验证失败")
+			responsex.Error(c, http.StatusUnprocessableEntity, err, "参数验证失败")
 			return
 		}
 		var object models.ActiveRecord
 		object, err = req.GenerateM()
 		if err != nil {
-			response.Error(c, 500, err, "数据准备失败，请稍后重试")
+			responsex.Error(c, 500, err, "数据准备失败，请稍后重试")
 			return
 		}
 
@@ -48,7 +50,7 @@ func DeleteAction(control dto.Control) gin.HandlerFunc {
 		).Where(req.GetId()).Delete(object)
 		if err = db.Error; err != nil {
 			log.Errorf("MsgID[%s] Delete error: %s", msgID, err)
-			response.Error(c, 500, err, "删除失败")
+			responsex.Error(c, 500, err, "删除失败")
 			return
 		}
 		if db.RowsAffected == 0 {

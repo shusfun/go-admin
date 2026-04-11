@@ -143,8 +143,10 @@ pnpm repo:reinit
 - `repo infra start`：自动探测并启动开发基础设施，优先复用当前可用的 Docker / Homebrew 服务
 - `repo infra stop`：停止当前选中的开发基础设施来源
 - `repo infra status`：查看当前基础设施来源、安装状态、运行状态和健康状态
-- `repo service start backend`：启动后端，默认优先使用项目级 `air` 热更新并读取 `config/settings.pg.yml`
-  - 若 `settings.extend.runtime.autoMigrateOnStart=true`，服务启动与 `air` 重启时都会自动执行幂等迁移检查
+- `repo service start backend`：启动后端并读取 `config/settings.pg.yml`
+  - 非 Windows 默认优先使用项目级 `air` 热更新
+  - Windows 默认使用 `repo-cli` 原生静默热更新，避免每次重启弹出 PowerShell
+  - 若 `settings.extend.runtime.autoMigrateOnStart=true`，服务启动与热更新重启时都会自动执行幂等迁移检查
 - `repo service start admin`：启动管理端开发服务器
 - `repo reinit --yes`：按当前前缀清理应用栈、项目级 Docker 数据目录、安装锁和本地产物
 - 所有受管服务日志和状态文件都会写到项目内 `temp/repo-cli/`：

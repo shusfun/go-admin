@@ -12,6 +12,7 @@ import (
 
 	"go-admin/common/dto"
 	"go-admin/common/models"
+	"go-admin/common/responsex"
 )
 
 // IndexAction 通用查询动作
@@ -20,6 +21,7 @@ func IndexAction(m models.ActiveRecord, d dto.Index, f func() interface{}) gin.H
 		db, err := pkg.GetOrm(c)
 		if err != nil {
 			log.Error(err)
+			responsex.Error(c, 500, err, "数据库连接获取失败")
 			return
 		}
 
@@ -32,7 +34,7 @@ func IndexAction(m models.ActiveRecord, d dto.Index, f func() interface{}) gin.H
 		//查询列表
 		err = req.Bind(c)
 		if err != nil {
-			response.Error(c, http.StatusUnprocessableEntity, err, "参数验证失败")
+			responsex.Error(c, http.StatusUnprocessableEntity, err, "参数验证失败")
 			return
 		}
 
@@ -49,7 +51,7 @@ func IndexAction(m models.ActiveRecord, d dto.Index, f func() interface{}) gin.H
 			Count(&count).Error
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Errorf("MsgID[%s] Index error: %s", msgID, err)
-			response.Error(c, 500, err, "查询失败")
+			responsex.Error(c, 500, err, "查询失败")
 			return
 		}
 		response.PageOK(c, list, int(count), req.GetPageIndex(), req.GetPageSize(), "查询成功")

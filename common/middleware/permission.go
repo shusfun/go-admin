@@ -8,7 +8,7 @@ import (
 	"github.com/go-admin-team/go-admin-core/sdk"
 	"github.com/go-admin-team/go-admin-core/sdk/api"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg/jwtauth"
-	"github.com/go-admin-team/go-admin-core/sdk/pkg/response"
+	"go-admin/common/responsex"
 )
 
 // AuthCheckRole 权限检查中间件
@@ -40,7 +40,7 @@ func AuthCheckRole() gin.HandlerFunc {
 		res, err = e.Enforce(v["rolekey"], c.Request.URL.Path, c.Request.Method)
 		if err != nil {
 			log.Errorf("AuthCheckRole error:%s method:%s path:%s", err, c.Request.Method, c.Request.URL.Path)
-			response.Error(c, 500, err, "")
+			responsex.Error(c, 500, err, "")
 			return
 		}
 

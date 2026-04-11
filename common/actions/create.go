@@ -11,6 +11,7 @@ import (
 
 	"go-admin/common/dto"
 	"go-admin/common/models"
+	"go-admin/common/responsex"
 )
 
 // CreateAction 通用新增动作
@@ -20,6 +21,7 @@ func CreateAction(control dto.Control) gin.HandlerFunc {
 		db, err := pkg.GetOrm(c)
 		if err != nil {
 			log.Error(err)
+			responsex.Error(c, 500, err, "数据库连接获取失败")
 			return
 		}
 
@@ -27,20 +29,20 @@ func CreateAction(control dto.Control) gin.HandlerFunc {
 		req := control.Generate()
 		err = req.Bind(c)
 		if err != nil {
-			response.Error(c, http.StatusUnprocessableEntity, err, "提交的信息不完整或格式不正确，请检查后重试")
+			responsex.Error(c, http.StatusUnprocessableEntity, err, "提交的信息不完整或格式不正确，请检查后重试")
 			return
 		}
 		var object models.ActiveRecord
 		object, err = req.GenerateM()
 		if err != nil {
-			response.Error(c, 500, err, "数据准备失败，请稍后重试")
+			responsex.Error(c, 500, err, "数据准备失败，请稍后重试")
 			return
 		}
 		object.SetCreateBy(user.GetUserId(c))
 		err = db.WithContext(c).Create(object).Error
 		if err != nil {
 			log.Errorf("Create error: %s", err)
-			response.Error(c, 500, err, "创建失败")
+			responsex.Error(c, 500, err, "创建失败")
 			return
 		}
 		response.OK(c, object.GetId(), "创建成功")

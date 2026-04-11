@@ -158,6 +158,7 @@ func (e SysUser) Update(c *gin.Context) {
 	err = s.Update(&req, p)
 	if err != nil {
 		e.Logger.Error(err)
+		e.Error(500, err, "更新失败")
 		return
 	}
 	e.OK(req.GetId(), "更新成功")
@@ -194,6 +195,7 @@ func (e SysUser) Delete(c *gin.Context) {
 	err = s.Remove(&req, p)
 	if err != nil {
 		e.Logger.Error(err)
+		e.Error(500, err, "删除失败")
 		return
 	}
 	e.OK(req.GetId(), "删除成功")
@@ -249,6 +251,7 @@ func (e SysUser) InsetAvatar(c *gin.Context) {
 	err = s.UpdateAvatar(&req, p)
 	if err != nil {
 		e.Logger.Error(err)
+		e.Error(500, err, "头像更新失败")
 		return
 	}
 	e.OK(asset, "修改成功")
@@ -323,6 +326,7 @@ func (e SysUser) UpdateStatus(c *gin.Context) {
 	err = s.UpdateStatus(&req, p)
 	if err != nil {
 		e.Logger.Error(err)
+		e.Error(500, err, "更新状态失败")
 		return
 	}
 	e.OK(req.GetId(), "更新成功")
@@ -360,6 +364,7 @@ func (e SysUser) ResetPwd(c *gin.Context) {
 	err = s.ResetPwd(&req, p)
 	if err != nil {
 		e.Logger.Error(err)
+		e.Error(500, err, "重置密码失败")
 		return
 	}
 	e.OK(req.GetId(), "更新成功")

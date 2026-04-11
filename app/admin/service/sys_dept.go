@@ -2,19 +2,39 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"go-admin/app/admin/models"
 
 	log "github.com/go-admin-team/go-admin-core/logger"
+	"github.com/go-admin-team/go-admin-core/sdk/config"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg"
 
 	"go-admin/app/admin/service/dto"
 	cDto "go-admin/common/dto"
 
 	"github.com/go-admin-team/go-admin-core/sdk/service"
+	"gorm.io/gorm"
 )
 
 type SysDept struct {
 	service.Service
+}
+
+func (e *SysDept) alignPrimaryKeySequence(tx *gorm.DB) error {
+	if config.DatabaseConfig.Driver != "postgres" {
+		return nil
+	}
+
+	sql := `
+SELECT setval(
+  pg_get_serial_sequence('sys_dept', 'dept_id'),
+  COALESCE((SELECT MAX(dept_id) FROM sys_dept), 0) + 1,
+  false
+)`
+	if err := tx.Exec(sql).Error; err != nil {
+		return fmt.Errorf("对齐部门主键序列失败: %w", err)
+	}
+	return nil
 }
 
 // GetPage 获取SysDept列表
@@ -69,6 +89,10 @@ func (e *SysDept) Insert(c *dto.SysDeptInsertReq) error {
 			tx.Commit()
 		}
 	}()
+	if err = e.alignPrimaryKeySequence(tx); err != nil {
+		e.Log.Errorf("db error:%s", err)
+		return err
+	}
 	err = tx.Create(&data).Error
 	if err != nil {
 		e.Log.Errorf("db error:%s", err)

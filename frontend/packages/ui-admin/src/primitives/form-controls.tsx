@@ -137,7 +137,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   return (
     <div
       className={cn(
-        "flex w-full overflow-hidden transition-all focus-within:ring-4",
+        "flex w-full transition-all focus-within:ring-4",
         fieldSurfaceClass,
         controlSizeClasses[size],
         getFieldShellClass(resolvedStatus),

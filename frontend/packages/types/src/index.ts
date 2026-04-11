@@ -1,9 +1,15 @@
 export type ClientType = "admin" | "mobile-user";
 
+export interface ApiDebugInfo {
+  error?: string;
+  stack?: string;
+}
+
 export interface ApiEnvelope<T> {
   code: number;
   data: T;
   msg: string;
+  debug?: ApiDebugInfo;
 }
 
 export interface LoginPayload {

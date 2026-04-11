@@ -141,9 +141,9 @@ pnpm repo:service:start admin
 pnpm repo:service:start mobile
 ```
 
-`repo service start backend` now prefers project-scoped `air` hot reload and reads `config/settings.pg.yml` by default. The first run prepares `./.tmp/bin/air` inside the repository, and `pnpm repo:service:start:backend` is available as an all-colon alias.
+`repo service start backend` reads `config/settings.pg.yml` by default. Non-Windows platforms prefer project-scoped `air` hot reload, while Windows uses a repo-cli native silent watcher to avoid PowerShell popups during backend restarts. The first non-Windows run prepares `./.tmp/bin/air` inside the repository, and `pnpm repo:service:start:backend` is available as an all-colon alias.
 
-When `settings.extend.runtime.autoMigrateOnStart=true`, every backend start and `air` restart also performs the existing idempotent database bootstrap check automatically.
+When `settings.extend.runtime.autoMigrateOnStart=true`, every backend start and hot-reload restart also performs the existing idempotent database bootstrap check automatically.
 
 - `backend`, `admin`, and `mobile` are managed by `repo-cli` as detached background processes.
 - Use `pnpm repo:service:status <service>` and `pnpm repo:service:logs <service>` to inspect the actual state.
@@ -230,7 +230,7 @@ pnpm repo:setup-status                            # 检查是否会进入 Setup 
 pnpm repo:infra:start                             # 自动探测并启动开发基础设施
 pnpm repo:infra:stop                              # 停止当前开发基础设施来源
 pnpm repo:infra:status                            # 查看当前基础设施来源与健康状态
-pnpm repo:service:start backend                   # 启动 API 服务（默认项目级 air 热更新）
+pnpm repo:service:start backend                   # 启动 API 服务（非 Windows 使用 air，Windows 使用静默原生热更新）
 pnpm repo:service:start:backend                  # 启动 API 服务（全冒号别名）
 pnpm repo:service:start admin                     # 启动 admin-web 开发服务器
 pnpm repo:service:start mobile                    # 启动 mobile-h5 开发服务器

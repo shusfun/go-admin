@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/go-admin-team/go-admin-core/sdk/config"
 	"gorm.io/gorm/clause"
@@ -18,6 +19,23 @@ import (
 
 type SysRole struct {
 	service.Service
+}
+
+func (e *SysRole) alignPrimaryKeySequence(tx *gorm.DB) error {
+	if config.DatabaseConfig.Driver != "postgres" {
+		return nil
+	}
+
+	sql := `
+SELECT setval(
+  pg_get_serial_sequence('sys_role', 'role_id'),
+  COALESCE((SELECT MAX(role_id) FROM sys_role), 0) + 1,
+  false
+)`
+	if err := tx.Exec(sql).Error; err != nil {
+		return fmt.Errorf("对齐角色主键序列失败: %w", err)
+	}
+	return nil
 }
 
 // GetPage 获取SysRole列表
@@ -93,6 +111,11 @@ func (e *SysRole) Insert(c *dto.SysRoleInsertReq, cb *casbin.SyncedEnforcer) err
 
 	if count > 0 {
 		err = errors.New("roleKey已存在，需更换在提交！")
+		e.Log.Errorf("db error:%s", err)
+		return err
+	}
+
+	if err = e.alignPrimaryKeySequence(tx); err != nil {
 		e.Log.Errorf("db error:%s", err)
 		return err
 	}

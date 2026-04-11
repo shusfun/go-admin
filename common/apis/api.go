@@ -3,12 +3,14 @@ package apis
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-admin-team/go-admin-core/logger"
 	"github.com/go-admin-team/go-admin-core/sdk/api"
+	"github.com/go-admin-team/go-admin-core/sdk/config"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg/response"
 	"gorm.io/gorm"
@@ -115,6 +117,42 @@ func sanitizeUserMessage(msg string) string {
 	return normalized
 }
 
+func shouldExposeDebugError() bool {
+	mode := strings.ToLower(strings.TrimSpace(config.ApplicationConfig.Mode))
+	return mode == "" || mode == pkg.ModeDev.String() || mode == pkg.ModeTest.String()
+}
+
+func buildDebugErrorPayload(c *gin.Context, code int, err error, msg string) gin.H {
+	userMsg := normalizeUserMessage(msg)
+	if userMsg == "" && err != nil {
+		userMsg = err.Error()
+	}
+	if userMsg == "" {
+		userMsg = "请求未完成，请稍后重试"
+	}
+
+	debugInfo := gin.H{}
+	if err != nil {
+		debugInfo["error"] = err.Error()
+		stack := strings.TrimSpace(fmt.Sprintf("%+v", err))
+		if stack == "" || stack == err.Error() {
+			stack = strings.TrimSpace(string(debug.Stack()))
+		}
+		if stack != "" {
+			debugInfo["stack"] = stack
+		}
+	}
+
+	payload := gin.H{
+		"code": code,
+		"msg":  userMsg,
+	}
+	if len(debugInfo) > 0 {
+		payload["debug"] = debugInfo
+	}
+	return payload
+}
+
 func (e *Api) AddError(err error) {
 	if e.Errors == nil {
 		e.Errors = err
@@ -209,6 +247,10 @@ func (e *Api) MakeService(c *service.Service) *Api {
 
 // Error 通常错误数据处理
 func (e *Api) Error(code int, err error, msg string) {
+	if shouldExposeDebugError() && err != nil {
+		response.Custum(e.Context, buildDebugErrorPayload(e.Context, code, err, msg))
+		return
+	}
 	response.Error(e.Context, code, err, sanitizeUserMessage(msg))
 }
 

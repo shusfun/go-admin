@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { parseWindowsNetstatPid } from "../src/shared/process.mjs";
+import { parseWindowsNetstatPid, parseWindowsTasklistAlive } from "../src/shared/process.mjs";
 
 test("parseWindowsNetstatPid extracts listener pid from IPv4 output", () => {
   const output = `
@@ -29,4 +29,18 @@ test("parseWindowsNetstatPid ignores non-listener rows", () => {
 `;
 
   assert.equal(parseWindowsNetstatPid(output, 18123), 0);
+});
+
+test("parseWindowsTasklistAlive returns true when tasklist includes the expected pid", () => {
+  const output = `
+backend-dev.exe              10492 Console                    1     56,888 K
+`;
+
+  assert.equal(parseWindowsTasklistAlive(output, 10492), true);
+});
+
+test("parseWindowsTasklistAlive returns false for localized no-task output", () => {
+  const output = "��Ϣ: û�����е�����ƥ��ָ����׼��\r\n";
+
+  assert.equal(parseWindowsTasklistAlive(output, 30604), false);
 });

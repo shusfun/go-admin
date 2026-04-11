@@ -424,6 +424,7 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       </DataTableSection>
 
       <FormDialog
+        description="全屏编辑角色基础信息、菜单权限和数据权限，适合处理节点较多的复杂角色。"
         onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) {
@@ -431,68 +432,94 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
           }
         }}
         open={dialogOpen}
+        size="fullscreen"
         title={dialogTitle}
       >
         {dialogLoading ? (
           <div className="flex flex-1 items-center py-6 text-sm text-muted-foreground">正在加载角色权限树...</div>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
-            <AppScrollbar className="min-h-0 flex-1" viewportClassName="pr-1">
-              <div className="grid gap-6">
-                <FormSection title="基础信息">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <FormField label="角色名称">
-                      <Input onChange={(event) => setDraft((current) => ({ ...current, roleName: event.target.value }))} value={draft.roleName} />
-                    </FormField>
-                    <FormField label="角色编码">
-                      <Input onChange={(event) => setDraft((current) => ({ ...current, roleKey: event.target.value }))} value={draft.roleKey} />
-                    </FormField>
-                    <FormField label="角色排序">
-                      <Input
-                        onChange={(event) => setDraft((current) => ({ ...current, roleSort: Number(event.target.value) }))}
-                        type="number"
-                        value={String(draft.roleSort)}
-                      />
-                    </FormField>
-                    <FormField label="状态">
-                      <Select
-                        onValueChange={(value) => setDraft((current) => ({ ...current, status: value }))}
-                        options={statusOptions.filter((item) => item.value)}
-                        value={draft.status}
-                      />
-                    </FormField>
-                    <FormField label="数据权限">
-                      <Select onValueChange={(value) => setDraft((current) => ({ ...current, dataScope: value }))} options={dataScopeOptions} value={draft.dataScope} />
-                    </FormField>
-                    <FormField label="标记">
-                      <Input onChange={(event) => setDraft((current) => ({ ...current, flag: event.target.value }))} value={draft.flag} />
-                    </FormField>
-                    <FormField className="md:col-span-2" label="备注">
-                      <Textarea onChange={(event) => setDraft((current) => ({ ...current, remark: event.target.value }))} rows={4} value={draft.remark} />
-                    </FormField>
-                  </div>
-                </FormSection>
+            <div className="grid min-h-0 flex-1 gap-6 xl:grid-cols-[minmax(22rem,26rem)_minmax(0,1fr)]">
+              <AppScrollbar className="min-h-0 xl:h-full" viewportClassName="pr-1">
+                <div className="grid gap-6 pb-1">
+                  <FormSection title="基础信息">
+                    <div className="grid gap-4">
+                      <FormField label="角色名称">
+                        <Input onChange={(event) => setDraft((current) => ({ ...current, roleName: event.target.value }))} value={draft.roleName} />
+                      </FormField>
+                      <FormField label="角色编码">
+                        <Input onChange={(event) => setDraft((current) => ({ ...current, roleKey: event.target.value }))} value={draft.roleKey} />
+                      </FormField>
+                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                        <FormField label="角色排序">
+                          <Input
+                            onChange={(event) => setDraft((current) => ({ ...current, roleSort: Number(event.target.value) }))}
+                            type="number"
+                            value={String(draft.roleSort)}
+                          />
+                        </FormField>
+                        <FormField label="状态">
+                          <Select
+                            onValueChange={(value) => setDraft((current) => ({ ...current, status: value }))}
+                            options={statusOptions.filter((item) => item.value)}
+                            value={draft.status}
+                          />
+                        </FormField>
+                      </div>
+                      <FormField label="数据权限">
+                        <Select onValueChange={(value) => setDraft((current) => ({ ...current, dataScope: value }))} options={dataScopeOptions} value={draft.dataScope} />
+                      </FormField>
+                      <FormField label="标记">
+                        <Input onChange={(event) => setDraft((current) => ({ ...current, flag: event.target.value }))} value={draft.flag} />
+                      </FormField>
+                      <FormField label="备注">
+                        <Textarea onChange={(event) => setDraft((current) => ({ ...current, remark: event.target.value }))} rows={6} value={draft.remark} />
+                      </FormField>
+                    </div>
+                  </FormSection>
 
-                <div className="grid gap-6 xl:grid-cols-2">
+                  <div className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-secondary/20 px-4 py-4 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge tone="primary">{draft.roleName.trim() || "未命名角色"}</Badge>
+                      <Badge tone="muted">{draft.roleKey.trim() || "未设置 roleKey"}</Badge>
+                    </div>
+                    <div>数据权限：{dataScopeLabels[draft.dataScope] || draft.dataScope || "-"}</div>
+                    <div>菜单已选 {menuTreeLocked ? lockedMenuIds.length : menuCheckedIds.length} 项，部门已选 {deptCheckedIds.length} 项。</div>
+                  </div>
+                </div>
+              </AppScrollbar>
+
+              <div className="grid min-h-0 gap-6">
+                <div className="flex flex-wrap items-center gap-2 rounded-[1.25rem] border border-border/70 bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
+                  <Badge tone={menuTreeLocked ? "warning" : "success"}>{menuTreeLocked ? "菜单权限锁定" : "菜单权限可编辑"}</Badge>
+                  <Badge tone={draft.dataScope === "2" ? "primary" : "muted"}>{draft.dataScope === "2" ? "部门权限可编辑" : "部门权限当前不生效"}</Badge>
+                  <span>全屏模式下可连续查看更深层级的权限树。</span>
+                </div>
+
+                <div className="grid min-h-0 gap-6 2xl:grid-cols-2">
                   <TreeSelectorPanel
                     checkedIds={menuCheckedIds}
+                    className="min-h-0"
                     description={menuTreeLocked ? "admin 角色菜单权限已锁定，仅展示已绑定结果。" : "勾选结果将随角色一起提交。"}
                     disabled={menuTreeLocked}
                     nodes={menuTree}
                     onChange={setMenuCheckedIds}
+                    scrollClassName="max-h-none"
                     title="菜单权限"
                   />
                   <TreeSelectorPanel
                     checkedIds={deptCheckedIds}
+                    className="min-h-0"
                     description={draft.dataScope === "2" ? "仅在“自定数据权限”时生效。" : "当前数据权限范围无需单独选择部门。"}
                     disabled={draft.dataScope !== "2"}
                     nodes={deptTree}
                     onChange={setDeptCheckedIds}
+                    scrollClassName="max-h-none"
                     title="部门权限"
                   />
                 </div>
               </div>
-            </AppScrollbar>
+            </div>
             <FormActions className="mt-4 shrink-0 border-t border-border pt-4">
               <AsyncActionButton
                 disabled={!draft.roleName.trim() || !draft.roleKey.trim()}

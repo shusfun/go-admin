@@ -36,6 +36,7 @@ export function createRepoContext(options) {
     airBinary,
     airVersionFile,
     airConfigFile: path.join(repoRoot, ".air.toml"),
+    backendWatcherScript: path.join(repoRoot, "tools", "repo-cli", "src", "domains", "runtime", "backend-watch.mjs"),
     backendDevBinary: path.join(goBinDir, executableName("backend-dev")),
     runtimeDir,
     logsDir: path.join(runtimeDir, "logs"),

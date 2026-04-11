@@ -86,8 +86,7 @@ export function isProcessAlive(pid) {
     if (result.code !== 0) {
       return false;
     }
-    const output = result.stdout.trim();
-    return output !== "" && !output.startsWith("INFO:");
+    return parseWindowsTasklistAlive(result.stdout, pid);
   }
   try {
     process.kill(pid, 0);
@@ -232,4 +231,28 @@ export function parseWindowsNetstatPid(output, port) {
 
 function hasZeroPort(address) {
   return /:0$/.test(address);
+}
+
+export function parseWindowsTasklistAlive(output, pid) {
+  const expectedPid = Number.parseInt(String(pid), 10);
+  if (!Number.isFinite(expectedPid) || expectedPid <= 0) {
+    return false;
+  }
+
+  for (const rawLine of String(output || "").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+    const parts = line.split(/\s+/);
+    if (parts.length < 2) {
+      continue;
+    }
+    const currentPid = Number.parseInt(parts[1], 10);
+    if (currentPid === expectedPid) {
+      return true;
+    }
+  }
+
+  return false;
 }

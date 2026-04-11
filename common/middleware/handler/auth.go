@@ -13,9 +13,9 @@ import (
 	"github.com/go-admin-team/go-admin-core/sdk/pkg/captcha"
 	jwt "github.com/go-admin-team/go-admin-core/sdk/pkg/jwtauth"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg/jwtauth/user"
-	"github.com/go-admin-team/go-admin-core/sdk/pkg/response"
 	"github.com/mssola/user_agent"
 	"go-admin/common/global"
+	"go-admin/common/responsex"
 )
 
 func PayloadFunc(data interface{}) jwt.MapClaims {
@@ -65,7 +65,7 @@ func Authenticator(c *gin.Context) (interface{}, error) {
 	db, err := pkg.GetOrm(c)
 	if err != nil {
 		log.Errorf("get db error, %s", err.Error())
-		response.Error(c, 500, err, "数据库连接获取失败")
+		responsex.Error(c, 500, err, "数据库连接获取失败")
 		return nil, jwt.ErrFailedAuthentication
 	}
 

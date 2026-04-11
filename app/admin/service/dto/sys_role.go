@@ -51,9 +51,6 @@ type SysRoleInsertReq struct {
 }
 
 func (s *SysRoleInsertReq) Generate(model *models.SysRole) {
-	if s.RoleId != 0 {
-		model.RoleId = s.RoleId
-	}
 	model.RoleName = s.RoleName
 	model.Status = s.Status
 	model.RoleKey = s.RoleKey

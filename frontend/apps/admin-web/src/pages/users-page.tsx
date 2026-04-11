@@ -172,6 +172,16 @@ export function UsersPage({ api }: { api: ReturnType<typeof createApiClient> }) 
         { key: "remark", label: "备注", type: "textarea" },
         ]}
         getRowId={(item) => Number(item.userId)}
+        labels={{
+          createAction: "新建用户",
+          createTitle: "新建用户",
+          editTitle: "编辑用户",
+          createSuccess: "用户已创建",
+          updateSuccess: "用户已更新",
+          saveError: "用户保存失败",
+          deleteSuccess: "用户已删除",
+          deleteError: "用户删除失败",
+        }}
         queryKey="users"
 
         rowActions={(item) => (

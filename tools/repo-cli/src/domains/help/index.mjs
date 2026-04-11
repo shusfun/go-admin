@@ -29,7 +29,7 @@ export function printHelp() {
     {
       title: "应用服务",
       lines: [
-        "repo service start backend   启动后端（默认项目级 air 热更新）",
+        "repo service start backend   启动后端（非 Windows 使用 air，Windows 使用静默原生热更新）",
         "repo service status backend  查看单个服务状态",
         "repo service start admin     启动管理端",
         "repo service start mobile    启动移动端",
