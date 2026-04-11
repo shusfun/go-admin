@@ -29,7 +29,7 @@ type SysLoginLog struct {
 // @Security Bearer
 func (e SysLoginLog) GetPage(c *gin.Context) {
 	s := service.SysLoginLog{}
-	req :=dto.SysLoginLogGetPageReq{}
+	req := dto.SysLoginLogGetPageReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.Form).
@@ -37,7 +37,7 @@ func (e SysLoginLog) GetPage(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	list := make([]models.SysLoginLog, 0)
@@ -60,7 +60,7 @@ func (e SysLoginLog) GetPage(c *gin.Context) {
 // @Security Bearer
 func (e SysLoginLog) Get(c *gin.Context) {
 	s := service.SysLoginLog{}
-	req :=dto.SysLoginLogGetReq{}
+	req := dto.SysLoginLogGetReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req).
@@ -68,7 +68,7 @@ func (e SysLoginLog) Get(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	var object models.SysLoginLog
@@ -90,7 +90,7 @@ func (e SysLoginLog) Get(c *gin.Context) {
 // @Security Bearer
 func (e SysLoginLog) Delete(c *gin.Context) {
 	s := service.SysLoginLog{}
-	req :=dto.SysLoginLogDeleteReq{}
+	req := dto.SysLoginLogDeleteReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.JSON, nil).
@@ -98,7 +98,7 @@ func (e SysLoginLog) Delete(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	err = s.Remove(&req)

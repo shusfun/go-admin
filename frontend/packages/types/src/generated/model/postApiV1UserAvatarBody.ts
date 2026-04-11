@@ -7,7 +7,7 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type PostApiV1PublicUploadFileBody = {
+export type PostApiV1UserAvatarBody = {
   /** file */
-  file: Blob;
+  'upload[]': Blob;
 };

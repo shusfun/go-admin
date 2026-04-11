@@ -1,20 +1,21 @@
 package apis
 
 import (
-	"github.com/gin-gonic/gin/binding"
-	"go-admin/app/admin/models"
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/go-admin-team/go-admin-core/sdk/api"
 	"github.com/go-admin-team/go-admin-core/sdk/pkg/jwtauth/user"
 	_ "github.com/go-admin-team/go-admin-core/sdk/pkg/response"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 
+	"go-admin/app/admin/models"
 	"go-admin/app/admin/service"
 	"go-admin/app/admin/service/dto"
 	"go-admin/common/actions"
+	"go-admin/common/images"
 )
 
 type SysUser struct {
@@ -39,7 +40,7 @@ func (e SysUser) GetPage(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -76,7 +77,7 @@ func (e SysUser) Get(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	var object models.SysUser
@@ -110,7 +111,7 @@ func (e SysUser) Insert(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	// 设置创建人
@@ -118,7 +119,7 @@ func (e SysUser) Insert(c *gin.Context) {
 	err = s.Insert(&req)
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -145,7 +146,7 @@ func (e SysUser) Update(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -180,7 +181,7 @@ func (e SysUser) Delete(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -203,8 +204,8 @@ func (e SysUser) Delete(c *gin.Context) {
 // @Description 获取JSON
 // @Tags 个人中心
 // @Accept multipart/form-data
-// @Param file formData file true "file"
-// @Success 200 {object} response.Response "{"code": 200, "data": [...]}"
+// @Param upload[] formData file true "file"
+// @Success 200 {object} response.Response{data=images.Asset} "{"code": 200, "data": {...}}"
 // @Router /api/v1/user/avatar [post]
 // @Security Bearer
 func (e SysUser) InsetAvatar(c *gin.Context) {
@@ -216,34 +217,41 @@ func (e SysUser) InsetAvatar(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	// 数据权限检查
 	p := actions.GetPermissionFromContext(c)
-	form, _ := c.MultipartForm()
-	files := form.File["upload[]"]
-	guid := uuid.New().String()
-	filPath := "static/uploadfile/" + guid + ".jpg"
-	for _, file := range files {
-		e.Logger.Debugf("upload avatar file: %s", file.Filename)
-		// 上传文件至指定目录
-		err = c.SaveUploadedFile(file, filPath)
-		if err != nil {
-			e.Logger.Errorf("save file error, %s", err.Error())
-			e.Error(500, err, "")
-			return
-		}
+	form, err := c.MultipartForm()
+	if err != nil {
+		e.Logger.Errorf("read avatar form error, %s", err.Error())
+		e.Error(http.StatusBadRequest, err, "头像表单解析失败")
+		return
 	}
+	files := form.File["upload[]"]
+	if len(files) == 0 {
+		e.Error(http.StatusBadRequest, nil, "请选择头像图片")
+		return
+	}
+
+	file := files[0]
+	e.Logger.Debugf("upload avatar file: %s", file.Filename)
+	asset, err := images.SaveAvatar(file, uuid.New().String())
+	if err != nil {
+		e.Logger.Errorf("process avatar error, %s", err.Error())
+		e.Error(http.StatusBadRequest, err, err.Error())
+		return
+	}
+
 	req.UserId = p.UserId
-	req.Avatar = "/" + filPath
+	req.Avatar = asset.Path
 
 	err = s.UpdateAvatar(&req, p)
 	if err != nil {
 		e.Logger.Error(err)
 		return
 	}
-	e.OK(filPath, "修改成功")
+	e.OK(asset, "修改成功")
 }
 
 // UpdateStatus 修改用户状态
@@ -266,7 +274,7 @@ func (e SysUser) UpdateStatus(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -303,7 +311,7 @@ func (e SysUser) ResetPwd(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -340,7 +348,7 @@ func (e SysUser) UpdatePwd(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -348,8 +356,11 @@ func (e SysUser) UpdatePwd(c *gin.Context) {
 	p := actions.GetPermissionFromContext(c)
 	var hash []byte
 	if hash, err = bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost); err != nil {
-		req.NewPassword = string(hash)
+		e.Logger.Error(err)
+		e.Error(500, err, "密码加密失败")
+		return
 	}
+	req.NewPassword = string(hash)
 
 	err = s.UpdatePwd(user.GetUserId(c), req.OldPassword, req.NewPassword, p)
 	if err != nil {
@@ -365,7 +376,7 @@ func (e SysUser) UpdatePwd(c *gin.Context) {
 // @Summary 获取个人中心用户
 // @Description 获取JSON
 // @Tags 个人中心
-// @Success 200 {object} response.Response "{"code": 200, "data": [...]}"
+// @Success 200 {object} response.Response{data=SysUserProfileResponse} "{"code": 200, "data": {...}}"
 // @Router /api/v1/user/profile [get]
 // @Security Bearer
 func (e SysUser) GetProfile(c *gin.Context) {
@@ -377,7 +388,7 @@ func (e SysUser) GetProfile(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -392,10 +403,20 @@ func (e SysUser) GetProfile(c *gin.Context) {
 		e.Error(500, err, "获取用户信息失败")
 		return
 	}
-	e.OK(gin.H{
-		"user":  sysUser,
-		"roles": roles,
-		"posts": posts,
+	e.OK(SysUserProfileResponse{
+		User: SysUserProfileUserResponse{
+			UserID:   sysUser.UserId,
+			Username: sysUser.Username,
+			NickName: sysUser.NickName,
+			DeptID:   sysUser.DeptId,
+			RoleID:   sysUser.RoleId,
+			Phone:    sysUser.Phone,
+			Email:    sysUser.Email,
+			Avatar:   images.AssetFromPath(sysUser.Avatar),
+			Remark:   sysUser.Remark,
+		},
+		Roles: roles,
+		Posts: posts,
 	}, "查询成功")
 }
 
@@ -403,7 +424,7 @@ func (e SysUser) GetProfile(c *gin.Context) {
 // @Summary 获取个人信息
 // @Description 获取JSON
 // @Tags 个人中心
-// @Success 200 {object} response.Response "{"code": 200, "data": [...]}"
+// @Success 200 {object} response.Response{data=SysUserInfoResponse} "{"code": 200, "data": {...}}"
 // @Router /api/v1/getinfo [get]
 // @Security Bearer
 func (e SysUser) GetInfo(c *gin.Context) {
@@ -417,7 +438,7 @@ func (e SysUser) GetInfo(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	p := actions.GetPermissionFromContext(c)
@@ -428,15 +449,16 @@ func (e SysUser) GetInfo(c *gin.Context) {
 	var buttons = make([]string, 1)
 	buttons[0] = "*:*:*"
 
-	var mp = make(map[string]interface{})
-	mp["roles"] = roles
+	resp := SysUserInfoResponse{
+		Roles: roles,
+	}
 	if user.GetRoleName(c) == "admin" || user.GetRoleName(c) == "系统管理员" {
-		mp["permissions"] = permissions
-		mp["buttons"] = buttons
+		resp.Permissions = permissions
+		resp.Buttons = buttons
 	} else {
 		list, _ := r.GetById(user.GetRoleId(c))
-		mp["permissions"] = list
-		mp["buttons"] = list
+		resp.Permissions = list
+		resp.Buttons = list
 	}
 	sysUser := models.SysUser{}
 	req.Id = user.GetUserId(c)
@@ -445,15 +467,15 @@ func (e SysUser) GetInfo(c *gin.Context) {
 		e.Error(http.StatusUnauthorized, err, "登录失败")
 		return
 	}
-	mp["introduction"] = " am a super administrator"
-	mp["avatar"] = "https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4acafe.gif"
+	resp.Introduction = " am a super administrator"
+	resp.Avatar = images.AssetFromPath("https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4acafe.gif")
 	if sysUser.Avatar != "" {
-		mp["avatar"] = sysUser.Avatar
+		resp.Avatar = images.AssetFromPath(sysUser.Avatar)
 	}
-	mp["userName"] = sysUser.Username
-	mp["userId"] = sysUser.UserId
-	mp["deptId"] = sysUser.DeptId
-	mp["name"] = sysUser.NickName
-	mp["code"] = 200
-	e.OK(mp, "")
+	resp.UserName = sysUser.Username
+	resp.UserID = sysUser.UserId
+	resp.DeptID = sysUser.DeptId
+	resp.Name = sysUser.NickName
+	resp.Code = 200
+	e.OK(resp, "")
 }

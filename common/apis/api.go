@@ -3,6 +3,7 @@ package apis
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -20,6 +21,98 @@ type Api struct {
 	Logger  *logger.Helper
 	Orm     *gorm.DB
 	Errors  error
+}
+
+var engineeringMessageMarkers = []string{
+	"错误详情",
+	"失败原因",
+	"package.json",
+	"roleid",
+	"tableid",
+	"entryid",
+	"dto",
+	"json",
+	"jwt",
+	"sql",
+	"panic",
+	"stack",
+	"gorm",
+	"orm",
+	"template",
+	"marshal",
+	"unmarshal",
+	"shouldbind",
+	"validate",
+	"makeorm",
+	"db not exist",
+	"incorrect password",
+	"update userinfo error",
+}
+
+func normalizeUserMessage(msg string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(msg)), " ")
+}
+
+func looksMostlyASCII(msg string) bool {
+	asciiLetters := 0
+	chineseChars := 0
+	for _, r := range msg {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+			asciiLetters++
+		case r >= 0x4e00 && r <= 0x9fff:
+			chineseChars++
+		}
+	}
+	return asciiLetters >= 6 && chineseChars == 0
+}
+
+func fallbackUserMessage(msg string) string {
+	switch {
+	case strings.Contains(msg, "登录"):
+		return "登录失败，请检查信息后重试"
+	case strings.Contains(msg, "安装"):
+		return "安装未完成，请检查配置后重试"
+	case strings.Contains(msg, "创建"):
+		return "创建未完成，请稍后重试"
+	case strings.Contains(msg, "更新"):
+		return "更新未完成，请稍后重试"
+	case strings.Contains(msg, "删除"):
+		return "删除未完成，请稍后重试"
+	case strings.Contains(msg, "查询"), strings.Contains(msg, "获取"), strings.Contains(msg, "查看"):
+		return "获取信息失败，请稍后重试"
+	case strings.Contains(msg, "上传"):
+		return "上传失败，请稍后重试"
+	case strings.Contains(msg, "连接"):
+		return "连接失败，请稍后重试"
+	case strings.Contains(msg, "权限"):
+		return "权限校验失败，请稍后重试"
+	default:
+		return "请求未完成，请稍后重试"
+	}
+}
+
+func sanitizeUserMessage(msg string) string {
+	normalized := normalizeUserMessage(msg)
+	if normalized == "" {
+		return "请求未完成，请稍后重试"
+	}
+	if strings.Contains(normalized, "数据库连接失败") {
+		return "数据库连接失败，请检查连接信息后重试"
+	}
+	if strings.Contains(normalized, "请求参数错误") || strings.Contains(normalized, "参数验证失败") {
+		return "提交的信息不完整或格式不正确，请检查后重试"
+	}
+	lowerMsg := strings.ToLower(normalized)
+	for _, marker := range engineeringMessageMarkers {
+		if strings.Contains(lowerMsg, marker) {
+			return fallbackUserMessage(normalized)
+		}
+	}
+	if looksMostlyASCII(normalized) {
+		return fallbackUserMessage(normalized)
+	}
+	return normalized
 }
 
 func (e *Api) AddError(err error) {
@@ -116,7 +209,7 @@ func (e *Api) MakeService(c *service.Service) *Api {
 
 // Error 通常错误数据处理
 func (e *Api) Error(code int, err error, msg string) {
-	response.Error(e.Context, code, err, msg)
+	response.Error(e.Context, code, err, sanitizeUserMessage(msg))
 }
 
 // OK 通常成功数据处理

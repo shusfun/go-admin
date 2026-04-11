@@ -69,14 +69,14 @@ func (e SysConfig) Get(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	var object models.SysConfig
 
 	err = s.Get(&req, &object)
 	if err != nil {
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -103,7 +103,7 @@ func (e SysConfig) Insert(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	req.SetCreateBy(user.GetUserId(c))
@@ -136,7 +136,7 @@ func (e SysConfig) Update(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	req.SetUpdateBy(user.GetUserId(c))
@@ -166,7 +166,7 @@ func (e SysConfig) Delete(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	req.SetUpdateBy(user.GetUserId(c))
@@ -233,7 +233,7 @@ func (e SysConfig) Get2Set(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	err = s.GetForSet(&req)
@@ -268,13 +268,13 @@ func (e SysConfig) Update2Set(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
 	err = s.UpdateForSet(&req)
 	if err != nil {
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -300,13 +300,13 @@ func (e SysConfig) GetSysConfigByKEYForService(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
 	err = s.GetWithKey(req, resp)
 	if err != nil {
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	e.OK(resp, s.Msg)

@@ -38,7 +38,7 @@ func (e SysDictData) GetPage(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -71,7 +71,7 @@ func (e SysDictData) Get(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -107,7 +107,7 @@ func (e SysDictData) Insert(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	req.SetCreateBy(user.GetUserId(c))
@@ -140,7 +140,7 @@ func (e SysDictData) Update(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	req.SetUpdateBy(user.GetUserId(c))
@@ -170,7 +170,7 @@ func (e SysDictData) Delete(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	req.SetUpdateBy(user.GetUserId(c))
@@ -200,7 +200,7 @@ func (e SysDictData) GetAll(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	list := make([]models.SysDictData, 0)
@@ -216,5 +216,5 @@ func (e SysDictData) GetAll(c *gin.Context) {
 		l = append(l, d)
 	}
 
-	e.OK(l,"查询成功")
+	e.OK(l, "查询成功")
 }

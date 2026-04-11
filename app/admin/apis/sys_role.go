@@ -44,7 +44,7 @@ func (e SysRole) GetPage(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -78,7 +78,7 @@ func (e SysRole) Get(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, fmt.Sprintf(" %s ", err.Error()))
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -113,7 +113,7 @@ func (e SysRole) Insert(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -126,13 +126,13 @@ func (e SysRole) Insert(c *gin.Context) {
 	err = s.Insert(&req, cb)
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, "创建失败,"+err.Error())
+		e.Error(500, err, "创建失败")
 		return
 	}
 	_, err = global.LoadPolicy(c)
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, "创建失败,"+err.Error())
+		e.Error(500, err, "创建失败")
 		return
 	}
 	e.OK(req.GetId(), "创建成功")
@@ -158,7 +158,7 @@ func (e SysRole) Update(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	cb := sdk.Runtime.GetCasbinKey(c.Request.Host)
@@ -168,14 +168,14 @@ func (e SysRole) Update(c *gin.Context) {
 	err = s.Update(&req, cb)
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, "更新失败,"+err.Error())
+		e.Error(500, err, "更新失败")
 		return
 	}
 
 	_, err = global.LoadPolicy(c)
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, "更新失败,"+err.Error())
+		e.Error(500, err, "更新失败")
 		return
 	}
 
@@ -200,7 +200,7 @@ func (e SysRole) Delete(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, fmt.Sprintf("删除角色 %v 失败，\r\n失败信息 %s", req.Ids, err.Error()))
+		e.Error(500, err, "删除失败")
 		return
 	}
 
@@ -235,13 +235,13 @@ func (e SysRole) Update2Status(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, fmt.Sprintf("更新角色状态失败，失败原因：%s ", err.Error()))
+		e.Error(500, err, "更新状态失败")
 		return
 	}
 	req.SetUpdateBy(user.GetUserId(c))
 	err = s.UpdateStatus(&req)
 	if err != nil {
-		e.Error(500, err, fmt.Sprintf("更新角色状态失败，失败原因：%s ", err.Error()))
+		e.Error(500, err, "更新状态失败")
 		return
 	}
 	e.OK(req.GetId(), fmt.Sprintf("更新角色 %v 状态成功！", req.GetId()))
@@ -267,7 +267,7 @@ func (e SysRole) Update2DataScope(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	data := &models.SysRole{
@@ -278,7 +278,7 @@ func (e SysRole) Update2DataScope(c *gin.Context) {
 	data.UpdateBy = user.GetUserId(c)
 	err = s.UpdateDataScope(&req).Error
 	if err != nil {
-		e.Error(500, err, fmt.Sprintf("更新角色数据权限失败！错误详情：%s", err.Error()))
+		e.Error(500, err, "更新权限失败")
 		return
 	}
 	e.OK(nil, "操作成功")

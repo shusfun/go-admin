@@ -51,9 +51,6 @@ func sysStaticFileRouter(r *gin.RouterGroup) {
 		return
 	}
 	r.Static("/static", "./static")
-	if config.ApplicationConfig.Mode != "prod" {
-		r.Static("/form-generator", "./static/form-generator")
-	}
 }
 
 func sysSwaggerRouter(r *gin.RouterGroup) {
@@ -62,6 +59,7 @@ func sysSwaggerRouter(r *gin.RouterGroup) {
 
 func sysCheckRoleRouterInit(r *gin.RouterGroup, authMiddleware *jwt.GinJWTMiddleware) {
 	wss := r.Group("").Use(authMiddleware.MiddlewareFunc())
+	captchaAPI := apis.System{}
 	{
 		wss.GET("/ws/:id/:channel", ws.WebsocketManager.WsClient)
 		wss.GET("/wslogout/:id/:channel", ws.WebsocketManager.UnWsClient)
@@ -70,6 +68,7 @@ func sysCheckRoleRouterInit(r *gin.RouterGroup, authMiddleware *jwt.GinJWTMiddle
 	for _, prefix := range routerx.AdminPrefixes() {
 		v1 := r.Group(prefix)
 		{
+			v1.GET("/captcha", captchaAPI.GenerateCaptchaHandler)
 			v1.POST("/login", authMiddleware.LoginHandler)
 			v1.GET("/refresh_token", authMiddleware.RefreshHandler)
 		}
@@ -77,7 +76,6 @@ func sysCheckRoleRouterInit(r *gin.RouterGroup, authMiddleware *jwt.GinJWTMiddle
 	}
 
 	appAPI := apis.SysUser{}
-	captchaAPI := apis.System{}
 	appV1 := r.Group(routerx.AppPrefix())
 	{
 		appV1.GET("/captcha", captchaAPI.GenerateCaptchaHandler)

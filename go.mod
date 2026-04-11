@@ -9,6 +9,7 @@ require (
 	github.com/bitly/go-simplejson v0.5.1
 	github.com/bytedance/go-tagexpr/v2 v2.9.11
 	github.com/casbin/casbin/v2 v2.104.0
+	github.com/chai2010/webp v1.4.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-admin-team/go-admin-core v1.5.3-rc.3.0.20250408121721-2763de5dcdf4
@@ -28,6 +29,7 @@ require (
 	github.com/swaggo/swag v1.16.4
 	github.com/unrolled/secure v1.17.0
 	golang.org/x/crypto v0.37.0
+	golang.org/x/image v0.26.0
 	golang.org/x/sync v0.15.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.5.7
@@ -121,7 +123,6 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/arch v0.16.0 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
-	golang.org/x/image v0.26.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.24.0 // indirect

@@ -6,8 +6,10 @@
 添加qq群: 521386980 进入技术交流群 请先star，谢谢！
  * OpenAPI spec version: 2.0.0
  */
+import type { ImagesVariant } from './imagesVariant';
 
-export type PostApiV1PublicUploadFileBody = {
-  /** file */
-  file: Blob;
-};
+export interface ImagesAsset {
+  path?: string;
+  size?: number;
+  variants?: ImagesVariant[];
+}

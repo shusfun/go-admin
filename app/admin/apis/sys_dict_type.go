@@ -1,7 +1,6 @@
 package apis
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-admin-team/go-admin-core/sdk/api"
@@ -31,7 +30,7 @@ type SysDictType struct {
 // @Security Bearer
 func (e SysDictType) GetPage(c *gin.Context) {
 	s := service.SysDictType{}
-	req :=dto.SysDictTypeGetPageReq{}
+	req := dto.SysDictTypeGetPageReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.Form).
@@ -39,7 +38,7 @@ func (e SysDictType) GetPage(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	list := make([]models.SysDictType, 0)
@@ -62,7 +61,7 @@ func (e SysDictType) GetPage(c *gin.Context) {
 // @Security Bearer
 func (e SysDictType) Get(c *gin.Context) {
 	s := service.SysDictType{}
-	req :=dto.SysDictTypeGetReq{}
+	req := dto.SysDictTypeGetReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, nil).
@@ -70,7 +69,7 @@ func (e SysDictType) Get(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	var object models.SysDictType
@@ -82,7 +81,7 @@ func (e SysDictType) Get(c *gin.Context) {
 	e.OK(object, "查询成功")
 }
 
-//Insert 字典类型创建
+// Insert 字典类型创建
 // @Summary 添加字典类型
 // @Description 获取JSON
 // @Tags 字典类型
@@ -94,7 +93,7 @@ func (e SysDictType) Get(c *gin.Context) {
 // @Security Bearer
 func (e SysDictType) Insert(c *gin.Context) {
 	s := service.SysDictType{}
-	req :=dto.SysDictTypeInsertReq{}
+	req := dto.SysDictTypeInsertReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.JSON).
@@ -102,14 +101,14 @@ func (e SysDictType) Insert(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	req.SetCreateBy(user.GetUserId(c))
 	err = s.Insert(&req)
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err,fmt.Sprintf(" 创建字典类型失败，详情：%s", err.Error()))
+		e.Error(500, err, "创建失败")
 		return
 	}
 	e.OK(req.GetId(), "创建成功")
@@ -127,14 +126,14 @@ func (e SysDictType) Insert(c *gin.Context) {
 // @Security Bearer
 func (e SysDictType) Update(c *gin.Context) {
 	s := service.SysDictType{}
-	req :=dto.SysDictTypeUpdateReq{}
+	req := dto.SysDictTypeUpdateReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.JSON, nil).
 		MakeService(&s.Service).
 		Errors
 	if err != nil {
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		e.Logger.Error(err)
 		return
 	}
@@ -157,7 +156,7 @@ func (e SysDictType) Update(c *gin.Context) {
 // @Security Bearer
 func (e SysDictType) Delete(c *gin.Context) {
 	s := service.SysDictType{}
-	req :=dto.SysDictTypeDeleteReq{}
+	req := dto.SysDictTypeDeleteReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.JSON, nil).
@@ -165,20 +164,20 @@ func (e SysDictType) Delete(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	req.SetUpdateBy(user.GetUserId(c))
 	err = s.Remove(&req)
 	if err != nil {
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	e.OK(req.GetId(), "删除成功")
 }
 
 // GetAll
-// @Summary 字典类型全部数据 代码生成使用接口
+// @Summary 字典类型全部数据
 // @Description 获取JSON
 // @Tags 字典类型
 // @Param dictName query string false "dictName"
@@ -189,7 +188,7 @@ func (e SysDictType) Delete(c *gin.Context) {
 // @Security Bearer
 func (e SysDictType) GetAll(c *gin.Context) {
 	s := service.SysDictType{}
-	req :=dto.SysDictTypeGetPageReq{}
+	req := dto.SysDictTypeGetPageReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.Form).
@@ -197,13 +196,13 @@ func (e SysDictType) GetAll(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	list := make([]models.SysDictType, 0)
 	err = s.GetAll(&req, &list)
 	if err != nil {
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	e.OK(list, "查询成功")

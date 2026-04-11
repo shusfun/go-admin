@@ -37,7 +37,7 @@ func (e SysDept) GetPage(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	list := make([]models.SysDept, 0)
@@ -67,7 +67,7 @@ func (e SysDept) Get(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	var object models.SysDept
@@ -102,7 +102,7 @@ func (e SysDept) Insert(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -138,13 +138,13 @@ func (e SysDept) Update(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	req.SetUpdateBy(user.GetUserId(c))
 	err = s.Update(&req)
 	if err != nil {
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	e.OK(req.GetId(), "更新成功")
@@ -169,7 +169,7 @@ func (e SysDept) Delete(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -192,7 +192,7 @@ func (e SysDept) Get2Tree(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	list := make([]dto.DeptLabel, 0)
@@ -213,21 +213,21 @@ func (e SysDept) GetDeptTreeRoleSelect(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
 	id, err := pkg.StringToInt(c.Param("roleId"))
 	result, err := s.SetDeptLabel()
 	if err != nil {
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	menuIds := make([]int, 0)
 	if id != 0 {
 		menuIds, err = s.GetWithRoleId(id)
 		if err != nil {
-			e.Error(500, err, err.Error())
+			e.Error(500, err, userFacingApiErrorMessage(500))
 			return
 		}
 	}

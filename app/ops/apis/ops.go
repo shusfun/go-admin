@@ -29,7 +29,7 @@ func (e OpsApi) GetEnvironments(c *gin.Context) {
 		MakeService(&s.Service).
 		Errors
 	if err != nil {
-		e.Error(http.StatusInternalServerError, err, err.Error())
+		e.Error(http.StatusInternalServerError, err, userFacingApiErrorMessage(http.StatusInternalServerError))
 		return
 	}
 	items, err := service.BuildEnvironmentItems(e.Orm, ext.ExtConfig.Ops.Environments)
@@ -49,17 +49,17 @@ func (e OpsApi) CreateTask(c *gin.Context) {
 		MakeService(&s.Service).
 		Errors
 	if err != nil {
-		e.Error(http.StatusBadRequest, err, err.Error())
+		e.Error(http.StatusBadRequest, err, userFacingApiErrorMessage(http.StatusBadRequest))
 		return
 	}
 	if service.GetTaskManager().IsShuttingDown() {
 		err = errors.New("服务正在停止，暂不接受新任务")
-		e.Error(http.StatusServiceUnavailable, err, err.Error())
+		e.Error(http.StatusServiceUnavailable, err, userFacingApiErrorMessage(http.StatusServiceUnavailable))
 		return
 	}
 	env, err := service.FindEnvironment(ext.ExtConfig.Ops.Environments, req.Env)
 	if err != nil {
-		e.Error(http.StatusBadRequest, err, err.Error())
+		e.Error(http.StatusBadRequest, err, userFacingApiErrorMessage(http.StatusBadRequest))
 		return
 	}
 	if !env.Enabled {
@@ -67,7 +67,7 @@ func (e OpsApi) CreateTask(c *gin.Context) {
 		return
 	}
 	if err = service.ValidateTaskRequest(&req, env); err != nil {
-		e.Error(http.StatusBadRequest, err, err.Error())
+		e.Error(http.StatusBadRequest, err, userFacingApiErrorMessage(http.StatusBadRequest))
 		return
 	}
 	taskID := int(time.Now().UnixNano())
@@ -113,7 +113,7 @@ func (e OpsApi) CancelTask(c *gin.Context) {
 		MakeService(&s.Service).
 		Errors
 	if err != nil {
-		e.Error(http.StatusBadRequest, err, err.Error())
+		e.Error(http.StatusBadRequest, err, userFacingApiErrorMessage(http.StatusBadRequest))
 		return
 	}
 	task, err := s.Cancel(req.Id)
@@ -141,7 +141,7 @@ func (e OpsApi) GetTaskList(c *gin.Context) {
 		MakeService(&s.Service).
 		Errors
 	if err != nil {
-		e.Error(http.StatusBadRequest, err, err.Error())
+		e.Error(http.StatusBadRequest, err, userFacingApiErrorMessage(http.StatusBadRequest))
 		return
 	}
 	list := make([]appModels.OpsTask, 0)
@@ -166,7 +166,7 @@ func (e OpsApi) GetTask(c *gin.Context) {
 		MakeService(&s.Service).
 		Errors
 	if err != nil {
-		e.Error(http.StatusBadRequest, err, err.Error())
+		e.Error(http.StatusBadRequest, err, userFacingApiErrorMessage(http.StatusBadRequest))
 		return
 	}
 	task, err := s.GetByID(req.Id)
@@ -191,7 +191,7 @@ func (e OpsApi) Stream(c *gin.Context) {
 		MakeService(&s.Service).
 		Errors
 	if err != nil {
-		e.Error(http.StatusBadRequest, err, err.Error())
+		e.Error(http.StatusBadRequest, err, userFacingApiErrorMessage(http.StatusBadRequest))
 		return
 	}
 	task, err := s.GetByID(req.Id)

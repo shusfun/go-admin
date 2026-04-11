@@ -1,8 +1,6 @@
 package apis
 
 import (
-	"fmt"
-	
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-admin-team/go-admin-core/sdk/api"
@@ -31,7 +29,7 @@ type SysPost struct {
 // @Security Bearer
 func (e SysPost) GetPage(c *gin.Context) {
 	s := service.SysPost{}
-	req :=dto.SysPostPageReq{}
+	req := dto.SysPostPageReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.Form).
@@ -39,7 +37,7 @@ func (e SysPost) GetPage(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -65,7 +63,7 @@ func (e SysPost) GetPage(c *gin.Context) {
 // @Security Bearer
 func (e SysPost) Get(c *gin.Context) {
 	s := service.SysPost{}
-	req :=dto.SysPostGetReq{}
+	req := dto.SysPostGetReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, nil).
@@ -73,14 +71,14 @@ func (e SysPost) Get(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	var object models.SysPost
 
 	err = s.Get(&req, &object)
 	if err != nil {
-		e.Error(500, err, fmt.Sprintf("岗位信息获取失败！错误详情：%s", err.Error()))
+		e.Error(500, err, "查询失败")
 		return
 	}
 
@@ -99,7 +97,7 @@ func (e SysPost) Get(c *gin.Context) {
 // @Security Bearer
 func (e SysPost) Insert(c *gin.Context) {
 	s := service.SysPost{}
-	req :=dto.SysPostInsertReq{}
+	req := dto.SysPostInsertReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.JSON).
@@ -107,13 +105,13 @@ func (e SysPost) Insert(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	req.SetCreateBy(user.GetUserId(c))
 	err = s.Insert(&req)
 	if err != nil {
-		e.Error(500, err, fmt.Sprintf("新建岗位失败！错误详情：%s", err.Error()))
+		e.Error(500, err, "创建失败")
 		return
 	}
 	e.OK(req.GetId(), "创建成功")
@@ -131,7 +129,7 @@ func (e SysPost) Insert(c *gin.Context) {
 // @Security Bearer
 func (e SysPost) Update(c *gin.Context) {
 	s := service.SysPost{}
-	req :=dto.SysPostUpdateReq{}
+	req := dto.SysPostUpdateReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.JSON, nil).
@@ -139,7 +137,7 @@ func (e SysPost) Update(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 
@@ -147,7 +145,7 @@ func (e SysPost) Update(c *gin.Context) {
 
 	err = s.Update(&req)
 	if err != nil {
-		e.Error(500, err, fmt.Sprintf("岗位更新失败！错误详情：%s", err.Error()))
+		e.Error(500, err, "更新失败")
 		return
 	}
 	e.OK(req.GetId(), "更新成功")
@@ -163,7 +161,7 @@ func (e SysPost) Update(c *gin.Context) {
 // @Security Bearer
 func (e SysPost) Delete(c *gin.Context) {
 	s := service.SysPost{}
-	req :=dto.SysPostDeleteReq{}
+	req := dto.SysPostDeleteReq{}
 	err := e.MakeContext(c).
 		MakeOrm().
 		Bind(&req, binding.JSON).
@@ -171,13 +169,13 @@ func (e SysPost) Delete(c *gin.Context) {
 		Errors
 	if err != nil {
 		e.Logger.Error(err)
-		e.Error(500, err, err.Error())
+		e.Error(500, err, userFacingApiErrorMessage(500))
 		return
 	}
 	req.SetUpdateBy(user.GetUserId(c))
 	err = s.Remove(&req)
 	if err != nil {
-		e.Error(500, err, fmt.Sprintf("岗位删除失败！错误详情：%s", err.Error()))
+		e.Error(500, err, "删除失败")
 		return
 	}
 	e.OK(req.GetId(), "删除成功")

@@ -39,6 +39,17 @@ export interface PostSummary {
   postCode: string;
 }
 
+export interface ImageVariant {
+  path: string;
+  size: number;
+}
+
+export interface ImageAsset {
+  path: string;
+  size: number;
+  variants?: ImageVariant[];
+}
+
 export interface ProfileUser {
   userId: number;
   username: string;
@@ -47,7 +58,7 @@ export interface ProfileUser {
   roleId: number;
   phone: string;
   email: string;
-  avatar: string;
+  avatar: ImageAsset | null;
   remark: string;
 }
 
@@ -62,7 +73,7 @@ export interface InfoResponse {
   permissions: string[];
   buttons: string[];
   introduction: string;
-  avatar: string;
+  avatar: ImageAsset | null;
   userName: string;
   userId: number;
   deptId: number;

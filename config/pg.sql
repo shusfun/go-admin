@@ -10,7 +10,7 @@ create sequence if not exists sys_config_config_id_seq;
 create sequence if not exists sys_job_id_seq;
 
 select setval('sys_role_role_id_seq',4);
-select setval('sys_user_user_id_seq',5);
+select setval('sys_user_user_id_seq',1,false);
 select setval('sys_post_post_id_seq',4);
 select setval('sys_menu_menu_id_seq',543);
 select setval('sys_dict_type_dict_id_seq',12);

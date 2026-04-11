@@ -33,7 +33,7 @@ func UpdateAction(control dto.Control) gin.HandlerFunc {
 		var object models.ActiveRecord
 		object, err = req.GenerateM()
 		if err != nil {
-			response.Error(c, 500, err, "模型生成失败")
+			response.Error(c, 500, err, "数据准备失败，请稍后重试")
 			return
 		}
 		object.SetUpdateBy(user.GetUserId(c))

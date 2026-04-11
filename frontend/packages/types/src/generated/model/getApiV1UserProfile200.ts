@@ -6,8 +6,7 @@
 添加qq群: 521386980 进入技术交流群 请先star，谢谢！
  * OpenAPI spec version: 2.0.0
  */
+import type { ResponseResponse } from './responseResponse';
+import type { GetApiV1UserProfile200AllOf } from './getApiV1UserProfile200AllOf';
 
-export type PostApiV1PublicUploadFileBody = {
-  /** file */
-  file: Blob;
-};
+export type GetApiV1UserProfile200 = ResponseResponse & GetApiV1UserProfile200AllOf;

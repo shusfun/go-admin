@@ -64,7 +64,7 @@ app/
   admin/    # 核心 RBAC：用户、角色、菜单、部门、岗位、字典、配置、日志
   jobs/     # 定时任务调度 (robfig/cron)，任务日志
   ops/      # 运维任务执行（部署、重启），支持 SSE 实时推流
-  other/    # 文件上传、代码生成（根据数据库表结构）、服务器监控
+  other/    # 文件上传、服务器监控
 cmd/        # Cobra CLI 子命令；cmd/api/server.go 是主服务入口
 common/     # 公共层：中间件、模型、DTO、数据库初始化、文件存储、响应封装
 config/     # YAML 配置文件 + 初始化 SQL

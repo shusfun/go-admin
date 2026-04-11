@@ -59,12 +59,9 @@ func SaveSysApi(message storage.Messager) (err error) {
 		for _, v := range l.List {
 			if v.HttpMethod != "HEAD" ||
 				strings.Contains(v.RelativePath, "/swagger/") ||
-				strings.Contains(v.RelativePath, "/static/") ||
-				strings.Contains(v.RelativePath, "/form-generator/") ||
-				strings.Contains(v.RelativePath, "/sys/tables") {
+				strings.Contains(v.RelativePath, "/static/") {
 
-				// 根据接口方法注释里的@Summary填充接口名称，适用于代码生成器
-				// 可在此处增加配置路径前缀的if判断，只对代码生成的自建应用进行定向的接口名称填充
+				// 根据接口方法注释里的@Summary填充接口名称。
 				jsonFile, _ := ioutil.ReadFile("docs/swagger.json")
 				jsonData, _ := simplejson.NewFromReader(bytes.NewReader(jsonFile))
 				urlPath := v.RelativePath

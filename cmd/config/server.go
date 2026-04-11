@@ -48,12 +48,6 @@ func run() {
 	}
 	fmt.Println("database:", string(database))
 
-	gen, errs := json.MarshalIndent(config.GenConfig, "", "   ") //转换成JSON返回的是byte[]
-	if errs != nil {
-		fmt.Println(errs.Error())
-	}
-	fmt.Println("gen:", string(gen))
-
 	loggerConfig, errs := json.MarshalIndent(config.LoggerConfig, "", "   ") //转换成JSON返回的是byte[]
 	if errs != nil {
 		fmt.Println(errs.Error())

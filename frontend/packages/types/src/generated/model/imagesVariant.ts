@@ -7,7 +7,7 @@
  * OpenAPI spec version: 2.0.0
  */
 
-export type PostApiV1PublicUploadFileBody = {
-  /** file */
-  file: Blob;
-};
+export interface ImagesVariant {
+  path?: string;
+  size?: number;
+}

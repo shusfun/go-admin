@@ -10,6 +10,7 @@ import type {
   CreateOpsTaskPayload,
   DeletePayload,
   InfoResponse,
+  ImageAsset,
   LoginPayload,
   LoginResult,
   OpsDoneEvent,
@@ -53,6 +54,21 @@ export class ApiError extends Error {
   }
 }
 
+const engineeringMessagePatterns = [
+  /错误详情/u,
+  /失败原因/u,
+  /请求参数错误/u,
+  /模版/u,
+  /模板/u,
+  /package\.json/i,
+  /shouldbind/i,
+  /validate/i,
+  /incorrect password/i,
+  /db not exist/i,
+  /makeorm/i,
+  /\b(roleid|tableid|entryid|dto|json|jwt|sql|panic|stack|marshal|unmarshal|gorm|orm|model|template)\b/i,
+];
+
 type SessionManager = {
   read: () => AppSession | null;
   write: (session: AppSession) => void;
@@ -80,6 +96,55 @@ type PlainBody = {
   code: number;
   msg?: string;
 };
+
+function normalizeMessage(message: string) {
+  return message.replace(/\s+/g, " ").trim();
+}
+
+function looksMostlyAscii(message: string) {
+  const asciiLetters = (message.match(/[A-Za-z]/g) || []).length;
+  const chineseChars = (message.match(/[\u4e00-\u9fff]/g) || []).length;
+  return asciiLetters >= 6 && chineseChars === 0;
+}
+
+function isEngineeringMessage(message: string) {
+  return engineeringMessagePatterns.some((pattern) => pattern.test(message)) || looksMostlyAscii(message);
+}
+
+function sanitizeUserFacingMessage(message: string | undefined, fallback: string) {
+  const normalized = normalizeMessage(message || "");
+  if (!normalized) {
+    return fallback;
+  }
+  if (normalized === "Network Error") {
+    return "网络开小差了，请稍后重试";
+  }
+  if (normalized.includes("数据库连接失败")) {
+    return "数据库连接失败，请检查连接信息后重试";
+  }
+  if (normalized.includes("请求参数错误") || normalized.includes("参数验证失败")) {
+    return "提交的信息不完整或格式不正确，请检查后重试";
+  }
+  if (isEngineeringMessage(normalized)) {
+    return fallback;
+  }
+  return normalized;
+}
+
+export function toUserFacingErrorMessage(error: unknown, fallback = "请求未完成，请稍后重试") {
+  if (axios.isAxiosError(error)) {
+    if (error.code === "ECONNABORTED" || !error.response) {
+      return "网络连接异常，请稍后重试";
+    }
+    const body = error.response?.data;
+    const message = body && typeof body === "object" && "msg" in body ? String(body.msg || "") : error.message;
+    return sanitizeUserFacingMessage(message, fallback);
+  }
+  if (error instanceof Error) {
+    return sanitizeUserFacingMessage(error.message, fallback);
+  }
+  return fallback;
+}
 
 function getApiPrefix(clientType: ClientType) {
   return clientType === "admin" ? "/admin-api/v1" : "/app-api/v1";
@@ -140,7 +205,7 @@ async function unwrapPlain<T extends PlainBody>(
     }
 
     if (body.code !== 200) {
-      throw new ApiError(body.msg || "请求失败", body.code);
+      throw new ApiError(sanitizeUserFacingMessage(body.msg, "请求失败"), body.code);
     }
 
     return body;
@@ -169,7 +234,7 @@ async function unwrapEnvelope<T>(
     }
 
     if (body.code !== 200) {
-      throw new ApiError(body.msg || "请求失败", body.code);
+      throw new ApiError(sanitizeUserFacingMessage(body.msg, "请求失败"), body.code);
     }
 
     return body.data;
@@ -234,11 +299,19 @@ export function createApiClient(options: ClientOptions) {
       },
     },
     system: {
+      async getAppConfig() {
+        return unwrapEnvelope<Record<string, string>>(() => instance.get<ApiEnvelope<Record<string, string>>>(`${adminPrefix}/app-config`), options);
+      },
       async getInfo() {
         return unwrapEnvelope<InfoResponse>(() => instance.get<ApiEnvelope<InfoResponse>>(`${apiPrefix}/getinfo`), options);
       },
       async getProfile() {
         return unwrapEnvelope<ProfileResponse>(() => instance.get<ApiEnvelope<ProfileResponse>>(`${apiPrefix}/user/profile`), options);
+      },
+      async uploadAvatar(file: File) {
+        const formData = new FormData();
+        formData.append("upload[]", file);
+        return unwrapEnvelope<ImageAsset>(() => instance.post<ApiEnvelope<ImageAsset>>(`${apiPrefix}/user/avatar`, formData), options);
       },
       async getMenuRole() {
         return unwrapEnvelope<RawMenuItem[]>(() => instance.get<ApiEnvelope<RawMenuItem[]>>(`${apiPrefix}/menurole`), options);
@@ -586,6 +659,7 @@ export type SetupDefaults = {
 };
 
 export type SetupStatus = {
+  hasServerDefaults: boolean;
   needs_setup: boolean;
   step: string;
   defaults: SetupDefaults;
@@ -598,6 +672,7 @@ type SetupStatusPayload = {
 };
 
 type InstallPayload = {
+  environment: string;
   database: TestDBPayload;
   admin: {
     username: string;
@@ -609,9 +684,9 @@ type InstallPayload = {
 
 export function getFallbackSetupDefaults(): SetupDefaults {
   return {
-    environment: "dev",
+    environment: "prod",
     database: {
-      host: "127.0.0.1",
+      host: "postgres",
       port: 5432,
       user: "postgres",
       password: "",
@@ -635,7 +710,7 @@ export function createSetupApi(baseURL: string) {
     const response = await request();
     const body = response.data;
     if (body.code !== 200) {
-      throw new ApiError(body.msg || "请求失败", body.code);
+      throw new ApiError(sanitizeUserFacingMessage(body.msg, "请求失败"), body.code);
     }
     return body.data;
   }
@@ -646,6 +721,7 @@ export function createSetupApi(baseURL: string) {
         instance.get<ApiEnvelope<SetupStatusPayload>>("/api/v1/setup/status"),
       );
       return {
+        hasServerDefaults: Boolean(status.defaults),
         ...status,
         defaults: status.defaults ?? getFallbackSetupDefaults(),
       };

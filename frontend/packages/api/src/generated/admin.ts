@@ -37,14 +37,13 @@ import type {
   DtoUpdateSysUserStatusReq,
   GetApiV1AppConfig200,
   GetApiV1Captcha200,
-  GetApiV1DbColumnsPageParams,
-  GetApiV1DbTablesPageParams,
   GetApiV1DeptParams,
   GetApiV1DictDataOptionSelect200,
   GetApiV1DictDataOptionSelectParams,
   GetApiV1DictDataParams,
   GetApiV1DictTypeOptionSelectParams,
   GetApiV1DictTypeParams,
+  GetApiV1Getinfo200,
   GetApiV1MenuParams,
   GetApiV1PostParams,
   GetApiV1RoleParams,
@@ -57,14 +56,14 @@ import type {
   GetApiV1SysConfigParams,
   GetApiV1SysLoginLogParams,
   GetApiV1SysOperaLogParams,
-  GetApiV1SysTablesPageParams,
   GetApiV1SysUserParams,
+  GetApiV1UserProfile200,
   HandlerLogin,
+  PostApiV1PublicUploadFileBody,
   PostApiV1PublicUploadFileParams,
-  PostApiV1PublicUploadfileBody,
-  PostApiV1SysTablesInfoParams,
-  ResponseResponse,
-  ToolsSysTables
+  PostApiV1UserAvatar200,
+  PostApiV1UserAvatarBody,
+  ResponseResponse
 } from '../../../types/src/generated/model';
 
 import { customInstance } from '../runtime/openapi';
@@ -93,34 +92,6 @@ export const getApiV1Captcha = (
  options?: SecondParameter<typeof customInstance<GetApiV1Captcha200>>,) => {
       return customInstance<GetApiV1Captcha200>(
       {url: `/api/v1/captcha`, method: 'GET'
-    },
-      options);
-    }
-  
-/**
- * 数据库表列分页列表 / database table column page list
- * @summary 分页列表数据 / page list data
- */
-export const getApiV1DbColumnsPage = (
-    params?: GetApiV1DbColumnsPageParams,
- options?: SecondParameter<typeof customInstance<ResponseResponse>>,) => {
-      return customInstance<ResponseResponse>(
-      {url: `/api/v1/db/columns/page`, method: 'GET',
-        params
-    },
-      options);
-    }
-  
-/**
- * 数据库表分页列表 / database table page list
- * @summary 分页列表数据 / page list data
- */
-export const getApiV1DbTablesPage = (
-    params?: GetApiV1DbTablesPageParams,
- options?: SecondParameter<typeof customInstance<ResponseResponse>>,) => {
-      return customInstance<ResponseResponse>(
-      {url: `/api/v1/db/tables/page`, method: 'GET',
-        params
     },
       options);
     }
@@ -328,7 +299,7 @@ export const deleteApiV1DictType = (
   
 /**
  * 获取JSON
- * @summary 字典类型全部数据 代码生成使用接口
+ * @summary 字典类型全部数据
  */
 export const getApiV1DictTypeOptionSelect = (
     params?: GetApiV1DictTypeOptionSelectParams,
@@ -375,8 +346,8 @@ export const putApiV1DictTypeDictId = (
  */
 export const getApiV1Getinfo = (
     
- options?: SecondParameter<typeof customInstance<ResponseResponse>>,) => {
-      return customInstance<ResponseResponse>(
+ options?: SecondParameter<typeof customInstance<GetApiV1Getinfo200>>,) => {
+      return customInstance<GetApiV1Getinfo200>(
       {url: `/api/v1/getinfo`, method: 'GET'
     },
       options);
@@ -576,10 +547,10 @@ export const getApiV1PostPostId = (
  * @summary 上传图片
  */
 export const postApiV1PublicUploadFile = (
-    postApiV1PublicUploadfileBody: PostApiV1PublicUploadfileBody,
+    postApiV1PublicUploadFileBody: PostApiV1PublicUploadFileBody,
     params: PostApiV1PublicUploadFileParams,
  options?: SecondParameter<typeof customInstance<string>>,) => {const formData = new FormData();
-formData.append(`file`, postApiV1PublicUploadfileBody.file)
+formData.append(`file`, postApiV1PublicUploadFileBody.file)
 
       return customInstance<string>(
       {url: `/api/v1/public/uploadFile`, method: 'POST',
@@ -994,84 +965,15 @@ export const deleteApiV1SysUserUserId = (
     }
   
 /**
- * 修改表结构
- * @summary 修改表结构
- */
-export const putApiV1SysTablesInfo = (
-    toolsSysTables: ToolsSysTables,
- options?: SecondParameter<typeof customInstance<string>>,) => {
-      return customInstance<string>(
-      {url: `/api/v1/sys/tables/info`, method: 'PUT',
-      headers: {'Content-Type': 'application/json', },
-      data: toolsSysTables
-    },
-      options);
-    }
-  
-/**
- * 添加表结构
- * @summary 添加表结构
- */
-export const postApiV1SysTablesInfo = (
-    params?: PostApiV1SysTablesInfoParams,
- options?: SecondParameter<typeof customInstance<string>>,) => {
-      return customInstance<string>(
-      {url: `/api/v1/sys/tables/info`, method: 'POST',
-        params
-    },
-      options);
-    }
-  
-/**
- * 获取JSON
- * @summary 获取配置
- */
-export const getApiV1SysTablesInfoTableId = (
-    tableId: number,
- options?: SecondParameter<typeof customInstance<ResponseResponse>>,) => {
-      return customInstance<ResponseResponse>(
-      {url: `/api/v1/sys/tables/info/${tableId}`, method: 'GET'
-    },
-      options);
-    }
-  
-/**
- * 删除表结构
- * @summary 删除表结构
- */
-export const deleteApiV1SysTablesInfoTableId = (
-    tableId: number,
- options?: SecondParameter<typeof customInstance<string>>,) => {
-      return customInstance<string>(
-      {url: `/api/v1/sys/tables/info/${tableId}`, method: 'DELETE'
-    },
-      options);
-    }
-  
-/**
- * 生成表分页列表
- * @summary 分页列表数据
- */
-export const getApiV1SysTablesPage = (
-    params?: GetApiV1SysTablesPageParams,
- options?: SecondParameter<typeof customInstance<ResponseResponse>>,) => {
-      return customInstance<ResponseResponse>(
-      {url: `/api/v1/sys/tables/page`, method: 'GET',
-        params
-    },
-      options);
-    }
-  
-/**
  * 获取JSON
  * @summary 修改头像
  */
 export const postApiV1UserAvatar = (
-    postApiV1PublicUploadfileBody: PostApiV1PublicUploadfileBody,
- options?: SecondParameter<typeof customInstance<ResponseResponse>>,) => {const formData = new FormData();
-formData.append(`file`, postApiV1PublicUploadfileBody.file)
+    postApiV1UserAvatarBody: PostApiV1UserAvatarBody,
+ options?: SecondParameter<typeof customInstance<PostApiV1UserAvatar200>>,) => {const formData = new FormData();
+formData.append(`upload[]`, postApiV1UserAvatarBody['upload[]'])
 
-      return customInstance<ResponseResponse>(
+      return customInstance<PostApiV1UserAvatar200>(
       {url: `/api/v1/user/avatar`, method: 'POST',
       headers: {'Content-Type': 'multipart/form-data', },
        data: formData
@@ -1085,8 +987,8 @@ formData.append(`file`, postApiV1PublicUploadfileBody.file)
  */
 export const getApiV1UserProfile = (
     
- options?: SecondParameter<typeof customInstance<ResponseResponse>>,) => {
-      return customInstance<ResponseResponse>(
+ options?: SecondParameter<typeof customInstance<GetApiV1UserProfile200>>,) => {
+      return customInstance<GetApiV1UserProfile200>(
       {url: `/api/v1/user/profile`, method: 'GET'
     },
       options);
@@ -1152,8 +1054,6 @@ export const postLogout = (
   
 export type GetApiV1AppConfigResult = NonNullable<Awaited<ReturnType<typeof getApiV1AppConfig>>>
 export type GetApiV1CaptchaResult = NonNullable<Awaited<ReturnType<typeof getApiV1Captcha>>>
-export type GetApiV1DbColumnsPageResult = NonNullable<Awaited<ReturnType<typeof getApiV1DbColumnsPage>>>
-export type GetApiV1DbTablesPageResult = NonNullable<Awaited<ReturnType<typeof getApiV1DbTablesPage>>>
 export type GetApiV1DeptResult = NonNullable<Awaited<ReturnType<typeof getApiV1Dept>>>
 export type PostApiV1DeptResult = NonNullable<Awaited<ReturnType<typeof postApiV1Dept>>>
 export type DeleteApiV1DeptResult = NonNullable<Awaited<ReturnType<typeof deleteApiV1Dept>>>
@@ -1214,11 +1114,6 @@ export type PostApiV1SysUserResult = NonNullable<Awaited<ReturnType<typeof postA
 export type GetApiV1SysUserUserIdResult = NonNullable<Awaited<ReturnType<typeof getApiV1SysUserUserId>>>
 export type PutApiV1SysUserUserIdResult = NonNullable<Awaited<ReturnType<typeof putApiV1SysUserUserId>>>
 export type DeleteApiV1SysUserUserIdResult = NonNullable<Awaited<ReturnType<typeof deleteApiV1SysUserUserId>>>
-export type PutApiV1SysTablesInfoResult = NonNullable<Awaited<ReturnType<typeof putApiV1SysTablesInfo>>>
-export type PostApiV1SysTablesInfoResult = NonNullable<Awaited<ReturnType<typeof postApiV1SysTablesInfo>>>
-export type GetApiV1SysTablesInfoTableIdResult = NonNullable<Awaited<ReturnType<typeof getApiV1SysTablesInfoTableId>>>
-export type DeleteApiV1SysTablesInfoTableIdResult = NonNullable<Awaited<ReturnType<typeof deleteApiV1SysTablesInfoTableId>>>
-export type GetApiV1SysTablesPageResult = NonNullable<Awaited<ReturnType<typeof getApiV1SysTablesPage>>>
 export type PostApiV1UserAvatarResult = NonNullable<Awaited<ReturnType<typeof postApiV1UserAvatar>>>
 export type GetApiV1UserProfileResult = NonNullable<Awaited<ReturnType<typeof getApiV1UserProfile>>>
 export type PutApiV1UserPwdResetResult = NonNullable<Awaited<ReturnType<typeof putApiV1UserPwdReset>>>
