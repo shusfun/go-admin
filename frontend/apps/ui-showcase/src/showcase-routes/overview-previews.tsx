@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type PreviewKind =
+export type PreviewKind =
   | "button"
   | "badge"
   | "breadcrumb"
@@ -624,6 +624,6 @@ function resolveKind(path: string): PreviewKind {
   return "layout";
 }
 
-export function OverviewPreview({ path }: { path: string }) {
-  return <Canvas kind={resolveKind(path)} />;
+export function OverviewPreview({ kind, path }: { kind?: PreviewKind; path?: string }) {
+  return <Canvas kind={kind ?? resolveKind(path ?? "")} />;
 }

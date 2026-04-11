@@ -13,6 +13,7 @@ import {
   DetailGrid,
   DetailItem,
   IconGrid,
+  Image,
   InlineNotice,
   KeyValueCard,
   LogViewer,
@@ -45,6 +46,30 @@ import {
   type ShowcaseCategory,
   type ShowcaseRoute,
 } from "./shared";
+
+const demoAvatarImage = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+    <defs>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#dbeafe" />
+        <stop offset="100%" stop-color="#bfdbfe" />
+      </linearGradient>
+    </defs>
+    <rect width="320" height="320" rx="48" fill="url(#bg)" />
+    <circle cx="160" cy="122" r="56" fill="#1d4ed8" opacity="0.14" />
+    <path d="M92 256c20-44 54-66 102-66s82 22 102 66" fill="#1d4ed8" opacity="0.18" />
+    <text x="160" y="145" text-anchor="middle" font-size="72" font-weight="700" font-family="Arial, sans-serif" fill="#1d4ed8">GA</text>
+  </svg>
+`)}`;
+
+const demoImageSource = {
+  path: demoAvatarImage,
+  size: 512,
+  variants: [
+    { path: demoAvatarImage, size: 128 },
+    { path: demoAvatarImage, size: 256 },
+  ],
+};
 
 function TablePage() {
   const [page, setPage] = useState(1);
@@ -285,6 +310,99 @@ function PaginationPage() {
   );
 }
 
+function DataTableSectionPage() {
+  const [page, setPage] = useState(2);
+
+  return (
+    <ShowcaseDocPage
+      apiItems={[
+        { description: "区块标题。", name: "title", required: true, type: "ReactNode" },
+        { description: "区块说明。", name: "description", type: "ReactNode" },
+        { description: "表格与分页等内容区。", name: "children", required: true, type: "ReactNode" },
+      ]}
+      categoryLabel="页面模式"
+      demos={[
+        {
+          code: `<DataTableSection title="用户列表" description="当前共 3 条记录。">
+  <Table>...</Table>
+</DataTableSection>`,
+          content: (
+            <DataTableSection description="把标题、数据说明和列表内容收成同一个数据区块。" title="用户列表">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>编号</TableHead>
+                    <TableHead>姓名</TableHead>
+                    <TableHead>角色</TableHead>
+                    <TableHead>状态</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tableRows.map((row) => (
+                    <TableRow key={`section-${row.id}`}>
+                      <TableCell>{row.id}</TableCell>
+                      <TableCell>{row.name}</TableCell>
+                      <TableCell>{row.role}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={row.status} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </DataTableSection>
+          ),
+          description: "最小形态下就是“标题 + 数据区”，适合标准列表页主内容块。",
+          title: "基础数据区块",
+        },
+        {
+          code: `<DataTableSection title="发布记录" description="当前共 36 条结果。">
+  <Table>...</Table>
+  <Pagination page={page} totalPages={6} showPager onPageChange={setPage} />
+</DataTableSection>`,
+          content: (
+            <DataTableSection description="完整模式里通常会把表格、分页和说明文字放在同一个区块中。" title="发布记录">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>服务</TableHead>
+                    <TableHead>版本</TableHead>
+                    <TableHead>负责人</TableHead>
+                    <TableHead>状态</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>gateway</TableCell>
+                    <TableCell>v2.4.1</TableCell>
+                    <TableCell>张三</TableCell>
+                    <TableCell><StatusBadge status="运行中" /></TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>order-api</TableCell>
+                    <TableCell>v2.3.9</TableCell>
+                    <TableCell>李四</TableCell>
+                    <TableCell><StatusBadge status="停用" /></TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+              <Pagination onPageChange={setPage} page={page} showPager totalPages={6} />
+            </DataTableSection>
+          ),
+          description: "分页和列表说明跟着 DataTableSection 走，可以减少页面层重复拼装。",
+          title: "表格 + 分页组合",
+        },
+      ]}
+      description="DataTableSection 用来承接标题、说明、表格与分页，是后台列表页最稳定的主内容容器。"
+      notes={[
+        "列表页优先先有数据区块，再谈表格细节，不要直接把 Table 裸放在页面里。",
+        "分页、统计说明和空态应跟随同一个数据区块收口。",
+      ]}
+      title="DataTableSection"
+    />
+  );
+}
+
 function TabsPage() {
   return (
     <ShowcaseDocPage
@@ -455,6 +573,76 @@ function ProgressPage() {
   );
 }
 
+function StatStripPage() {
+  return (
+    <ShowcaseDocPage
+      apiItems={[
+        { description: "统计项数组。", name: "items", required: true, type: 'Array<{ label: ReactNode; value: ReactNode }>' },
+        { description: "可直接嵌入 Tabs、Card 或概览页头部。", name: "children usage", type: "layout pattern" },
+      ]}
+      categoryLabel="页面模式"
+      demos={[
+        {
+          code: `<StatStrip
+  items={[
+    { label: "执行批次", value: "32" },
+    { label: "平均时长", value: "1.8m" },
+    { label: "错误数", value: "0" },
+    { label: "回滚次数", value: "1" },
+  ]}
+/>`,
+          content: (
+            <StatStrip
+              items={[
+                { label: "执行批次", value: "32" },
+                { label: "平均时长", value: "1.8m" },
+                { label: "错误数", value: "0" },
+                { label: "回滚次数", value: "1" },
+              ]}
+            />
+          ),
+          description: "把一组轻量关键指标收成一条统计带，适合页头下方或标签内容区。",
+          title: "基础统计带",
+        },
+        {
+          code: `<Card>
+  <CardHeader>...</CardHeader>
+  <CardContent>
+    <StatStrip items={[...]} />
+  </CardContent>
+</Card>`,
+          content: (
+            <Card>
+              <CardHeader>
+                <CardTitle>发布窗口摘要</CardTitle>
+                <CardDescription>适合作为任务页或详情页顶部的轻量信息带。</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <StatStrip
+                  items={[
+                    { label: "负责人", value: "张三" },
+                    { label: "当前环境", value: "staging" },
+                    { label: "待审批", value: "2" },
+                    { label: "预计完成", value: "21:40" },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+          ),
+          description: "当信息密度高但不值得做成卡片矩阵时，StatStrip 更轻。",
+          title: "嵌入详情头部",
+        },
+      ]}
+      description="StatStrip 用于在页头、标签页和详情顶部快速展示一排稳定的关键统计，不需要拆成多张卡片。"
+      notes={[
+        "更适合低层级的稳定指标，不要把复杂交互和说明文本塞进统计带。",
+        "当指标需要单独强调或数量不均衡时，优先改用 MetricCard。",
+      ]}
+      title="StatStrip"
+    />
+  );
+}
+
 function AvatarPage() {
   return (
     <ShowcaseDocPage
@@ -598,6 +786,56 @@ function IconPage() {
         "命名应与业务语义对齐，避免同一功能换多种图标表达。",
       ]}
       title="Icon"
+    />
+  );
+}
+
+function ImagePage() {
+  return (
+    <ShowcaseDocPage
+      apiItems={[
+        { description: "图片源，可传字符串或带 variants 的资源对象。", name: "src", required: true, type: "string | ImageAsset" },
+        { description: "加载失败时的兜底图片。", name: "fallbackSrc", type: "string" },
+        { description: "可选的尺寸档位列表。", name: "variantSizes", type: "number[]" },
+        { description: "原生图片属性。", name: "alt / className / loading", type: "ImgHTMLAttributes<HTMLImageElement>" },
+      ]}
+      categoryLabel="页面模式"
+      demos={[
+        {
+          code: `<Image alt="Go Admin avatar" className="h-20 w-20 rounded-2xl object-cover" src={demoImageSource} />`,
+          content: <Image alt="Go Admin avatar" className="h-20 w-20 rounded-2xl object-cover" src={demoImageSource} />,
+          description: "组件支持直接传入资源对象，后续可根据渲染尺寸自动选择合适档位。",
+          title: "资源对象模式",
+        },
+        {
+          code: `<div className="grid gap-4 md:grid-cols-2">
+  <Image alt="封面图" className="aspect-[4/3] w-full rounded-2xl object-cover" src={demoAvatarImage} />
+  <Card>...</Card>
+</div>`,
+          content: (
+            <div className="grid gap-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+              <Image alt="封面图" className="aspect-[4/3] w-full rounded-2xl object-cover border border-border/70" src={demoAvatarImage} />
+              <Card>
+                <CardHeader>
+                  <CardTitle>图片承接规范</CardTitle>
+                  <CardDescription>统一通过 Image 接组件内头像、封面、Logo 和文档示意图。</CardDescription>
+                </CardHeader>
+                <CardContent className="text-sm leading-7 text-muted-foreground">
+                  当宿主站点后续接入多尺寸资源时，页面层不需要再单独处理变体路径拼接。
+                </CardContent>
+              </Card>
+            </div>
+          ),
+          description: "同一个组件既可承接头像，也可承接文档和卡片中的较大图像。",
+          title: "内容区图片",
+        },
+      ]}
+      description="Image 统一封装后台里的图片展示逻辑，支持普通路径、资源对象和多尺寸变体选择。"
+      notes={[
+        "页面层不要自己拼接图片变体路径，统一交给 Image 与资源对象能力承接。",
+        "头像、封面和品牌图都优先使用同一个组件，避免不同页面行为漂移。",
+      ]}
+      title="Image"
     />
   );
 }
@@ -772,6 +1010,68 @@ function TaskStatusCardPage() {
       description="TaskStatusCard 用于承接任务状态和关键信息，是状态型卡片的组合件。"
       notes={["状态卡应同时表达总体状态和关键上下文。", "操作区只放任务级动作，不要塞二级筛选。"]}
       title="TaskStatusCard"
+    />
+  );
+}
+
+function KeyValueCardPage() {
+  return (
+    <ShowcaseDocPage
+      apiItems={[
+        { description: "卡片标题。", name: "title", required: true, type: "ReactNode" },
+        { description: "卡片说明。", name: "description", type: "ReactNode" },
+        { description: "键值项数组。", name: "items", required: true, type: 'Array<{ label: ReactNode; value: ReactNode }>' },
+      ]}
+      categoryLabel="数据展示"
+      demos={[
+        {
+          code: `<KeyValueCard
+  title="发布详情"
+  description="用于承接一组稳定的详情键值。"
+  items={detailItems}
+/>`,
+          content: <KeyValueCard description="用于承接一组稳定的详情键值。" items={detailItems} title="发布详情" />,
+          description: "最适合详情页右侧面板、弹窗摘要和主从布局里的固定说明块。",
+          title: "基础卡片",
+        },
+        {
+          code: `<div className="grid gap-4 md:grid-cols-2">
+  <KeyValueCard ... />
+  <TaskStatusCard ... />
+</div>`,
+          content: (
+            <div className="grid gap-4 md:grid-cols-2">
+              <KeyValueCard
+                description="当前选中服务的静态基础信息。"
+                items={[
+                  { label: "服务名", value: "gateway" },
+                  { label: "负责人", value: "张三" },
+                  { label: "环境", value: "staging" },
+                  { label: "最近发布", value: "2026-04-09 21:30" },
+                ]}
+                title="服务详情"
+              />
+              <Card>
+                <CardHeader>
+                  <CardTitle>组合方式</CardTitle>
+                  <CardDescription>通常与状态卡、日志块或备注卡并列出现。</CardDescription>
+                </CardHeader>
+                <CardContent className="text-sm leading-7 text-muted-foreground">
+                  KeyValueCard 负责稳定键值，不承担长文本和过程信息。
+                </CardContent>
+              </Card>
+            </div>
+          ),
+          description: "详情页里让 KeyValueCard 专注承接稳定字段，能显著降低布局复杂度。",
+          title: "详情区组合",
+        },
+      ]}
+      description="KeyValueCard 是 DetailGrid 体系上的卡片封装，适合把一组稳定的详情键值收成单独信息块。"
+      notes={[
+        "长文本、日志和动态过程不要继续塞在 KeyValueCard 里，应该交给其他详情块处理。",
+        "字段数量过多时优先拆成多张卡片，而不是把单卡越拉越长。",
+      ]}
+      title="KeyValueCard"
     />
   );
 }
@@ -951,15 +1251,19 @@ function WideTablePatternsPage() {
 
 export const dataRoutes: ShowcaseRoute[] = [
   { component: TablePage, label: "Table", path: "/data/table", shortLabel: "TBL", summaryKey: "showcase.route.data.table.summary" },
+  { component: DataTableSectionPage, label: "DataTableSection", path: "/patterns/data-table-section", shortLabel: "DTS", summaryKey: "showcase.route.patterns.data-table-section.summary" },
   { component: PaginationPage, label: "Pagination", path: "/data/pagination", shortLabel: "PAG", summaryKey: "showcase.route.data.pagination.summary" },
   { component: TabsPage, label: "Tabs", path: "/data/tabs", shortLabel: "TAB", summaryKey: "showcase.route.data.tabs.summary" },
   { component: ProgressPage, label: "Progress", path: "/data/progress", shortLabel: "PRG", summaryKey: "showcase.route.data.progress.summary" },
+  { component: StatStripPage, label: "StatStrip", path: "/patterns/stat-strip", shortLabel: "STR", summaryKey: "showcase.route.patterns.stat-strip.summary" },
   { component: AvatarPage, label: "Avatar", path: "/data/avatar", shortLabel: "AVT", summaryKey: "showcase.route.data.avatar.summary" },
+  { component: ImagePage, label: "Image", path: "/data/image", shortLabel: "IMG", summaryKey: "showcase.route.data.image.summary" },
   { component: IconPage, label: "Icon", path: "/data/icon", shortLabel: "ICN", summaryKey: "showcase.route.data.icon.summary" },
   { component: LogViewerPage, label: "LogViewer", path: "/data/log-viewer", shortLabel: "LOG", summaryKey: "showcase.route.data.log-viewer.summary" },
   { component: VirtualListPage, label: "AppVirtualList", path: "/data/virtual-list", shortLabel: "VTL", summaryKey: "showcase.route.data.virtual-list.summary" },
-  { component: WideTablePatternsPage, label: "Wide Table Patterns", path: "/data/wide-table-patterns", shortLabel: "WDT", summaryKey: "showcase.route.data.wide-table-patterns.summary" },
+  { component: WideTablePatternsPage, label: "Wide Table Patterns", path: "/patterns/wide-table-patterns", shortLabel: "WDT", summaryKey: "showcase.route.data.wide-table-patterns.summary" },
   { component: DetailGridPage, label: "DetailGrid", path: "/data/detail-grid", shortLabel: "DTL", summaryKey: "showcase.route.data.detail-grid.summary" },
+  { component: KeyValueCardPage, label: "KeyValueCard", path: "/data/key-value-card", shortLabel: "KVC", summaryKey: "showcase.route.data.key-value-card.summary" },
   { component: TaskStatusCardPage, label: "TaskStatusCard", path: "/data/task-status-card", shortLabel: "TSK", summaryKey: "showcase.route.data.task-status-card.summary" },
   { component: CommitListPage, label: "CommitList", path: "/data/commit-list", shortLabel: "CMT", summaryKey: "showcase.route.data.commit-list.summary" },
 ];

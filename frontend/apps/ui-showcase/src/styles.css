@@ -275,6 +275,49 @@
     @apply gap-5 border-b-0 pb-2;
   }
 
+  .showcase-overview-hero {
+    @apply grid gap-6 rounded-[1.75rem] border p-6 md:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)] md:p-8;
+    border-color: color-mix(in srgb, hsl(var(--border)) 80%, transparent);
+    background:
+      radial-gradient(circle at top left, hsl(var(--primary) / 0.14), transparent 36%),
+      linear-gradient(
+        135deg,
+        color-mix(in srgb, hsl(var(--card)) 94%, hsl(var(--background))) 0%,
+        color-mix(in srgb, hsl(var(--card)) 74%, hsl(var(--background))) 100%
+      );
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, hsl(var(--foreground)) 5%, transparent),
+      0 18px 40px rgba(15, 23, 42, 0.06);
+  }
+
+  .showcase-overview-hero__content {
+    @apply grid gap-5;
+  }
+
+  .showcase-overview-hero__badge-row {
+    @apply flex flex-wrap items-center gap-3;
+  }
+
+  .showcase-overview-hero__actions {
+    @apply flex flex-wrap gap-3;
+  }
+
+  .showcase-overview-hero__preview {
+    @apply overflow-hidden rounded-[1.5rem] border p-4 md:p-5;
+    min-height: 16rem;
+    border-color: color-mix(in srgb, hsl(var(--border)) 84%, transparent);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, hsl(var(--secondary)) 62%, white) 0%,
+        color-mix(in srgb, hsl(var(--card)) 84%, hsl(var(--background))) 100%
+      );
+  }
+
+  .showcase-overview-hero__preview > * {
+    @apply h-full w-full;
+  }
+
   .showcase-overview-search {
     @apply grid gap-3;
   }
@@ -301,12 +344,73 @@
     @apply grid gap-12;
   }
 
+  .showcase-overview-metrics,
+  .showcase-overview-featured,
+  .showcase-overview-guide,
+  .showcase-overview-groups {
+    @apply pt-10;
+  }
+
+  .showcase-overview-metric-grid {
+    @apply grid gap-4 md:grid-cols-2 xl:grid-cols-4;
+  }
+
+  .showcase-overview-metric-card {
+    @apply grid gap-3 rounded-[1.5rem] border p-5;
+    border-color: color-mix(in srgb, hsl(var(--border)) 80%, transparent);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, hsl(var(--card)) 92%, white) 0%,
+        color-mix(in srgb, hsl(var(--card)) 70%, hsl(var(--background))) 100%
+      );
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+  }
+
+  .showcase-overview-metric-card__label {
+    @apply text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground;
+  }
+
+  .showcase-overview-metric-card__value {
+    @apply text-3xl font-semibold tracking-tight text-foreground;
+  }
+
+  .showcase-overview-metric-card__detail {
+    @apply text-sm leading-7 text-muted-foreground;
+  }
+
+  .showcase-overview-guide-grid {
+    @apply grid gap-4 md:grid-cols-2 xl:grid-cols-4;
+  }
+
+  .showcase-overview-guide-card {
+    @apply grid gap-2 rounded-[1.4rem] border p-5;
+    border-color: color-mix(in srgb, hsl(var(--border)) 82%, transparent);
+    background: color-mix(in srgb, hsl(var(--card)) 88%, white);
+  }
+
+  .showcase-overview-guide-card h3 {
+    @apply text-base font-semibold text-foreground;
+  }
+
+  .showcase-overview-guide-card p {
+    @apply text-sm leading-7 text-muted-foreground;
+  }
+
   .showcase-overview-group {
     @apply grid gap-5 pt-2;
   }
 
   .showcase-overview-group__header {
-    @apply flex items-center justify-between gap-4;
+    @apply flex flex-wrap items-start justify-between gap-4;
+  }
+
+  .showcase-overview-group__copy {
+    @apply grid gap-2;
+  }
+
+  .showcase-overview-group__description {
+    @apply max-w-2xl text-sm leading-7 text-muted-foreground;
   }
 
   .showcase-overview-group__title {
@@ -356,6 +460,10 @@
     @apply grid gap-1 px-1 py-3;
   }
 
+  .showcase-overview-entry__meta {
+    @apply flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground;
+  }
+
   .showcase-overview-entry__title {
     @apply text-[15px] font-semibold text-foreground transition-colors;
   }
@@ -382,6 +490,24 @@
 
   .showcase-overview-empty__description {
     @apply mx-auto max-w-xl text-sm leading-7 text-muted-foreground;
+  }
+
+  @media (max-width: 767px) {
+    .showcase-overview-page {
+      @apply rounded-[1.35rem] px-5 py-5;
+    }
+
+    .showcase-overview-hero {
+      @apply rounded-[1.35rem] p-4;
+    }
+
+    .showcase-overview-hero__preview {
+      min-height: 13.5rem;
+    }
+
+    .showcase-overview-link-grid {
+      @apply grid-cols-1;
+    }
   }
 }
 

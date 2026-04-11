@@ -1,4 +1,20 @@
 {
   "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@go-admin/auth": ["../../packages/auth/src/index.ts"],
+      "@go-admin/design-tokens": ["../../packages/design-tokens/src/index.ts"],
+      "@go-admin/design-tokens/base.css": ["../../packages/design-tokens/src/base.css"],
+      "@go-admin/design-tokens/default-theme.css": ["../../packages/design-tokens/src/default-theme.css"],
+      "@go-admin/design-tokens/host-theme-template.css": ["../../packages/design-tokens/src/host-theme-template.css"],
+      "@go-admin/design-tokens/theme": ["../../packages/design-tokens/src/theme.tsx"],
+      "@go-admin/design-tokens/theme.css": ["../../packages/design-tokens/src/theme.css"],
+      "@go-admin/i18n": ["../../packages/i18n/src/index.tsx"],
+      "@go-admin/types": ["../../packages/types/src/index.ts"],
+      "@go-admin/ui-admin": ["../../packages/ui-admin/src/index.tsx"],
+      "@go-admin/ui-admin/styles.css": ["../../packages/ui-admin/src/styles.css"]
+    }
+  },
   "include": ["src", "vite.config.ts"]
 }

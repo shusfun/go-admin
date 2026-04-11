@@ -30,6 +30,7 @@ import {
   DocsSection,
   DocsShell,
   DocsSidebar,
+  FilterBar,
   FilterPanel,
   FormActions,
   FormField,
@@ -55,6 +56,8 @@ import {
   TreeTableSection,
   Watermark,
   WizardLayout,
+  AdvancedFilterPanel,
+  AdvancedFilterWorkbench,
   toast,
 } from "@go-admin/ui-admin";
 import { useState } from "react";
@@ -80,7 +83,7 @@ function FilterPanelPage() {
         { description: "面板说明。", name: "description", type: "string" },
         { description: "筛选内容与工具栏。", name: "children", required: true, type: "ReactNode" },
       ]}
-      categoryLabel="后台布局"
+      categoryLabel="页面模式"
       demos={[
         {
           code: `<FilterPanel title="筛选与操作" description="组合搜索区和工具栏。">
@@ -108,8 +111,8 @@ function FilterPanelPage() {
               </Toolbar>
             </FilterPanel>
           ),
-          description: "列表页最常见的筛选骨架：字段区 + 操作区。",
-          title: "基础筛选区",
+          description: "不需要高级筛选时，直接使用字段区 + 操作区，不额外挂载折叠面板。",
+          title: "无高级筛选",
         },
         {
           code: `<FilterPanel title="快速筛选" description="顶部空间紧凑时的单行布局。">
@@ -237,7 +240,10 @@ function FilterPanelPage() {
         },
       ]}
       description="FilterPanel 统一搜索区结构、留白和操作按钮位置，是后台列表页的骨架组件。"
-      notes={["列表页优先复用 FilterPanel，而不是每页自己拼搜索区。", "筛选字段不要过多，超过两行应考虑折叠策略。"]}
+      notes={[
+        "列表页优先复用 FilterPanel，而不是每页自己拼搜索区。",
+        "没有高级筛选时只保留 FilterPanel + Toolbar；字段超过两行再考虑折叠策略。",
+      ]}
       title="FilterPanel"
     />
   );
@@ -251,7 +257,7 @@ function CardPage() {
         { defaultValue: "false", description: "是否为提升态。", name: "elevated", type: "boolean" },
         { description: "头部、内容、底部插槽。", name: "CardHeader / CardContent / CardFooter", type: "ReactNode" },
       ]}
-      categoryLabel="后台布局"
+      categoryLabel="数据展示"
       demos={[
         {
           code: `<div className="grid gap-4 md:grid-cols-2">
@@ -392,6 +398,129 @@ function CardPage() {
   );
 }
 
+function ToolbarPage() {
+  return (
+    <ShowcaseDocPage
+      apiItems={[
+        { description: "工具栏主容器。", name: "Toolbar", required: true, type: "ReactNode wrapper" },
+        { description: "筛选项横向容器。", name: "FilterBar", type: "ReactNode wrapper" },
+        { description: "高级筛选折叠面板。", name: "AdvancedFilterPanel", type: "ReactNode wrapper" },
+        { description: "主筛选字段协议。", name: "primaryFields", type: "AdvancedFilterWorkbenchField[]" },
+        { description: "高级筛选字段协议。", name: "advancedFields", type: "AdvancedFilterWorkbenchField[]" },
+        { description: "顶部动作协议。", name: "topActions", type: "AdvancedFilterWorkbenchAction[]" },
+        { description: "底部摘要协议。", name: "summary", type: "AdvancedFilterWorkbenchSummary" },
+        { description: "底部动作协议。", name: "footerActions", type: "AdvancedFilterWorkbenchAction[]" },
+        { description: "已应用高级筛选数量。", name: "appliedAdvancedCount", type: "number" },
+      ]}
+      categoryLabel="页面模式"
+      demos={[
+        {
+          code: `<Toolbar>
+  <FilterBar>...</FilterBar>
+  <RowActions>...</RowActions>
+</Toolbar>`,
+          content: (
+            <Toolbar>
+              <FilterBar>
+                <FormField className="min-w-[220px] flex-1" label="关键词">
+                  <Input placeholder="服务名 / 负责人" />
+                </FormField>
+                <FormField className="min-w-[200px] flex-1" label="集群">
+                  <Select onValueChange={() => undefined} options={selectOptions} placeholder="选择机房" />
+                </FormField>
+              </FilterBar>
+              <RowActions>
+                <Button type="button">查询</Button>
+                <Button type="button" variant="outline">导出</Button>
+              </RowActions>
+            </Toolbar>
+          ),
+          description: "无高级筛选时保持单层工具条，字段区和动作区直接并排组织。",
+          title: "基础工具条",
+        },
+        {
+          code: `<AdvancedFilterWorkbench
+  appliedAdvancedCount={4}
+  primaryFields={[...]}
+  advancedFields={[...]}
+  summary={{ count: 28, hint: "..." }}
+  footerActions={[...]}
+/>`,
+          content: (
+            <AdvancedFilterWorkbench
+              advancedFields={[
+                { key: "caseNumber", kind: "input", label: "案件号", placeholder: "按案件号筛选" },
+                { key: "owner", kind: "input", label: "负责人", placeholder: "输入负责人" },
+                { key: "region", kind: "select", label: "机房", options: selectOptions, placeholder: "选择机房" },
+                {
+                  key: "insurer",
+                  kind: "select",
+                  label: "承保方",
+                  options: [
+                    { label: "全部承保方", value: "all" },
+                    { label: "太保产险", value: "cpic" },
+                    { label: "平安产险", value: "pingan" },
+                  ],
+                  placeholder: "选择承保方",
+                },
+                { key: "reportedAt", kind: "dateRange", label: "报案时间", startPlaceholder: "开始日期", endPlaceholder: "结束日期" },
+                { key: "assignedAt", kind: "dateRange", label: "委托时间", startPlaceholder: "开始日期", endPlaceholder: "结束日期" },
+                { key: "reviewedAt", kind: "dateRange", label: "审核时间", startPlaceholder: "开始日期", endPlaceholder: "结束日期" },
+              ]}
+              appliedAdvancedCount={4}
+              footerActions={[
+                { key: "reset", label: "清空条件", variant: "outline" },
+                { key: "apply", label: "确认筛选" },
+              ]}
+              primaryFields={[
+                { key: "keyword", kind: "input", controlClassName: "min-w-[240px] flex-1", placeholder: "搜索车牌号、报案号..." },
+                {
+                  key: "status",
+                  className: "min-w-[160px]",
+                  kind: "select",
+                  options: [
+                    { label: "全部状态", value: "all" },
+                    { label: "待查勘定损", value: "pending" },
+                    { label: "查勘定损中", value: "running" },
+                    { label: "结案", value: "done" },
+                  ],
+                  placeholder: "全部状态",
+                },
+                { key: "platform", className: "min-w-[180px]", kind: "select", options: selectOptions, placeholder: "全部平台" },
+                {
+                  key: "sortBy",
+                  className: "min-w-[150px]",
+                  kind: "select",
+                  options: [
+                    { label: "最新录入", value: "created_at_desc" },
+                    { label: "最早录入", value: "created_at_asc" },
+                    { label: "最近报案", value: "reported_at_desc" },
+                  ],
+                  placeholder: "最新录入",
+                },
+              ]}
+              summary={{ count: 28, hint: "所有筛选项修改后，点击“确认筛选”才会更新列表。" }}
+              topActions={[
+                { key: "reset-draft", label: "重置", variant: "ghost" },
+                { key: "grid", label: "⊞", variant: "outline", size: "icon" },
+                { key: "list", label: "☰", variant: "outline", size: "icon" },
+              ]}
+            />
+          ),
+          description: "通过字段协议和动作协议生成完整筛选工作台，更接近真实业务列表页的落地方式。",
+          title: "协议驱动工作台",
+        },
+      ]}
+      description="Toolbar、FilterBar、AdvancedFilterPanel 负责底层结构；复杂列表页优先使用协议驱动的 AdvancedFilterWorkbench，统一字段、动作和摘要的组织方式。"
+      notes={[
+        "简单场景先用 Toolbar + FilterBar，不要为空状态额外挂一个 AdvancedFilterPanel。",
+        "复杂场景直接上 AdvancedFilterWorkbench，用字段协议描述 UI，而不是在页面里手写大段 JSX。",
+      ]}
+      title="Toolbar"
+    />
+  );
+}
+
 function SectionCardPage() {
   const [selectedAudience, setSelectedAudience] = useState("tenant-admin");
 
@@ -402,7 +531,7 @@ function SectionCardPage() {
         { description: "分区说明。", name: "description", type: "string" },
         { description: "分区内容。", name: "children", required: true, type: "ReactNode" },
       ]}
-      categoryLabel="后台布局"
+      categoryLabel="页面模式"
       demos={[
         {
           code: `<SectionCard title="操作说明" description="用于承接说明性内容。">
@@ -532,7 +661,7 @@ function ProgressStepsPage() {
           type: 'Array<{ label: ReactNode; description?: ReactNode; meta?: ReactNode; state: "success" | "running" | "pending" | "failed" }>',
         },
       ]}
-      categoryLabel="后台布局"
+      categoryLabel="页面模式"
       demos={[
         {
           code: `<ProgressSteps items={[...]} />`,
@@ -577,7 +706,7 @@ function LoadingPage() {
         { defaultValue: '"default"', description: "尺寸。", name: "size", type: '"large" | "default" | "small"' },
         { defaultValue: "false", description: "是否展示块级加载容器。", name: "block", type: "boolean" },
       ]}
-      categoryLabel="后台布局"
+      categoryLabel="页面模式"
       demos={[
         {
           code: `<Loading block label="正在同步后台上下文" size="large" />`,
@@ -680,7 +809,7 @@ function PageHeaderPage() {
         { description: "面包屑。", name: "breadcrumbs", type: 'Array<{ href?: string; label: string }>' },
         { description: "右侧操作区。", name: "actions", type: "ReactNode" },
       ]}
-      categoryLabel="后台布局"
+      categoryLabel="导航与身份"
       demos={[
         {
           code: `<PageHeader
@@ -827,7 +956,7 @@ function TreeSelectorPanelPage() {
         { description: "选中变化回调。", name: "onChange", required: true, type: "(next: number[]) => void" },
         { description: "标题和说明。", name: "title / description", type: "ReactNode" },
       ]}
-      categoryLabel="后台布局"
+      categoryLabel="页面模式"
       demos={[
         {
           code: `<TreeSelectorPanel
@@ -882,7 +1011,7 @@ function MasterDetailLayoutPage() {
         { description: "左侧列表区。", name: "ListPane", type: "ReactNode wrapper" },
         { description: "右侧详情区。", name: "DetailPane", type: "ReactNode wrapper" },
       ]}
-      categoryLabel="后台布局"
+      categoryLabel="页面模式"
       demos={[
         {
           code: `<MasterDetailLayout>
@@ -965,7 +1094,7 @@ function AuthLayoutPage() {
         { description: "表单主体。", name: "children", required: true, type: "ReactNode" },
         { description: "表单承接容器。", name: "AuthPanel", type: "ReactNode wrapper" },
       ]}
-      categoryLabel="后台布局"
+      categoryLabel="页面模式"
       demos={[
         {
           code: `<AuthLayout title="统一后台登录" description="..." aside={<Card>...</Card>}>
@@ -1050,7 +1179,7 @@ function WizardLayoutPage() {
         { description: "标题与说明。", name: "title / description", required: true, type: "ReactNode" },
         { description: "步骤内容。", name: "children", required: true, type: "ReactNode" },
       ]}
-      categoryLabel="后台布局"
+      categoryLabel="页面模式"
       demos={[
         {
           code: `<WizardLayout currentStep={1} steps={[...]} title="安装向导">...</WizardLayout>`,
@@ -1124,7 +1253,7 @@ function DocsBlocksPage() {
         { description: "文档 API 表。", name: "DocsApiTable", type: "api table wrapper" },
         { description: "文档导航侧栏。", name: "DocsSidebar", type: "sidebar wrapper" },
       ]}
-      categoryLabel="文档骨架"
+      categoryLabel="文档构建"
       demos={[
         {
           code: `<DocsSection id="usage" title="基础用法">
@@ -1195,7 +1324,7 @@ function AppFrameShellPage() {
         { description: "移动端抽屉内容。", name: "mobileSidebar", type: "ReactNode | ({ closeSidebar }) => ReactNode" },
         { description: "内容区样式。", name: "contentClassName / contentInnerClassName / rootClassName", type: "string" },
       ]}
-      categoryLabel="文档骨架"
+      categoryLabel="应用壳层"
       demos={[
         {
           code: `<AppFrameShell
@@ -1284,6 +1413,49 @@ function AppFrameShellPage() {
   );
 }
 
+function MetricCardPage() {
+  return (
+    <ShowcaseDocPage
+      apiItems={[
+        { description: "指标名称。", name: "label", required: true, type: "string" },
+        { description: "指标值。", name: "value", required: true, type: "string" },
+        { description: "指标补充说明。", name: "detail", required: true, type: "string" },
+      ]}
+      categoryLabel="页面模式"
+      demos={[
+        {
+          code: `<MetricCard label="服务数" value="18" detail="当前受管服务总数" />`,
+          content: <MetricCard detail="当前受管服务总数" label="服务数" value="18" />,
+          description: "单卡模式适合摘要区、详情页角标信息和小型看板。",
+          title: "单卡承接",
+        },
+        {
+          code: `<div className="grid gap-4 md:grid-cols-3">
+  <MetricCard ... />
+  <MetricCard ... />
+  <MetricCard ... />
+</div>`,
+          content: (
+            <div className="grid gap-4 md:grid-cols-3">
+              <MetricCard detail="相较昨日 +12%" label="调用量" value="28.4K" />
+              <MetricCard detail="处理时延 P95" label="平均耗时" value="183ms" />
+              <MetricCard detail="近一小时告警数" label="告警" value="2" />
+            </div>
+          ),
+          description: "当指标数量不多且重要性接近时，直接平铺 MetricCard 即可，不必强行再包一层大结构。",
+          title: "轻量指标组",
+        },
+      ]}
+      description="MetricCard 是后台概览页最小粒度的指标卡片，适合承接单个核心数字与简短说明。"
+      notes={[
+        "单卡适合轻量指标；一旦需要统一栅格和整体节奏，再升级为 MetricGrid。",
+        "避免把按钮、下拉和长说明塞进指标卡，保持它只承接概览信息。",
+      ]}
+      title="MetricCard"
+    />
+  );
+}
+
 function MetricGridPage() {
   return (
     <ShowcaseDocPage
@@ -1293,7 +1465,7 @@ function MetricGridPage() {
         { description: "单个指标值。", name: "MetricCard.value", required: true, type: "string" },
         { description: "单个指标说明。", name: "MetricCard.detail", required: true, type: "string" },
       ]}
-      categoryLabel="后台布局"
+      categoryLabel="页面模式"
       demos={[
         {
           code: `<MetricGrid>
@@ -1342,7 +1514,7 @@ function AdminShellPage() {
         { description: "内容区。", name: "children", required: true, type: "ReactNode" },
         { description: "内容层辅助栅格。", name: "AdminPageStack / AdminTwoColumn / AdminThreeColumn", type: "ReactNode wrapper" },
       ]}
-      categoryLabel="文档骨架"
+      categoryLabel="应用壳层"
       demos={[
         {
           code: `<AdminShell sidebar={<Sidebar />}>
@@ -1423,7 +1595,7 @@ function AdminNavigationPage() {
         { description: "导航触发回调。", name: "onNavigate / setCollapsed / onLogout", type: "function" },
         { description: "用户摘要。", name: "avatar / name / roleName", type: "string" },
       ]}
-      categoryLabel="文档骨架"
+      categoryLabel="导航与身份"
       demos={[
         {
           code: `<AdminTopbar ... />
@@ -1515,7 +1687,7 @@ function BrandIdentityPage() {
         { description: "头像。", name: "IdentityCard.avatar", type: "string" },
         { description: "姓名、角色、租户。", name: "IdentityCard.name / roleName / tenantCode", type: "string" },
       ]}
-      categoryLabel="文档骨架"
+      categoryLabel="导航与身份"
       demos={[
         {
           code: `<BrandBlock />
@@ -1571,7 +1743,7 @@ function DocsShellPage() {
         { description: "移动端抽屉内容。", name: "mobileSidebar", type: "ReactNode | ({ closeSidebar }) => ReactNode" },
         { description: "壳层与内容区样式。", name: "className / contentClassName / contentInnerClassName / rootClassName / sidebarClassName", type: "string" },
       ]}
-      categoryLabel="文档骨架"
+      categoryLabel="应用壳层"
       demos={[
         {
           code: `<DocsShell sidebar={<Sidebar />} header={<Header />}>
@@ -1691,7 +1863,7 @@ function GlobalSearchPage() {
         { description: "弹层显隐回调。", name: "onOpenChange", type: "(open: boolean) => void" },
         { description: "选择项回调。", name: "onSelect", type: "(item: GlobalSearchItem) => void" },
       ]}
-      categoryLabel="文档骨架"
+      categoryLabel="导航与身份"
       demos={[
         {
           code: `const [open, setOpen] = useState(false);
@@ -1782,7 +1954,7 @@ function AnchorPage() {
         { description: "当前激活项。", name: "activeHref", type: "string" },
         { description: "切换回调。", name: "onChange", type: "(href: string) => void" },
       ]}
-      categoryLabel="文档骨架"
+      categoryLabel="导航与身份"
       demos={[
         {
           code: `<div className="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
@@ -1875,7 +2047,7 @@ function BacktopPage() {
         { defaultValue: "300", description: "纵向拖拽最大偏移，且不会被拖出当前视口。", name: "maxDragOffset", type: "number" },
         { defaultValue: "320", description: "滚动动画时长参数。", name: "duration", type: "number" },
       ]}
-      categoryLabel="文档骨架"
+      categoryLabel="导航与身份"
       demos={[
         {
           code: `<div className="relative">
@@ -1939,7 +2111,7 @@ function WatermarkPage() {
         { defaultValue: "96 / 72", description: "横纵向间距。", name: "gapX / gapY", type: "number" },
         { defaultValue: "-18", description: "旋转角度。", name: "rotate", type: "number" },
       ]}
-      categoryLabel="文档骨架"
+      categoryLabel="文档构建"
       demos={[
         {
           code: `<Watermark content="GO ADMIN UI">
@@ -2005,30 +2177,32 @@ function WatermarkPage() {
 }
 
 export const layoutRoutes: ShowcaseRoute[] = [
-  { component: PageHeaderPage, label: "PageHeader", path: "/layout/page-header", shortLabel: "HDR", summaryKey: "showcase.route.layout.page-header.summary" },
-  { component: FilterPanelPage, label: "FilterPanel", path: "/layout/filter-panel", shortLabel: "FLT", summaryKey: "showcase.route.layout.filter-panel.summary" },
-  { component: CardPage, label: "Card", path: "/layout/card", shortLabel: "CRD", summaryKey: "showcase.route.layout.card.summary" },
-  { component: SectionCardPage, label: "SectionCard", path: "/layout/section-card", shortLabel: "SEC", summaryKey: "showcase.route.layout.section-card.summary" },
-  { component: ProgressStepsPage, label: "ProgressSteps", path: "/layout/progress-steps", shortLabel: "STP", summaryKey: "showcase.route.layout.progress-steps.summary" },
-  { component: LoadingPage, label: "Loading", path: "/layout/loading", shortLabel: "LDG", summaryKey: "showcase.route.layout.loading.summary" },
-  { component: MetricGridPage, label: "MetricGrid", path: "/layout/metric-grid", shortLabel: "MET", summaryKey: "showcase.route.layout.metric-grid.summary" },
-  { component: TreeSelectorPanelPage, label: "TreeSelectorPanel", path: "/layout/tree-selector-panel", shortLabel: "TRE", summaryKey: "showcase.route.layout.tree-selector-panel.summary" },
-  { component: MasterDetailLayoutPage, label: "MasterDetailLayout", path: "/layout/master-detail-layout", shortLabel: "MDL", summaryKey: "showcase.route.layout.master-detail-layout.summary" },
-  { component: AuthLayoutPage, label: "AuthLayout", path: "/layout/auth-layout", shortLabel: "ATH", summaryKey: "showcase.route.layout.auth-layout.summary" },
-  { component: WizardLayoutPage, label: "WizardLayout", path: "/layout/wizard-layout", shortLabel: "WZD", summaryKey: "showcase.route.layout.wizard-layout.summary" },
+  { component: PageHeaderPage, label: "PageHeader", path: "/navigation/page-header", shortLabel: "HDR", summaryKey: "showcase.route.layout.page-header.summary" },
+  { component: FilterPanelPage, label: "FilterPanel", path: "/patterns/filter-panel", shortLabel: "FLT", summaryKey: "showcase.route.layout.filter-panel.summary" },
+  { component: ToolbarPage, label: "Toolbar", path: "/patterns/toolbar", shortLabel: "TLB", summaryKey: "showcase.route.patterns.toolbar.summary" },
+  { component: CardPage, label: "Card", path: "/data/card", shortLabel: "CRD", summaryKey: "showcase.route.layout.card.summary" },
+  { component: SectionCardPage, label: "SectionCard", path: "/patterns/section-card", shortLabel: "SEC", summaryKey: "showcase.route.layout.section-card.summary" },
+  { component: ProgressStepsPage, label: "ProgressSteps", path: "/patterns/progress-steps", shortLabel: "STP", summaryKey: "showcase.route.layout.progress-steps.summary" },
+  { component: LoadingPage, label: "Loading", path: "/patterns/loading", shortLabel: "LDG", summaryKey: "showcase.route.layout.loading.summary" },
+  { component: MetricCardPage, label: "MetricCard", path: "/patterns/metric-card", shortLabel: "MTC", summaryKey: "showcase.route.patterns.metric-card.summary" },
+  { component: MetricGridPage, label: "MetricGrid", path: "/patterns/metric-grid", shortLabel: "MET", summaryKey: "showcase.route.layout.metric-grid.summary" },
+  { component: TreeSelectorPanelPage, label: "TreeSelectorPanel", path: "/patterns/tree-selector-panel", shortLabel: "TRE", summaryKey: "showcase.route.layout.tree-selector-panel.summary" },
+  { component: MasterDetailLayoutPage, label: "MasterDetailLayout", path: "/patterns/master-detail-layout", shortLabel: "MDL", summaryKey: "showcase.route.layout.master-detail-layout.summary" },
+  { component: AuthLayoutPage, label: "AuthLayout", path: "/patterns/auth-layout", shortLabel: "ATH", summaryKey: "showcase.route.layout.auth-layout.summary" },
+  { component: WizardLayoutPage, label: "WizardLayout", path: "/patterns/wizard-layout", shortLabel: "WZD", summaryKey: "showcase.route.layout.wizard-layout.summary" },
 ];
 
 export const docsRoutes: ShowcaseRoute[] = [
-  { component: DocsBlocksPage, label: "Docs Blocks", path: "/docs/docs-blocks", shortLabel: "DOC", summaryKey: "showcase.route.docs.docs-blocks.summary" },
-  { component: DocsShellPage, label: "DocsShell", path: "/docs/docs-shell", shortLabel: "DSH", summaryKey: "showcase.route.docs.docs-shell.summary" },
-  { component: GlobalSearchPage, label: "GlobalSearch", path: "/docs/global-search", shortLabel: "GSR", summaryKey: "showcase.route.docs.global-search.summary" },
-  { component: AnchorPage, label: "Anchor", path: "/docs/anchor", shortLabel: "ANC", summaryKey: "showcase.route.docs.anchor.summary" },
-  { component: BacktopPage, label: "Backtop", path: "/docs/backtop", shortLabel: "TOP", summaryKey: "showcase.route.docs.backtop.summary" },
+  { component: DocsBlocksPage, label: "Docs Blocks", path: "/docs/blocks", shortLabel: "DOC", summaryKey: "showcase.route.docs.docs-blocks.summary" },
+  { component: DocsShellPage, label: "DocsShell", path: "/shells/docs-shell", shortLabel: "DSH", summaryKey: "showcase.route.docs.docs-shell.summary" },
+  { component: GlobalSearchPage, label: "GlobalSearch", path: "/navigation/global-search", shortLabel: "GSR", summaryKey: "showcase.route.docs.global-search.summary" },
+  { component: AnchorPage, label: "Anchor", path: "/navigation/anchor", shortLabel: "ANC", summaryKey: "showcase.route.docs.anchor.summary" },
+  { component: BacktopPage, label: "Backtop", path: "/navigation/backtop", shortLabel: "TOP", summaryKey: "showcase.route.docs.backtop.summary" },
   { component: WatermarkPage, label: "Watermark", path: "/docs/watermark", shortLabel: "WTM", summaryKey: "showcase.route.docs.watermark.summary" },
-  { component: AppFrameShellPage, label: "AppFrameShell", path: "/docs/app-frame-shell", shortLabel: "APP", summaryKey: "showcase.route.docs.app-frame-shell.summary" },
-  { component: AdminShellPage, label: "AdminShell", path: "/docs/admin-shell", shortLabel: "ADM", summaryKey: "showcase.route.docs.admin-shell.summary" },
-  { component: AdminNavigationPage, label: "Admin Navigation", path: "/docs/admin-navigation", shortLabel: "NAV", summaryKey: "showcase.route.docs.admin-navigation.summary" },
-  { component: BrandIdentityPage, label: "Brand & Identity", path: "/docs/brand-identity", shortLabel: "IDN", summaryKey: "showcase.route.docs.brand-identity.summary" },
+  { component: AppFrameShellPage, label: "AppFrameShell", path: "/shells/app-frame-shell", shortLabel: "APP", summaryKey: "showcase.route.docs.app-frame-shell.summary" },
+  { component: AdminShellPage, label: "AdminShell", path: "/shells/admin-shell", shortLabel: "ADM", summaryKey: "showcase.route.docs.admin-shell.summary" },
+  { component: AdminNavigationPage, label: "Admin Navigation", path: "/navigation/admin-navigation", shortLabel: "NAV", summaryKey: "showcase.route.docs.admin-navigation.summary" },
+  { component: BrandIdentityPage, label: "Brand & Identity", path: "/navigation/brand-identity", shortLabel: "IDN", summaryKey: "showcase.route.docs.brand-identity.summary" },
 ];
 
 export const layoutCategory: ShowcaseCategory = {

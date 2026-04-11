@@ -13,6 +13,7 @@ import {
   FormActions,
   FormField,
   HelpText,
+  ImageCaptchaField,
   Input,
   Label,
   RadioGroup,
@@ -36,6 +37,21 @@ import {
   type ShowcaseRoute,
 } from "./shared";
 
+const demoCaptchaSvg = encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" width="320" height="96" viewBox="0 0 320 96">
+    <rect width="320" height="96" rx="20" fill="#eff6ff" />
+    <path d="M28 66c26-30 58 24 84-8s55 6 86-12 49 26 88-6" fill="none" stroke="#93c5fd" stroke-width="6" stroke-linecap="round" />
+    <text x="160" y="58" text-anchor="middle" font-size="34" font-weight="700" font-family="Arial, sans-serif" fill="#1d4ed8">AB12</text>
+  </svg>
+`);
+
+function createDemoCaptcha() {
+  return Promise.resolve({
+    image: `data:image/svg+xml;charset=utf-8,${demoCaptchaSvg}`,
+    uuid: `captcha-${Date.now()}`,
+  });
+}
+
 function InputPage() {
   const [serviceName, setServiceName] = useState("ops-worker");
 
@@ -56,7 +72,7 @@ function InputPage() {
         { description: "后置内容。", name: "append", type: "ReactNode" },
         { description: "输入框内前后缀。", name: "prefix / suffix", type: "ReactNode" },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<FormField label="服务名称">
@@ -201,7 +217,7 @@ function SelectPage() {
         { defaultValue: "false", description: "是否允许清空。", name: "clearable", type: "boolean" },
         { description: "当前选中值。", name: "value", type: "string" },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<Select clearable onValueChange={setSelectedCluster} options={selectOptions} value={selectedCluster} />`,
@@ -268,7 +284,7 @@ function ComboboxPage() {
         { defaultValue: "false", description: "是否允许清空。", name: "clearable", type: "boolean" },
         { defaultValue: '"default"', description: "尺寸。", name: "size", type: '"large" | "default" | "small"' },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<Combobox clearable onSelect={setSelectedRole} options={roleOptions} value={selectedRole} />`,
@@ -335,7 +351,7 @@ function DatePickerPage() {
         { defaultValue: "true", description: "是否允许手输。", name: "editable", type: "boolean" },
         { defaultValue: "true", description: "是否展示确认区。", name: "showConfirm", type: "boolean" },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<DatePicker onChange={setDate} value={date} valueFormat="YYYY-MM-DD" />`,
@@ -403,7 +419,7 @@ function DateRangePickerPage() {
         { defaultValue: "false", description: "是否拆开双面板导航。", name: "unlinkPanels", type: "boolean" },
         { description: "范围过程态回调。", name: "onCalendarChange", type: "(value?: [...]) => void" },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<DateRangePicker
@@ -480,7 +496,7 @@ function SwitchPage() {
         { defaultValue: "false", description: "是否进入轻加载态。", name: "loading", type: "boolean" },
         { defaultValue: "false", description: "是否禁用。", name: "disabled", type: "boolean" },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<Switch checked={enabled} onCheckedChange={setEnabled} />`,
@@ -538,7 +554,7 @@ function CheckboxPage() {
         { defaultValue: "false", description: "是否为错误态。", name: "invalid", type: "boolean" },
         { defaultValue: "false", description: "是否禁用。", name: "disabled", type: "boolean" },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<Checkbox checked={approved} onCheckedChange={(value) => setApproved(value === true)} />`,
@@ -599,7 +615,7 @@ function RadioGroupPage() {
         { defaultValue: '"default"', description: "单选尺寸。", name: "size", type: '"large" | "default" | "small"' },
         { defaultValue: "false", description: "是否为错误态。", name: "invalid", type: "boolean" },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<RadioGroup onValueChange={setEnv} value={env}>...</RadioGroup>`,
@@ -682,7 +698,7 @@ function TextareaPage() {
         { description: "输入回调。", name: "onChange", type: "(event: ChangeEvent<HTMLTextAreaElement>) => void" },
         { description: "最大字数。", name: "maxLength", type: "number" },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<Textarea
@@ -784,7 +800,7 @@ function FormFieldPage() {
         { defaultValue: "false", description: "是否必填。", name: "required", type: "boolean" },
         { description: "字段内容。", name: "children", required: true, type: "ReactNode" },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<FormField label="服务名称" description="系统内唯一标识">
@@ -844,7 +860,7 @@ function FormPage() {
         { description: "字段容器。", name: "FormField", type: "ReactNode wrapper" },
         { description: "原生 form 属性，如 onSubmit。", name: "...props", type: "FormHTMLAttributes<HTMLFormElement>" },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<Form onSubmit={(event) => event.preventDefault()}>
@@ -1000,7 +1016,7 @@ function CalendarPage() {
         { defaultValue: "true", description: "是否展示非本月日期。", name: "showOutsideDays", type: "boolean" },
         { description: "禁用日期规则。", name: "disabled", type: "Matcher | Matcher[]" },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<Calendar selected={selectedDate} onSelect={setSelectedDate} />`,
@@ -1103,7 +1119,7 @@ function UploadPage() {
         { description: "文件列表变化回调。", name: "onFileListChange", type: "(next: UploadFileItem[]) => void" },
         { defaultValue: '"text"', description: "列表展示风格。", name: "listType", type: '"text" | "card"' },
       ]}
-      categoryLabel="表单录入"
+      categoryLabel="表单输入"
       demos={[
         {
           code: `<Upload
@@ -1209,6 +1225,84 @@ function UploadPage() {
   );
 }
 
+function ImageCaptchaFieldPage() {
+  const [captchaUuid, setCaptchaUuid] = useState("");
+  const [refreshToken, setRefreshToken] = useState(0);
+
+  return (
+    <ShowcaseDocPage
+      apiItems={[
+        { description: "验证码加载函数，返回 uuid 与图片内容。", name: "getCaptcha", required: true, type: "() => Promise<{ image: string; uuid: string }>" },
+        { description: "图片 alt 文案。", name: "imageAlt", required: true, type: "string" },
+        { description: "输入框透传属性。", name: "inputProps", type: "ComponentProps<typeof Input>" },
+        { description: "刷新按钮空态文案。", name: "refreshLabel", required: true, type: "string" },
+        { description: "刷新结果回调。", name: "onCaptchaChange", type: "(payload) => void" },
+        { description: "外部刷新 token。", name: "refreshToken", type: "number | string" },
+      ]}
+      categoryLabel="表单输入"
+      demos={[
+        {
+          code: `<ImageCaptchaField
+  getCaptcha={createDemoCaptcha}
+  imageAlt="验证码"
+  inputProps={{ placeholder: "请输入验证码" }}
+  refreshLabel="刷新验证码"
+/>`,
+          content: (
+            <FormField description="适合登录、重置密码和敏感操作校验等场景。" label="基础用法">
+              <ImageCaptchaField
+                getCaptcha={createDemoCaptcha}
+                imageAlt="验证码"
+                inputProps={{ placeholder: "请输入验证码" }}
+                onCaptchaChange={(payload) => setCaptchaUuid(payload?.uuid ?? "")}
+                refreshLabel="刷新验证码"
+              />
+            </FormField>
+          ),
+          description: "把输入框、图片预览和刷新动作收敛成一个标准字段组件。",
+          title: "基础验证码字段",
+        },
+        {
+          code: `<ImageCaptchaField
+  getCaptcha={createDemoCaptcha}
+  imageAlt="发布验证"
+  inputProps={{ placeholder: "输入校验码" }}
+  refreshLabel="点击刷新"
+  refreshToken={refreshToken}
+/>`,
+          content: (
+            <div className="grid gap-4">
+              <FormField description={`最近一次验证码 uuid：${captchaUuid || "未拉取"}`} label="业务侧重置">
+                <ImageCaptchaField
+                  getCaptcha={createDemoCaptcha}
+                  imageAlt="发布验证"
+                  inputProps={{ placeholder: "输入校验码" }}
+                  onCaptchaChange={(payload) => setCaptchaUuid(payload?.uuid ?? "")}
+                  refreshLabel="点击刷新"
+                  refreshToken={refreshToken}
+                />
+              </FormField>
+              <FormActions>
+                <Button onClick={() => setRefreshToken((current) => current + 1)} type="button" variant="outline">
+                  外部触发刷新
+                </Button>
+              </FormActions>
+            </div>
+          ),
+          description: "当业务层需要重新拉取验证码时，直接更新 refreshToken 即可驱动刷新。",
+          title: "外部刷新控制",
+        },
+      ]}
+      description="ImageCaptchaField 把验证码输入、图片拉取和刷新节流能力封成标准字段，避免登录页和敏感操作页各自重复实现。"
+      notes={[
+        "验证码字段应作为 FormField 的一部分使用，不在页面里手动拼输入框和图片按钮。",
+        "真正的图片获取逻辑由业务层提供，组件只负责承接刷新与展示。",
+      ]}
+      title="ImageCaptchaField"
+    />
+  );
+}
+
 export const formsRoutes: ShowcaseRoute[] = [
   { component: CalendarPage, label: "Calendar", path: "/forms/calendar", shortLabel: "CAL", summaryKey: "showcase.route.forms.calendar.summary" },
   { component: FormPage, label: "Form", path: "/forms/form", shortLabel: "FRM", summaryKey: "showcase.route.forms.form.summary" },
@@ -1222,6 +1316,7 @@ export const formsRoutes: ShowcaseRoute[] = [
   { component: SwitchPage, label: "Switch", path: "/forms/switch", shortLabel: "SWT", summaryKey: "showcase.route.forms.switch.summary" },
   { component: CheckboxPage, label: "Checkbox", path: "/forms/checkbox", shortLabel: "CHK", summaryKey: "showcase.route.forms.checkbox.summary" },
   { component: RadioGroupPage, label: "RadioGroup", path: "/forms/radio-group", shortLabel: "RAD", summaryKey: "showcase.route.forms.radio-group.summary" },
+  { component: ImageCaptchaFieldPage, label: "ImageCaptchaField", path: "/forms/image-captcha-field", shortLabel: "CAP", summaryKey: "showcase.route.forms.image-captcha-field.summary" },
   { component: UploadPage, label: "Upload", path: "/forms/upload", shortLabel: "UPL", summaryKey: "showcase.route.forms.upload.summary" },
 ];
 

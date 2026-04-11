@@ -1,25 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
-import { useI18n, type Locale } from "@go-admin/i18n";
-import { AppScrollbar, Backtop, Badge, Button, DocsShell, GlobalSearch, ThemeToggle } from "@go-admin/ui-admin";
+import { useI18n } from "@go-admin/i18n";
+import { AppScrollbar, Badge, Button, DocsShell, GlobalSearch, ThemeToggle } from "@go-admin/ui-admin";
 
 import {
-  getShowcaseCategoryDescription,
   getShowcaseCategoryLabel,
   getShowcaseRouteSummary,
-  getShowcaseRouteSummaryAcrossLocales,
-  tShowcase,
 } from "./i18n/showcase";
-import { showcaseCategories, showcaseRoutes } from "./showcase-routes";
+import { showcaseCategories, showcaseEntries, showcaseRouteMap, showcaseRoutes } from "./showcase-routes";
+import { buildShowcaseSearchItems } from "./showcase-search";
 
-const defaultRoute = showcaseCategories[0]?.items[0]?.path ?? "/actions/button";
+const defaultRoute = showcaseRoutes.find((route) => route.label === "Overview")?.path ?? "/overview";
 
 function ScrollToTop() {
   const location = useLocation();
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
+    document.querySelector<HTMLElement>(".go-admin-shell-content-scroll-root")?.scrollTo({ top: 0 });
   }, [location.pathname]);
 
   return null;
@@ -62,7 +61,8 @@ function ShowcaseLocaleToggle() {
 function ShowcaseHeader({ onSearchOpen }: { onSearchOpen: () => void }) {
   const { t } = useI18n();
   const location = useLocation();
-  const currentRoute = showcaseRoutes.find((route) => route.path === location.pathname);
+  const currentEntry = showcaseEntries.find((entry) => entry.href === `${location.pathname}${location.hash}`);
+  const currentRoute = showcaseRouteMap.get(location.pathname);
 
   return (
     <header className="showcase-header hidden xl:flex">
@@ -72,7 +72,7 @@ function ShowcaseHeader({ onSearchOpen }: { onSearchOpen: () => void }) {
       </div>
       <div className="showcase-header__crumb">
         <span className="showcase-header__eyebrow">{t("showcase.header.eyebrow")}</span>
-        <span className="showcase-header__current">{currentRoute?.label ?? t("showcase.header.currentFallback")}</span>
+        <span className="showcase-header__current">{currentEntry?.title ?? currentRoute?.label ?? t("showcase.header.currentFallback")}</span>
       </div>
       <div className="showcase-header__actions">
         <ShowcaseSearchTrigger onClick={onSearchOpen} />
@@ -98,18 +98,18 @@ function ShowcaseSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <section className="showcase-sidebar__group" key={category.key}>
             <div className="showcase-sidebar__group-head">
               <p className="showcase-sidebar__group-title">{getShowcaseCategoryLabel(category, t)}</p>
-              <span className="showcase-sidebar__group-count">{category.items.length}</span>
+              <span className="showcase-sidebar__group-count">{category.routes.length}</span>
             </div>
             <nav className="showcase-sidebar__nav">
-              {category.items.map((item) => (
+              {category.routes.map((route) => (
                 <NavLink
                   className={({ isActive }) => (isActive ? "showcase-sidebar__link is-active" : "showcase-sidebar__link")}
-                  key={item.path}
+                  key={route.path}
                   onClick={onNavigate}
-                  to={item.path}
+                  to={route.path}
                 >
-                  <span className="showcase-sidebar__link-label">{item.label}</span>
-                  <span className="showcase-sidebar__link-summary">{getShowcaseRouteSummary(item, t)}</span>
+                  <span className="showcase-sidebar__link-label">{route.label}</span>
+                  <span className="showcase-sidebar__link-summary">{getShowcaseRouteSummary(route, t)}</span>
                 </NavLink>
               ))}
             </nav>
@@ -125,32 +125,8 @@ export function App() {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  // scroll-rule: allow-page-content-overflow UI Showcase 主内容区保留原生滚动，供锚点与 Backtop 使用。
-  const pageContentClassName = "showcase-content-scroll-root px-4 py-6 md:px-8 md:py-8 xl:min-h-0 xl:overflow-y-auto";
-  const searchItems = useMemo(
-    () =>
-      showcaseCategories.flatMap((category) =>
-        category.items.map((route) => ({
-          description: getShowcaseRouteSummary(route, t),
-          id: route.path,
-          keywords: [
-            category.key,
-            route.shortLabel,
-            route.path,
-            getShowcaseCategoryLabel(category, t),
-            getShowcaseCategoryDescription(category, t),
-            ...getShowcaseRouteSummaryAcrossLocales(route),
-            ...(["zh-CN", "en-US"] as const).flatMap((value) => [
-              tShowcase(value as Locale, category.labelKey),
-              tShowcase(value as Locale, category.descriptionKey),
-            ]),
-          ],
-          section: getShowcaseCategoryLabel(category, t),
-          title: route.label,
-        })),
-      ),
-    [locale, t],
-  );
+  const pageContentClassName = "px-4 py-6 md:px-8 md:py-8";
+  const searchItems = useMemo(() => buildShowcaseSearchItems(locale, t), [locale, t]);
 
   function handleSearchOpenChange(nextOpen: boolean) {
     setSearchOpen(nextOpen);
@@ -193,12 +169,11 @@ export function App() {
           <Route element={<Navigate replace to={defaultRoute} />} path="/" />
           {showcaseRoutes.map((route) => {
             const Component = route.component;
-            return <Route element={<Component />} key={route.path} path={route.path} />;
+            return <Route element={<ShowcaseRouteOutlet routeLabel={route.label}><Component /></ShowcaseRouteOutlet>} key={route.path} path={route.path} />;
           })}
           <Route element={<Navigate replace to={defaultRoute} />} path="*" />
         </Routes>
       </DocsShell>
-      <Backtop draggable maxDragOffset={300} target=".showcase-content-scroll-root" visibilityHeight={160} />
       <GlobalSearch
         description={t("showcase.search.description")}
         enableHotkeys
@@ -212,6 +187,36 @@ export function App() {
         query={searchQuery}
         title={t("showcase.search.title")}
       />
+    </>
+  );
+}
+
+function ShowcaseRouteOutlet({
+  children,
+  routeLabel,
+}: {
+  children: ReactNode;
+  routeLabel: string;
+}) {
+  const anchorIds = Array.from(
+    new Set(
+      showcaseEntries
+        .filter((entry) => entry.ownerRoute === routeLabel && entry.href.includes("#"))
+        .map((entry) => entry.href.split("#")[1])
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  return (
+    <>
+      {anchorIds.length ? (
+        <div aria-hidden className="sr-only">
+          {anchorIds.map((anchorId) => (
+            <span id={anchorId} key={anchorId} />
+          ))}
+        </div>
+      ) : null}
+      {children}
     </>
   );
 }

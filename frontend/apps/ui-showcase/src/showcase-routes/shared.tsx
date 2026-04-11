@@ -1,14 +1,12 @@
 import { type ReactElement, type ReactNode } from "react";
 import { useI18n } from "@go-admin/i18n";
-
-import {
-  DocsApiTable,
-  DocsDemoCard,
-} from "@go-admin/ui-admin";
+import { DocsApiTable, DocsDemoCard } from "@go-admin/ui-admin";
 
 import { translateShowcaseCategoryLabel } from "../i18n/showcase";
+import type { PreviewKind } from "./overview-previews";
 
 export type ShowcaseApiItem = {
+  anchorAliases?: string[];
   defaultValue?: string;
   description: string;
   name: string;
@@ -16,13 +14,15 @@ export type ShowcaseApiItem = {
   type: string;
 };
 
-export type ShowcaseRoute = {
+export type DocRoute = {
   component: () => ReactElement;
   label: string;
   path: string;
   shortLabel: string;
   summaryKey: string;
 };
+
+export type ShowcaseRoute = DocRoute;
 
 export type ShowcaseCategory = {
   descriptionKey: string;
@@ -31,20 +31,53 @@ export type ShowcaseCategory = {
   labelKey: string;
 };
 
+export type DocEntry = {
+  categoryKey: string;
+  exportNames?: string[];
+  featured?: boolean;
+  href: string;
+  id: string;
+  keywords?: string[];
+  ownerRoute: string;
+  previewKind: PreviewKind;
+  shortLabel?: string;
+  summaryKey: string;
+  title: string;
+};
+
+export type DocCategory = {
+  descriptionKey: string;
+  items: DocEntry[];
+  key: string;
+  labelKey: string;
+  routes: DocRoute[];
+};
+
 export type ShowcaseDemoSection = {
   code?: string;
   content: ReactNode;
   description?: ReactNode;
+  id?: string;
   title: ReactNode;
 };
 
-function toSectionId(value: ReactNode, fallback: string) {
-  const raw = typeof value === "string" ? value : fallback;
-
-  return raw
+function toStableId(value: string, fallback: string) {
+  const normalized = value
+    .trim()
     .toLowerCase()
     .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-")
-    .replace(/^-+|-+$/g, "") || fallback;
+    .replace(/^-+|-+$/g, "");
+
+  return normalized || fallback;
+}
+
+function toSectionId(value: ReactNode, fallback: string) {
+  const raw = typeof value === "string" ? value : fallback;
+  return toStableId(raw, fallback);
+}
+
+export function toApiAnchorId(name: string) {
+  return `api-${toStableId(name, "entry")}`;
 }
 
 export function ShowcasePreviewCard({
@@ -80,6 +113,11 @@ export function ShowcaseApiTable({
 
   return (
     <section className="showcase-doc-block" id="api">
+      <div aria-hidden className="sr-only">
+        {items.flatMap((item) => [item.name, ...(item.anchorAliases ?? [])]).map((anchorName) => (
+          <span id={toApiAnchorId(anchorName)} key={anchorName} />
+        ))}
+      </div>
       <DocsApiTable
         description={t("showcase.shared.api.description")}
         items={items}
@@ -138,7 +176,7 @@ export function ShowcaseDocPage({
   const { t } = useI18n();
   const sections = demos.map((demo, index) => ({
     ...demo,
-    id: `demo-${index + 1}-${toSectionId(demo.title, `section-${index + 1}`)}`,
+    id: demo.id ?? `demo-${index + 1}-${toSectionId(demo.title, `section-${index + 1}`)}`,
   }));
 
   return (

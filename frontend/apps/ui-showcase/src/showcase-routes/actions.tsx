@@ -47,7 +47,7 @@ function ButtonPage() {
         { defaultValue: "false", description: "是否以 Slot 子节点方式渲染。", name: "asChild", type: "boolean" },
         { defaultValue: "false", description: "异步按钮是否进入 loading 态。", name: "loading", type: "boolean" },
       ]}
-      categoryLabel="基础操作"
+      categoryLabel="基础能力"
       demos={[
         {
           code: `<RowActions>
@@ -156,7 +156,7 @@ function BadgePage() {
         { defaultValue: '"light"', description: "标签视觉效果。", name: "effect", type: '"light" | "solid" | "plain"' },
         { defaultValue: '"default"', description: "标签尺寸。", name: "size", type: '"default" | "small"' },
       ]}
-      categoryLabel="基础操作"
+      categoryLabel="基础能力"
       demos={[
         {
           code: `<RowActions>
@@ -232,7 +232,7 @@ function StatusBadgePage() {
       apiItems={[
         { description: "业务状态原文。", name: "status", required: true, type: "string" },
       ]}
-      categoryLabel="基础操作"
+      categoryLabel="导航与身份"
       demos={[
         {
           code: `<RowActions>
@@ -322,7 +322,7 @@ function BreadcrumbPage() {
         { defaultValue: "最后一项", description: "末级节点通常只展示文案，不再提供 href。", name: "items[n].href", type: "string | undefined" },
         { description: "节点显示文本。", name: "items[n].label", required: true, type: "string" },
       ]}
-      categoryLabel="基础操作"
+      categoryLabel="基础能力"
       demos={[
         {
           code: `<Breadcrumb items={[{ href: "/", label: "后台" }, { label: "组件展示站" }]} />`,
@@ -369,7 +369,7 @@ function ThemeTogglePage() {
         { description: "无显式 props，点击后在浅色/深色/系统主题间轮换。", name: "props", type: "none" },
         { description: "主题状态持久化与读取由 design-tokens 主题能力负责。", name: "behavior", type: "internal" },
       ]}
-      categoryLabel="基础操作"
+      categoryLabel="导航与身份"
       demos={[
         {
           code: `<ThemeToggle />`,
@@ -424,11 +424,11 @@ function ThemeTogglePage() {
 }
 
 export const actionsRoutes: ShowcaseRoute[] = [
-  { component: ButtonPage, label: "Button", path: "/actions/button", shortLabel: "BTN", summaryKey: "showcase.route.actions.button.summary" },
-  { component: BadgePage, label: "Badge", path: "/actions/badge", shortLabel: "TAG", summaryKey: "showcase.route.actions.badge.summary" },
-  { component: BreadcrumbPage, label: "Breadcrumb", path: "/actions/breadcrumb", shortLabel: "BRD", summaryKey: "showcase.route.actions.breadcrumb.summary" },
-  { component: StatusBadgePage, label: "StatusBadge", path: "/actions/status-badge", shortLabel: "STS", summaryKey: "showcase.route.actions.status-badge.summary" },
-  { component: ThemeTogglePage, label: "ThemeToggle", path: "/actions/theme-toggle", shortLabel: "THM", summaryKey: "showcase.route.actions.theme-toggle.summary" },
+  { component: ButtonPage, label: "Button", path: "/foundation/button", shortLabel: "BTN", summaryKey: "showcase.route.actions.button.summary" },
+  { component: BadgePage, label: "Badge", path: "/foundation/badge", shortLabel: "TAG", summaryKey: "showcase.route.actions.badge.summary" },
+  { component: BreadcrumbPage, label: "Breadcrumb", path: "/navigation/breadcrumb", shortLabel: "BRD", summaryKey: "showcase.route.actions.breadcrumb.summary" },
+  { component: StatusBadgePage, label: "StatusBadge", path: "/foundation/status-badge", shortLabel: "STS", summaryKey: "showcase.route.actions.status-badge.summary" },
+  { component: ThemeTogglePage, label: "ThemeToggle", path: "/navigation/theme-toggle", shortLabel: "THM", summaryKey: "showcase.route.actions.theme-toggle.summary" },
 ];
 
 export const actionsCategory: ShowcaseCategory = {

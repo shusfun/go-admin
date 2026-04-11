@@ -6,9 +6,11 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json"
   },
   "dependencies": {
+    "@go-admin/auth": "workspace:*",
     "@go-admin/design-tokens": "workspace:*",
     "@go-admin/i18n": "workspace:*",
     "@go-admin/ui-admin": "workspace:*",
