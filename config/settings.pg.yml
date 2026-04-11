@@ -20,11 +20,14 @@ settings:
             taskTimeoutSeconds: 900
         runtime:
             autoMigrateOnStart: true
+    gen:
+        dbname: go_admin_dev
+        frontpath: ../go-admin-ui/src
     jwt:
-        secret: 4c38b00088c2736c6c943f4e67205fc3f9360a4ffe0280b0241ed8596735e8f2
+        secret: c8d324dc81525e4ac60d60d31c3d2aa016814902a0011006e085980fa13cf90c
         timeout: 3600
     logger:
-        enableddb: true
+        enableddb: false
         level: info
         path: temp/logs
         stdout: ""
