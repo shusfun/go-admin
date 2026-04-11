@@ -88,7 +88,7 @@ pnpm repo:service:start admin
 ## UI Showcase 静态部署
 
 - 当前演示地址：<https://shusfun.github.io/go-admin/>
-- 深链接示例：<https://shusfun.github.io/go-admin/#/data/virtual-list>
+- 深链接示例：<https://shusfun.github.io/go-admin/#/navigation/global-search>
 - `apps/ui-showcase` 的生产构建默认使用 `HashRouter`，适合 GitHub Pages 这类无服务端路由回退的静态托管。
 - 构建时会优先读取 `VITE_SHOWCASE_BASE`，未显式指定时若检测到 `GITHUB_REPOSITORY`，会自动推导仓库 Pages 的子路径 base。
 - 若你把展示站部署到 GitHub 用户页别名根路径，可设置 `VITE_SHOWCASE_BASE=/`。

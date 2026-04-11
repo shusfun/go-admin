@@ -159,12 +159,11 @@ export async function portOwnerPid(port) {
   }
 
   if (process.platform === "win32") {
-    const result = runCommand("powershell", [
-      "-NoProfile",
-      "-Command",
-      `(Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess)`,
-    ]);
-    return parsePid(result.stdout);
+    const result = runCommand("netstat", ["-ano", "-p", "tcp", "-n"]);
+    if (result.code !== 0) {
+      return 0;
+    }
+    return parseWindowsNetstatPid(result.stdout, port);
   }
 
   const lsof = runCommand("lsof", ["-tiTCP:" + String(port), "-sTCP:LISTEN"]);
@@ -206,4 +205,31 @@ function parsePid(output) {
   }
   const pid = Number.parseInt(match[1], 10);
   return Number.isFinite(pid) ? pid : 0;
+}
+
+export function parseWindowsNetstatPid(output, port) {
+  const suffix = `:${port}`;
+  for (const rawLine of String(output || "").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+    const parts = line.split(/\s+/);
+    if (parts.length < 5 || parts[0].toUpperCase() !== "TCP") {
+      continue;
+    }
+    const [_, localAddress, foreignAddress, __, pidText] = parts;
+    if (!localAddress.endsWith(suffix) || !hasZeroPort(foreignAddress)) {
+      continue;
+    }
+    const pid = Number.parseInt(pidText, 10);
+    if (Number.isFinite(pid)) {
+      return pid;
+    }
+  }
+  return 0;
+}
+
+function hasZeroPort(address) {
+  return /:0$/.test(address);
 }

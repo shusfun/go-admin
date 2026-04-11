@@ -3,12 +3,13 @@ import path from "node:path";
 
 import { goEnv, localServicePort } from "./context.mjs";
 import { resolveBackendCommand } from "./backend-dev.mjs";
+import { ensureFrontendWorkspaceReady } from "./frontend-deps.mjs";
 import { loadState, nowRFC3339 } from "./state.mjs";
 import { isProcessAlive, portListening, portOpen, portOwnerPid, startDetachedCommand, stopProcess, waitForPortClosed } from "../../shared/process.mjs";
 import { formatCommand, printDivider, printField, printFields, printHint, printSection, toRepoRelative } from "../../shared/output.mjs";
 
 const DEFAULT_SERVICE_START_TIMEOUT_MS = 15000;
-const BACKEND_HOT_RELOAD_START_TIMEOUT_MS = 60000;
+const BACKEND_HOT_RELOAD_START_TIMEOUT_MS = 120000;
 const SERVICE_START_PROGRESS_INTERVAL_MS = 1000;
 
 export function allServices(context) {
@@ -101,6 +102,7 @@ export async function reconcileState(context) {
       mode: service.mode,
       port: service.port,
       pid: 0,
+      launcherPid: 0,
       logPath: service.kind === "local" ? path.join(context.logsDir, `${service.name}.log`) : "",
     };
     current.name = service.name;
@@ -109,6 +111,7 @@ export async function reconcileState(context) {
     current.runner = current.runner || defaultRunner(service.name);
 
     const pidAlive = isProcessAlive(current.pid);
+    const launcherAlive = isProcessAlive(current.launcherPid ?? 0);
     const listeningPid = await portOwnerPid(service.port);
     const serving = (await portOpen(service.port)) || listeningPid > 0;
     if (serving) {
@@ -119,7 +122,10 @@ export async function reconcileState(context) {
       if (!pidAlive || current.pid <= 0) {
         current.pid = listeningPid;
       }
-    } else if (pidAlive) {
+      if (!launcherAlive && current.launcherPid > 0) {
+        current.launcherPid = 0;
+      }
+    } else if (pidAlive || launcherAlive) {
       current.status = "starting";
       current.exitedAt = "";
     } else {
@@ -133,6 +139,7 @@ export async function reconcileState(context) {
         current.lastError = "";
       }
       current.pid = 0;
+      current.launcherPid = 0;
     }
     current.updatedAt = nowRFC3339();
     current.logPath = path.join(context.logsDir, `${service.name}.log`);
@@ -144,6 +151,8 @@ export async function reconcileState(context) {
 }
 
 export async function startServices(context, services) {
+  await ensureServicesStartable(context, services);
+  await ensureFrontendWorkspaceReady(context, services);
   await ensureServicesStartable(context, services);
 
   const failures = [];
@@ -171,6 +180,7 @@ export async function startServices(context, services) {
       runner: spec.runner || defaultRunner(service.name),
       port: service.port,
       pid,
+      launcherPid: pid,
       logPath,
       command: formatCommand(spec.name, spec.args),
       note: spec.note || "",
@@ -207,6 +217,7 @@ export async function startServices(context, services) {
         runner: spec.runner || defaultRunner(service.name),
         port: service.port,
         pid: pidStillAlive ? pid : listeningPid,
+        launcherPid: pidStillAlive ? pid : 0,
         logPath,
         command: formatCommand(spec.name, spec.args),
         note: spec.note || "",
@@ -246,6 +257,7 @@ export async function startServices(context, services) {
       runner: spec.runner || defaultRunner(service.name),
       port: service.port,
       pid: ready.pid || pid,
+      launcherPid: pid,
       logPath,
       command: formatCommand(spec.name, spec.args),
       note: spec.note || "",
@@ -283,11 +295,28 @@ export async function stopServices(context, services) {
   for (const service of services.filter((item) => item.kind === "local")) {
     printSection(`停止 ${service.label}`);
     const current = state.services[service.name];
-    const pid = current?.pid || (await portOwnerPid(service.port));
-    if (pid) {
+    const stopPids = resolveStopPidCandidates(current?.launcherPid ?? 0, current?.pid ?? 0, await portOwnerPid(service.port));
+    for (const pid of stopPids) {
       stopProcess(pid);
-      await waitForPortClosed(service.port);
     }
+
+    let portClosed = await waitForPortClosed(service.port);
+    if (!portClosed) {
+      const remainingPid = await portOwnerPid(service.port);
+      if (remainingPid > 0 && !stopPids.includes(remainingPid)) {
+        stopProcess(remainingPid);
+        portClosed = await waitForPortClosed(service.port);
+      }
+    }
+    if (!portClosed && (await portListening(service.port))) {
+      const occupantPid = await portOwnerPid(service.port);
+      throw new Error(
+        occupantPid > 0
+          ? `${service.label} 停止失败，端口 ${service.port} 仍被 PID ${occupantPid} 占用`
+          : `${service.label} 停止失败，端口 ${service.port} 仍未释放`,
+      );
+    }
+
     const latest = loadState(context);
     latest.services[service.name] = {
       ...(latest.services[service.name] ?? {
@@ -296,6 +325,7 @@ export async function stopServices(context, services) {
         runner: defaultRunner(service.name),
         port: service.port,
         logPath: path.join(context.logsDir, `${service.name}.log`),
+        launcherPid: 0,
       }),
       name: service.name,
       status: "stopped",
@@ -303,6 +333,7 @@ export async function stopServices(context, services) {
       runner: latest.services[service.name]?.runner || defaultRunner(service.name),
       port: service.port,
       pid: 0,
+      launcherPid: 0,
       logPath: path.join(context.logsDir, `${service.name}.log`),
       lastError: "",
       updatedAt: nowRFC3339(),
@@ -336,6 +367,7 @@ export async function printServicesStatus(context, services = null) {
       runner: defaultRunner(service.name),
       port: service.port,
       logPath: path.join(context.logsDir, `${service.name}.log`),
+      launcherPid: 0,
       command: "",
       lastError: "",
       note: "",
@@ -351,6 +383,7 @@ export async function printServicesStatus(context, services = null) {
       ["地址", serviceAccessUrl(service)],
       ["端口", String(service.port)],
       ["PID", current.pid > 0 ? String(current.pid) : "-"],
+      ["启动器 PID", current.launcherPid > 0 ? String(current.launcherPid) : ""],
       ["命令", current.command || "-"],
       ["说明", current.note || ""],
       ["日志", toRepoRelative(context, current.logPath || path.join(context.logsDir, `${service.name}.log`))],
@@ -452,6 +485,17 @@ export function summarizeServiceStartupProgress(service, latestLogLine) {
     return "开发服务器已启动，等待端口确认";
   }
   return "进程已启动，等待端口就绪";
+}
+
+export function resolveStopPidCandidates(...pids) {
+  const result = [];
+  for (const pid of pids) {
+    if (pid <= 0 || result.includes(pid)) {
+      continue;
+    }
+    result.push(pid);
+  }
+  return result;
 }
 
 function createServiceStartProgressReporter(context, service, logPath) {

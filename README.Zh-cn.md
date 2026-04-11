@@ -20,7 +20,7 @@
 ## 🎬 在线体验
 
 UI Showcase 演示：<https://shusfun.github.io/go-admin/>
-> 静态托管默认使用 HashRouter，例如组件页可直接访问：<https://shusfun.github.io/go-admin/#/data/virtual-list>
+> 静态托管默认使用 HashRouter，例如组件页可直接访问：<https://shusfun.github.io/go-admin/#/navigation/global-search>
 
 Element UI vue体验：[https://vue2.go-admin.dev](https://vue2.go-admin.dev/#/login)
 > ⚠️⚠️⚠️ 账号 / 密码： admin / 123456

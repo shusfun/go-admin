@@ -5,6 +5,7 @@ import { createRepoContext } from "../src/domains/runtime/context.mjs";
 import {
   allServices,
   extractLatestLogLineForProgress,
+  resolveStopPidCandidates,
   resolveServiceStartTimeoutMs,
   summarizeServiceStartupProgress,
 } from "../src/domains/runtime/services.mjs";
@@ -18,7 +19,7 @@ test("resolveServiceStartTimeoutMs gives backend air enough cold-start time", ()
     const backend = allServices(context).find((service) => service.name === "backend");
     assert.ok(backend, "expected backend service definition");
 
-    assert.equal(resolveServiceStartTimeoutMs(backend, { runner: "air", mode: "hot-reload" }), 60000);
+    assert.equal(resolveServiceStartTimeoutMs(backend, { runner: "air", mode: "hot-reload" }), 120000);
     assert.equal(resolveServiceStartTimeoutMs(backend, { runner: "go", mode: "detached" }), 15000);
   } finally {
     removeFixtureRepo(repoRoot);
@@ -75,4 +76,9 @@ test("summarizeServiceStartupProgress recognizes frontend ready logs", () => {
   } finally {
     removeFixtureRepo(repoRoot);
   }
+});
+
+test("resolveStopPidCandidates deduplicates state pid and port owner pid", () => {
+  assert.deepEqual(resolveStopPidCandidates(28380, 2648, 28380, 0, -1), [28380, 2648]);
+  assert.deepEqual(resolveStopPidCandidates(0, 0), []);
 });

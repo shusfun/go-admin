@@ -140,6 +140,9 @@ importers:
 
   frontend/apps/ui-showcase:
     dependencies:
+      '@go-admin/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@go-admin/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens

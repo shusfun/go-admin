@@ -2,7 +2,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync,
 import path from "node:path";
 import readline from "node:readline/promises";
 
-import { printStatusTable, reconcileState, tailServiceLog } from "../runtime/services.mjs";
+import { allServices, printStatusTable, reconcileState, stopServices, tailServiceLog } from "../runtime/services.mjs";
 import { inspectProjectAir } from "../runtime/backend-dev.mjs";
 import { printInfraStatus, startInfra } from "../infra/index.mjs";
 import { commandExists, runCommand, runCommandOrThrow } from "../../shared/process.mjs";
@@ -130,10 +130,6 @@ export async function runReinit(context, yes) {
     }
   }
 
-  cleanupActiveInfraForReinit(context);
-
-  await runDatabaseResetAction(context);
-
   const targets = [
     path.join(context.repoRoot, ".tmp", "go"),
     path.join(context.repoRoot, ".tmp", "bin"),
@@ -146,9 +142,13 @@ export async function runReinit(context, yes) {
     context.backendBinary,
     context.installLockFile,
   ];
-  for (const target of targets) {
-    removeRepoPath(context, target);
-  }
+
+  await stopManagedServicesForReinit(context);
+  cleanupActiveInfraForReinit(context);
+  clearReinitTargets(context, targets);
+  await runDatabaseResetAction(context);
+  clearReinitTargets(context, [context.installLockFile]);
+
   printSection("环境重置");
   printField("结果", "已清理项目数据库、本地产物、安装锁与 repo-cli 状态");
 }
@@ -231,7 +231,7 @@ export function resolveDatabaseResetPlan(context) {
   if (settings.database.driver !== "postgres") {
     throw new Error(`当前仅支持重置 PostgreSQL，实际驱动为 ${settings.database.driver || "(空)"}`);
   }
-  assertResettableDatabaseName(database.dbname);
+  assertResettableDatabaseName(context, database.dbname);
 
   return {
     provider: "global",
@@ -373,13 +373,18 @@ function readSettingsFile(context) {
   };
 }
 
-function assertResettableDatabaseName(databaseName) {
+function assertResettableDatabaseName(context, databaseName) {
   const normalized = String(databaseName || "").trim().toLowerCase();
   if (!normalized) {
     throw new Error("当前配置缺少数据库名称，无法执行重置");
   }
   if (["postgres", "template0", "template1"].includes(normalized)) {
     throw new Error(`拒绝重置系统数据库 ${databaseName}`);
+  }
+
+  const expectedDatabaseName = composeEnv(context).DEV_POSTGRES_DB.toLowerCase();
+  if (normalized !== expectedDatabaseName) {
+    throw new Error(`仅允许重置当前项目开发库 ${composeEnv(context).DEV_POSTGRES_DB}，实际为 ${databaseName}`);
   }
 }
 
@@ -396,7 +401,73 @@ function escapeSQLString(value) {
 }
 
 function resolveActiveInfraProvider(context) {
-  return normalizeInfraProvider(context.profile?.infra?.provider || "");
+  if (isProjectDockerPostgresRunning(context)) {
+    return "docker";
+  }
+
+  const explicit = normalizeInfraProvider(context.profile?.infra?.provider || "");
+  if (explicit === "docker") {
+    return "docker";
+  }
+  if (looksLikeDockerProjectDatabase(context)) {
+    return "docker";
+  }
+  if (explicit === "global") {
+    return "global";
+  }
+  return "";
+}
+
+function isProjectDockerPostgresRunning(context) {
+  if (!existsSync(context.dockerDevFile) || !commandExists("docker")) {
+    return false;
+  }
+
+  const composeVersion = runCommand("docker", ["compose", "version"], {
+    cwd: context.repoRoot,
+    env: composeEnv(context),
+  });
+  if (composeVersion.code !== 0) {
+    return false;
+  }
+
+  const result = runCommand("docker", [...composeBaseArgs(context, true), "ps", "--status", "running", "--services"], {
+    cwd: context.repoRoot,
+    env: composeEnv(context),
+  });
+  if (result.code !== 0) {
+    return false;
+  }
+
+  return result.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .includes("postgres");
+}
+
+function looksLikeDockerProjectDatabase(context) {
+  if (!existsSync(context.configFile)) {
+    return false;
+  }
+
+  const settings = readSettingsFile(context);
+  if (settings.database.driver !== "postgres") {
+    return false;
+  }
+
+  const database = parseDatabaseSource(settings.database.source);
+  const dockerEnv = composeEnv(context);
+  const dockerPort = context.ports.DEV_POSTGRES_PORT ?? 0;
+  const host = String(database.host || "").trim().toLowerCase();
+
+  return (
+    (host === "127.0.0.1" || host === "localhost") &&
+    database.port === dockerPort &&
+    database.dbname === dockerEnv.DEV_POSTGRES_DB &&
+    database.user === dockerEnv.DEV_POSTGRES_USER &&
+    database.password === dockerEnv.DEV_POSTGRES_PASSWORD
+  );
 }
 
 function cleanupActiveInfraForReinit(context) {
@@ -453,13 +524,36 @@ function buildProjectDatabaseResetSQL() {
   ].join(" ");
 }
 
+async function stopManagedServicesForReinit(context) {
+  try {
+    await stopServices(context, allServices(context));
+  } catch (error) {
+    console.error(`停止受管服务失败，将继续执行 reinit：${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function clearReinitTargets(context, targets) {
+  for (const target of targets) {
+    removeRepoPath(context, target);
+  }
+}
+
 function removeRepoPath(context, targetPath) {
   assertPathInsideRepo(context, targetPath);
   if (!existsSync(targetPath)) {
     return;
   }
   makePathWritableRecursive(targetPath);
-  rmSync(targetPath, { recursive: true, force: true });
+  try {
+    rmSync(targetPath, { recursive: true, force: true });
+  } catch (error) {
+    if (tryReleaseExecutableLock(context, targetPath, error)) {
+      makePathWritableRecursive(targetPath);
+      rmSync(targetPath, { recursive: true, force: true });
+      return;
+    }
+    throw error;
+  }
 }
 
 function assertPathInsideRepo(context, targetPath) {
@@ -486,4 +580,36 @@ function makePathWritableRecursive(targetPath) {
   }
 
   chmodSync(targetPath, stat.mode | 0o600);
+}
+
+function tryReleaseExecutableLock(context, targetPath, error) {
+  if (process.platform !== "win32") {
+    return false;
+  }
+  if (!isExecutablePath(targetPath)) {
+    return false;
+  }
+  const code = error?.code || "";
+  if (code !== "EPERM" && code !== "EBUSY") {
+    return false;
+  }
+
+  const processName = path.basename(targetPath);
+  const escapedTarget = targetPath.replaceAll("'", "''");
+  const script = [
+    `$target='${escapedTarget}'`,
+    `$matched=Get-CimInstance Win32_Process -Filter "name = '${processName}'" | Where-Object { $_.ExecutablePath -and [System.StringComparer]::OrdinalIgnoreCase.Equals($_.ExecutablePath, $target) }`,
+    `if ($matched) { $matched | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }`,
+  ].join("; ");
+  const result = runCommand("powershell", ["-NoProfile", "-Command", script], {
+    cwd: context.repoRoot,
+    env: process.env,
+  });
+
+  return result.code === 0;
+}
+
+function isExecutablePath(targetPath) {
+  const lower = String(targetPath || "").toLowerCase();
+  return lower.endsWith(".exe") || lower.endsWith(".cmd") || lower.endsWith(".bat");
 }

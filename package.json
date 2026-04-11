@@ -54,6 +54,7 @@
     "repo:service:backend": "pnpm run repo -- service start backend",
     "repo:service:admin": "pnpm run repo -- service start admin",
     "repo:service:mobile": "pnpm run repo -- service start mobile",
+    "repo:service:showcase": "pnpm run repo -- service start showcase",
     "repo:service:stop:all": "pnpm run repo -- service stop all",
     "repo:migrate": "pnpm run repo -- migrate",
     "repo:openapi": "pnpm run repo -- openapi",

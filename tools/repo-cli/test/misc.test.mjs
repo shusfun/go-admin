@@ -50,10 +50,11 @@ test("runReinit clears runtime artifacts in isolated repo", async () => {
       context.backendBinary,
       context.installLockFile,
     ];
+    const fileTargets = new Set([context.backendBinary, context.installLockFile]);
 
     for (const target of targets) {
       mkdirSync(path.dirname(target), { recursive: true });
-      if (path.extname(target)) {
+      if (fileTargets.has(target)) {
         writeFileSync(target, "fixture");
       } else {
         mkdirSync(target, { recursive: true });
@@ -106,6 +107,31 @@ test("resolveDatabaseResetPlan prefers docker project data dir", () => {
   }
 });
 
+test("resolveDatabaseResetPlan infers docker from current project docker config", () => {
+  const repoRoot = createFixtureRepo("repo-cli-db-docker-config");
+  try {
+    const context = createRepoContext({ repoRoot });
+    writeFileSync(
+      context.configFile,
+      [
+        "settings:",
+        "  database:",
+        "    driver: postgres",
+        "    source: host=127.0.0.1 port=15432 user=fixture_repo_dev password=fixture_repo_dev dbname=fixture_repo_dev sslmode=disable",
+        "",
+      ].join("\n"),
+    );
+    const plan = resolveDatabaseResetPlan(context);
+    assert.deepEqual(plan, {
+      dataDir: context.dockerPostgresDataDir,
+      databaseName: "fixture_repo_dev",
+      provider: "docker",
+    });
+  } finally {
+    removeFixtureRepo(repoRoot);
+  }
+});
+
 test("resolveDatabaseResetPlan reads current global postgres config", () => {
   const repoRoot = createFixtureRepo("repo-cli-db-global");
   try {
@@ -116,19 +142,39 @@ test("resolveDatabaseResetPlan reads current global postgres config", () => {
         "settings:",
         "  database:",
         "    driver: postgres",
-        "    source: host=127.0.0.1 port=5432 user=demo password=secret dbname=go_admin_dev sslmode=disable",
+        "    source: host=127.0.0.1 port=5432 user=demo password=secret dbname=fixture_repo_dev sslmode=disable",
         "",
       ].join("\n"),
     );
     const plan = resolveDatabaseResetPlan(context);
     assert.deepEqual(plan, {
-      databaseName: "go_admin_dev",
+      databaseName: "fixture_repo_dev",
       host: "127.0.0.1",
       password: "secret",
       port: 5432,
       provider: "global",
       user: "demo",
     });
+  } finally {
+    removeFixtureRepo(repoRoot);
+  }
+});
+
+test("resolveDatabaseResetPlan rejects non-project dev database", () => {
+  const repoRoot = createFixtureRepo("repo-cli-db-foreign");
+  try {
+    const context = createRepoContext({ repoRoot });
+    writeFileSync(
+      context.configFile,
+      [
+        "settings:",
+        "  database:",
+        "    driver: postgres",
+        "    source: host=127.0.0.1 port=5432 user=demo password=secret dbname=other_project_dev sslmode=disable",
+        "",
+      ].join("\n"),
+    );
+    assert.throws(() => resolveDatabaseResetPlan(context), /仅允许重置当前项目开发库/);
   } finally {
     removeFixtureRepo(repoRoot);
   }

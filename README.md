@@ -14,7 +14,7 @@
 ## 在线演示
 
 - UI Showcase：<https://shusfun.github.io/go-admin/>
-- UI Showcase 深链接示例：<https://shusfun.github.io/go-admin/#/data/virtual-list>
+- UI Showcase 深链接示例：<https://shusfun.github.io/go-admin/#/navigation/global-search>
 
 ## 功能特性
 
