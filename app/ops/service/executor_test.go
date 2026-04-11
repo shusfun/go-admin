@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -227,6 +228,19 @@ func TestResolveTaskTimeoutUsesOverride(t *testing.T) {
 	}
 }
 
+func TestGetComposeFileUsesRepoDirForRelativePath(t *testing.T) {
+	repoDir := mustMkdirTempDir(t)
+	env := cfg.OpsEnvironment{
+		Backend: cfg.OpsBackendTarget{
+			RepoDir:     repoDir,
+			ComposeFile: "deploy/docker-compose.yml",
+		},
+	}
+	if got := getComposeFile(env); got != filepath.Join(repoDir, "deploy", "docker-compose.yml") {
+		t.Fatalf("expected compose file to resolve from repo dir, got %q", got)
+	}
+}
+
 func TestTaskRunnerRunDeployBackendCompletesFullUpdateChain(t *testing.T) {
 	fixture := createGitFixture(t, 1, true)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -239,7 +253,7 @@ func TestTaskRunnerRunDeployBackendCompletesFullUpdateChain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve docker log path failed: %v", err)
 	}
-	installFakeCommand(t, "docker", "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \""+dockerLog+"\"\n")
+	installFakeCommand(t, "docker", dockerLog)
 
 	db := openOpsTestDB(t)
 	task := &appModels.OpsTask{
@@ -320,7 +334,7 @@ func TestTaskRunnerRunRestartBackendCompletesRestartChain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve docker log path failed: %v", err)
 	}
-	installFakeCommand(t, "docker", "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \""+dockerLog+"\"\n")
+	installFakeCommand(t, "docker", dockerLog)
 
 	db := openOpsTestDB(t)
 	task := &appModels.OpsTask{
@@ -383,10 +397,14 @@ func mustMkdirTempDir(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		t.Fatalf("failed to resolve temp dir: %v", err)
+	}
 	t.Cleanup(func() {
-		_ = os.RemoveAll(dir)
+		_ = os.RemoveAll(absDir)
 	})
-	return dir
+	return absDir
 }
 
 func createFile(t *testing.T, path, content string) {
@@ -480,17 +498,18 @@ func openOpsTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func installFakeCommand(t *testing.T, name string, script string) {
+func installFakeCommand(t *testing.T, name string, logPath string) {
 	t.Helper()
 
 	binDir := mustMkdirTempDir(t)
-	absBinDir, err := filepath.Abs(binDir)
-	if err != nil {
-		t.Fatalf("resolve fake bin dir failed: %v", err)
+	commandPath := filepath.Join(binDir, name)
+	content := []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"" + logPath + "\"\n")
+	if runtime.GOOS == "windows" {
+		commandPath += ".cmd"
+		content = []byte("@echo off\r\necho %*>> \"" + strings.ReplaceAll(logPath, "/", "\\") + "\"\r\n")
 	}
-	commandPath := filepath.Join(absBinDir, name)
-	if err := os.WriteFile(commandPath, []byte(script), 0o755); err != nil {
+	if err := os.WriteFile(commandPath, content, 0o755); err != nil {
 		t.Fatalf("write fake command failed: %v", err)
 	}
-	t.Setenv("PATH", absBinDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }

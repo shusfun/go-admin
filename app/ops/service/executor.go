@@ -911,10 +911,17 @@ func ensureFrontendProject(repoDir string) error {
 }
 
 func getComposeFile(env cfg.OpsEnvironment) string {
-	if env.Backend.ComposeFile != "" {
-		return env.Backend.ComposeFile
+	composeFile := env.Backend.ComposeFile
+	if composeFile == "" {
+		composeFile = "docker-compose.yml"
 	}
-	return filepath.Join(env.Backend.RepoDir, "docker-compose.yml")
+	if filepath.IsAbs(composeFile) {
+		return composeFile
+	}
+	if env.Backend.RepoDir == "" {
+		return filepath.Clean(composeFile)
+	}
+	return filepath.Join(env.Backend.RepoDir, composeFile)
 }
 
 func getDistDir(env cfg.OpsEnvironment) string {
