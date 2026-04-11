@@ -57,6 +57,12 @@
   --color-surface-soft: color-mix(in srgb, hsl(var(--card)) 72%, transparent);
   --color-overlay-soft: color-mix(in srgb, hsl(var(--foreground)) 8%, transparent);
   --color-overlay-strong: color-mix(in srgb, hsl(var(--foreground)) 12%, transparent);
+  --ui-admin-info: 215 16% 47%;
+  --ui-admin-info-foreground: 210 40% 98%;
+  --ui-admin-success: 160 84% 32%;
+  --ui-admin-success-foreground: 210 40% 98%;
+  --ui-admin-warning: 38 92% 50%;
+  --ui-admin-warning-foreground: 26 83% 14%;
 }
 
 .dark {
@@ -86,4 +92,10 @@
   --color-surface-soft: color-mix(in srgb, hsl(var(--card)) 78%, transparent);
   --color-overlay-soft: color-mix(in srgb, hsl(var(--foreground)) 10%, transparent);
   --color-overlay-strong: color-mix(in srgb, hsl(var(--foreground)) 14%, transparent);
+  --ui-admin-info: 215 20% 65%;
+  --ui-admin-info-foreground: 222 47% 7%;
+  --ui-admin-success: 160 84% 42%;
+  --ui-admin-success-foreground: 222 47% 7%;
+  --ui-admin-warning: 38 92% 58%;
+  --ui-admin-warning-foreground: 26 83% 12%;
 }

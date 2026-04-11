@@ -113,7 +113,7 @@ export function SetupWizardPage({ initialStatus, setupApi, onComplete }: SetupWi
       const ready = await waitForSetupCompletion(() => setupApi.getStatus());
       if (ready) {
         await onComplete({
-          autoLogin: defaults.environment === "dev",
+          autoLogin: defaults.environment !== "prod",
           password: values.password,
           username: values.username,
         });

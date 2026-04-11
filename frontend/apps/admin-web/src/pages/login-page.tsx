@@ -73,8 +73,8 @@ export function LoginPage({ brandLogo = "", brandName, initialValues, notice, te
   }, [form, initialValues?.password, initialValues?.remember, initialValues?.username]);
 
   return (
-    <div className="grid gap-4">
-      <div className="flex justify-end">
+    <>
+      <div className="absolute right-6 top-6 z-50">
         <AdminLocaleToggle />
       </div>
       <AuthLayout
@@ -154,7 +154,8 @@ export function LoginPage({ brandLogo = "", brandName, initialValues, notice, te
             </InlineNotice>
           ) : null}
           {errorMessage ? (
-            <InlineNotice tone="danger" title={t("admin.login.error.title")}>
+            <InlineNotice tone="danger">
+              <span className="font-medium mr-2">{t("admin.login.error.title")}</span>
               {errorMessage}
             </InlineNotice>
           ) : null}
@@ -164,6 +165,6 @@ export function LoginPage({ brandLogo = "", brandName, initialValues, notice, te
         </form>
         </AuthPanel>
       </AuthLayout>
-    </div>
+    </>
   );
 }

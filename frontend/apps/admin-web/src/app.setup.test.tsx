@@ -1,11 +1,37 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@go-admin/i18n";
 
 import { adminMessages } from "./i18n/admin";
 import { AppContent } from "./app";
+
+const apiMocks = vi.hoisted(() => ({
+  getAppConfig: vi.fn(),
+  getCaptcha: vi.fn(),
+  login: vi.fn(),
+  logout: vi.fn(),
+}));
+
+vi.mock("@go-admin/api", async () => {
+  const actual = await vi.importActual<typeof import("@go-admin/api")>("@go-admin/api");
+
+  return {
+    ...actual,
+    createApiClient: vi.fn(() => ({
+      auth: {
+        getCaptcha: apiMocks.getCaptcha,
+        login: apiMocks.login,
+        logout: apiMocks.logout,
+      },
+      system: {
+        getAppConfig: apiMocks.getAppConfig,
+      },
+    })),
+  };
+});
 
 let mockSetupCompletionPayload = {
   autoLogin: false,
@@ -38,9 +64,14 @@ vi.mock("./pages/login-page", () => ({
   },
 }));
 
+vi.mock("./admin-workbench", () => ({
+  AdminWorkbench: () => <div>Mock Admin Workbench</div>,
+}));
+
 let host: HTMLDivElement;
 let root: Root;
 let originalLocalStorage: Storage;
+let queryClient: QueryClient;
 
 function createLocalStorageMock(): Storage {
   const store = new Map<string, string>();
@@ -75,9 +106,26 @@ async function flushPromises(rounds = 6) {
   }
 }
 
+async function renderApp(setupApiClient: unknown) {
+  await act(async () => {
+    root.render(
+      <QueryClientProvider client={queryClient}>
+        <I18nProvider initialLocale="zh-CN" messages={adminMessages}>
+          <AppContent setupApiClient={setupApiClient as never} />
+        </I18nProvider>
+      </QueryClientProvider>,
+    );
+  });
+}
+
 describe("AppContent setup 切换", () => {
   beforeEach(() => {
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    apiMocks.getAppConfig.mockReset();
+    apiMocks.getAppConfig.mockResolvedValue({});
+    apiMocks.getCaptcha.mockReset();
+    apiMocks.login.mockReset();
+    apiMocks.logout.mockReset();
     mockSetupCompletionPayload = {
       autoLogin: false,
       password: "admin123",
@@ -93,12 +141,21 @@ describe("AppContent setup 切换", () => {
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          gcTime: 0,
+          retry: false,
+        },
+      },
+    });
   });
 
   afterEach(() => {
     act(() => {
       root.unmount();
     });
+    queryClient.clear();
     Object.defineProperty(window, "localStorage", {
       configurable: true,
       value: originalLocalStorage,
@@ -134,25 +191,21 @@ describe("AppContent setup 切换", () => {
       testDatabase: vi.fn(),
     };
 
-    await act(async () => {
-      root.render(
-        <I18nProvider initialLocale="zh-CN" messages={adminMessages}>
-          <AppContent setupApiClient={setupApiClient as never} />
-        </I18nProvider>,
-      );
-    });
+    await renderApp(setupApiClient);
     await flushPromises();
 
     expect(setupApiClient.getStatus).toHaveBeenCalledTimes(1);
+    expect(apiMocks.getAppConfig).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain("Mock Setup Wizard");
   });
 
-  it("setup 完成后切回登录页", async () => {
+  it("本地地址下自动登录失败时回到登录页并提示", async () => {
     mockSetupCompletionPayload = {
       autoLogin: false,
       password: "admin123",
       username: "setup-admin",
     };
+    apiMocks.login.mockRejectedValue(new Error("登录接口调用失败"));
     const setupApiClient = {
       getStatus: vi.fn().mockResolvedValue({
         hasServerDefaults: true,
@@ -178,13 +231,7 @@ describe("AppContent setup 切换", () => {
       testDatabase: vi.fn(),
     };
 
-    await act(async () => {
-      root.render(
-        <I18nProvider initialLocale="zh-CN" messages={adminMessages}>
-          <AppContent setupApiClient={setupApiClient as never} />
-        </I18nProvider>,
-      );
-    });
+    await renderApp(setupApiClient);
     await flushPromises();
 
     const button = Array.from(document.querySelectorAll("button")).find((item) => item.textContent?.includes("完成安装"));
@@ -199,7 +246,7 @@ describe("AppContent setup 切换", () => {
     expect(document.querySelector('[data-testid="login-username"]')?.textContent).toBe("setup-admin");
     expect(document.querySelector('[data-testid="login-password"]')?.textContent).toBe("admin123");
     expect(document.querySelector('[data-testid="login-remember"]')?.textContent).toBe("false");
-    expect(document.querySelector('[data-testid="login-notice"]')?.textContent).toContain("完成登录后继续");
+    expect(document.querySelector('[data-testid="login-notice"]')?.textContent).toContain("自动登录失败");
   });
 
   it("setup 状态接口不可用时回退到登录页", async () => {
@@ -209,17 +256,67 @@ describe("AppContent setup 切换", () => {
       testDatabase: vi.fn(),
     };
 
-    await act(async () => {
-      root.render(
-        <I18nProvider initialLocale="zh-CN" messages={adminMessages}>
-          <AppContent setupApiClient={setupApiClient as never} />
-        </I18nProvider>,
-      );
-    });
+    await renderApp(setupApiClient);
     await flushPromises();
 
     expect(setupApiClient.getStatus).toHaveBeenCalledTimes(1);
     expect(document.body.textContent).toContain("Mock Login Page");
+  });
+
+  it("setup 完成且允许自动登录时会直接进入后台", async () => {
+    mockSetupCompletionPayload = {
+      autoLogin: true,
+      password: "admin123",
+      username: "setup-admin",
+    };
+    apiMocks.login.mockResolvedValue({
+      code: 200,
+      expire: "2099-01-01T00:00:00Z",
+      msg: "ok",
+      token: "setup-token",
+    });
+
+    const setupApiClient = {
+      getStatus: vi.fn().mockResolvedValue({
+        hasServerDefaults: true,
+        needs_setup: true,
+        step: "welcome",
+        defaults: {
+          environment: "dev",
+          database: {
+            host: "127.0.0.1",
+            port: 5432,
+            user: "postgres",
+            password: "",
+            dbname: "go_admin",
+          },
+          admin: {
+            username: "admin",
+            email: "",
+            phone: "",
+          },
+        },
+      }),
+      install: vi.fn(),
+      testDatabase: vi.fn(),
+    };
+
+    await renderApp(setupApiClient);
+    await flushPromises();
+
+    const button = Array.from(document.querySelectorAll("button")).find((item) => item.textContent?.includes("完成安装"));
+    expect(button).toBeTruthy();
+
+    await act(async () => {
+      button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flushPromises();
+
+    expect(apiMocks.login).toHaveBeenCalledWith({
+      password: "admin123",
+      username: "setup-admin",
+    });
+    expect(document.body.textContent).toContain("Mock Admin Workbench");
   });
 
   it("已记住的账号密码会作为登录页初始值", async () => {
@@ -231,13 +328,7 @@ describe("AppContent setup 切换", () => {
       testDatabase: vi.fn(),
     };
 
-    await act(async () => {
-      root.render(
-        <I18nProvider initialLocale="zh-CN" messages={adminMessages}>
-          <AppContent setupApiClient={setupApiClient as never} />
-        </I18nProvider>,
-      );
-    });
+    await renderApp(setupApiClient);
     await flushPromises();
 
     expect(lastLoginPageProps).toBeTruthy();

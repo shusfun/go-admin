@@ -7,8 +7,7 @@ import { ToastViewport } from "@go-admin/ui-admin";
 
 import { App } from "./app";
 import { adminMessages } from "./i18n/admin";
-import "@go-admin/design-tokens/base.css";
-import "@go-admin/ui-admin/styles.css";
+import "@go-admin/ui-admin/theme.css";
 import "./admin-host-theme.css";
 import "./styles.css";
 
