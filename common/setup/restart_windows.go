@@ -8,18 +8,34 @@ import (
 	"syscall"
 )
 
+const windowsDetachedProcess = 0x00000008
+
 func execSetupRestartPlan(plan *setupRestartPlan) error {
-	cmd := exec.Command("cmd", "/C", buildWindowsRestartCommand(plan))
-	cmd.Env = plan.env
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	cmd := newWindowsRestartCommand(plan)
 	return cmd.Start()
 }
 
-func buildWindowsRestartCommand(plan *setupRestartPlan) string {
-	parts := make([]string, 0, len(plan.args)+9)
-	parts = append(parts, "ping", "-n", "2", "127.0.0.1", ">NUL", "&&", "start", "\"\"", syscall.EscapeArg(plan.executable))
-	for _, arg := range plan.args[1:] {
-		parts = append(parts, syscall.EscapeArg(arg))
+func newWindowsRestartCommand(plan *setupRestartPlan) *exec.Cmd {
+	executable := normalizeWindowsRestartPath(plan.executable)
+	args := append([]string{}, plan.args[1:]...)
+
+	cmd := exec.Command(executable, args...)
+	cmd.Env = plan.env
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | windowsDetachedProcess,
+		HideWindow:    true,
 	}
-	return strings.Join(parts, " ")
+	return cmd
+}
+
+// 去掉 Windows verbatim path 前缀，避免 shell / CreateProcess 在某些场景下把路径误判成 UNC。
+func normalizeWindowsRestartPath(value string) string {
+	switch {
+	case strings.HasPrefix(value, `\\?\UNC\`):
+		return `\\` + strings.TrimPrefix(value, `\\?\UNC\`)
+	case strings.HasPrefix(value, `\\?\`):
+		return strings.TrimPrefix(value, `\\?\`)
+	default:
+		return value
+	}
 }

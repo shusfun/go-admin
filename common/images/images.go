@@ -12,7 +12,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/chai2010/webp"
+	"github.com/eringen/gowebper"
 	xdraw "golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
 
@@ -193,9 +193,10 @@ func encodeAvatarVariant(src image.Image, size int, path string) error {
 	}
 	defer file.Close()
 
-	return webp.Encode(file, target, &webp.Options{
-		Lossless: false,
-		Quality:  avatarQuality,
+	// 统一使用纯 Go 的 WebP 编码，避免 Windows 下依赖第三方二进制或 CGO。
+	return gowebper.Encode(file, target, &gowebper.Options{
+		Level:   gowebper.LevelDefault,
+		Quality: avatarQuality,
 	})
 }
 
