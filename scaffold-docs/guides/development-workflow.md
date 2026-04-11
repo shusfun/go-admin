@@ -30,8 +30,8 @@ pnpm repo:env
 
 结果会体现在：
 
-- `docs/admin/admin_swagger.json`
-- `docs/admin/admin_swagger.yaml`
+- `docs/admin-swagger/admin_swagger.json`
+- `docs/admin-swagger/admin_swagger.yaml`
 - `frontend/packages/api/openapi/admin.json`
 - 前端生成的 API client 与类型定义
 

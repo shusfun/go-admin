@@ -31,7 +31,7 @@
 - 默认开发流程统一走 `pnpm repo:*`
 - 后端更新主路径是 `git pull -> 重启服务 -> 按配置执行幂等迁移检查`
 - `pnpm repo:migrate` 仍保留，但属于保底命令，不是默认主流程
-- `docs/admin/admin_swagger.*` 是生成产物，不建议直接当作项目说明文档阅读
+- `docs/admin-swagger/admin_swagger.*` 是生成产物，不建议直接当作项目说明文档阅读
 
 ## 4. 适用角色
 

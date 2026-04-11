@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const sourcePath = path.resolve("docs/admin/admin_swagger.json");
+const sourcePath = path.resolve("docs/admin-swagger/admin_swagger.json");
 const targetPath = path.resolve("frontend/packages/api/openapi/admin.json");
 
 const spec = JSON.parse(fs.readFileSync(sourcePath, "utf8"));

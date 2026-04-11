@@ -1,6 +1,6 @@
 # 脚手架文档中心
 
-`scaffold-docs/` 用于存放脚手架说明、开发指南和专题设计文档；`docs/` 留给需求文档，`docs/admin/` 继续保留 Swagger 生成产物。
+`scaffold-docs/` 用于存放脚手架说明、开发指南和专题设计文档；`docs/` 留给需求文档，`docs/admin-swagger/` 继续保留 Swagger 生成产物。
 
 ## 1. 脚手架入口
 
@@ -36,18 +36,18 @@
 
 ## 3. 自动生成与参考产物
 
-- [admin_swagger.json](../docs/admin/admin_swagger.json)
-- [admin_swagger.yaml](../docs/admin/admin_swagger.yaml)
-- [admin_docs.go](../docs/admin/admin_docs.go)
+- [admin_swagger.json](../docs/admin-swagger/admin_swagger.json)
+- [admin_swagger.yaml](../docs/admin-swagger/admin_swagger.yaml)
+- [admin_docs.go](../docs/admin-swagger/admin_docs.go)
 
 说明：
 
-- `docs/admin/admin_swagger.*` 与 `docs/admin/admin_docs.go` 属于生成产物，变更接口后通过 `pnpm repo:openapi` 或 `go generate` 重新生成
+- `docs/admin-swagger/admin_swagger.*` 与 `docs/admin-swagger/admin_docs.go` 属于生成产物，变更接口后通过 `pnpm repo:openapi` 或 `go generate` 重新生成
 - 这类文件可作为接口参考，但不适合作为脚手架阅读入口
 
 ## 4. 文档维护约定
 
 - 面向“如何接手项目、如何从模板开始二开”的内容，优先放在 `scaffold-docs/`
 - 面向业务需求、需求拆解、验收标准的内容，放在 `docs/`
-- 自动生成文件继续保留在 `docs/admin/`
+- 自动生成文件继续保留在 `docs/admin-swagger/`
 - 若专题文档与脚手架文档冲突，以专题中的“唯一真相源”说明为准，并回写脚手架文档入口

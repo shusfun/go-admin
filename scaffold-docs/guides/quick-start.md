@@ -68,7 +68,7 @@ pnpm repo:build backend
 说明：
 
 - 服务日志和状态文件位于 `temp/repo-cli/`
-- OpenAPI 同步后会更新 `docs/admin/admin_swagger.json` 与前端类型
+- OpenAPI 同步后会更新 `docs/admin-swagger/admin_swagger.json` 与前端类型
 - 后端默认优先使用仓库内 `./.tmp/bin/air` 做热更新
 
 ## 5. 重置与重新初始化

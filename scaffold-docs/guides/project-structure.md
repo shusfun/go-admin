@@ -12,7 +12,7 @@
 | `config/` | YAML 配置、初始化 SQL、扩展配置 |
 | `frontend/` | 前端 pnpm monorepo，含后台、移动端、共享包 |
 | `tools/repo-cli/` | 仓库级开发 CLI 的源码 |
-| `docs/` | 需求文档目录，`docs/admin/` 保留 Swagger 生成产物 |
+| `docs/` | 需求文档目录，`docs/admin-swagger/` 保留 Swagger 生成产物 |
 | `scaffold-docs/` | 脚手架说明、开发指南、专题设计文档 |
 | `template/` | 后端代码生成所需模板文件 |
 | `test/` | 仓库级测试与生成测试样例 |
@@ -73,7 +73,7 @@
 ## 5. 开发辅助与生成产物
 
 - `tools/repo-cli/`：统一封装依赖安装、服务启动、日志查看、OpenAPI 同步、重置、改名等流程
-- `docs/admin/admin_swagger.*`：后端接口生成产物
+- `docs/admin-swagger/admin_swagger.*`：后端接口生成产物
 - `template/*.template`：后端代码生成模板
 
 ## 6. 文档分层
@@ -81,6 +81,6 @@
 - 脚手架入口文档：`scaffold-docs/guides/`
 - 专题设计文档：`scaffold-docs/specs/`、`scaffold-docs/admin/`
 - 需求文档：`docs/`
-- 自动生成参考：`docs/admin/admin_swagger.*`
+- 自动生成参考：`docs/admin-swagger/admin_swagger.*`
 
 如果遇到“目录看懂了，但不知道平时怎么开发”，下一步请看 [开发工作流](./development-workflow.md)。

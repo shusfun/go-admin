@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-`go-admin` 是一个按业务域组织的 Go 后端项目。核心业务代码位于 `app/`，其中 `app/admin`、`app/jobs`、`app/other` 分别承载不同模块；命令入口和启动流程位于 `cmd/`；通用中间件、模型、存储、DTO 与响应封装集中在 `common/`。运行配置和初始化 SQL 在 `config/`，Swagger 生成文件在 `docs/admin/`，静态资源在 `static/`，代码模板在 `template/`，仓库级测试与生成测试样例在 `test/`。
+`go-admin` 是一个按业务域组织的 Go 后端项目。核心业务代码位于 `app/`，其中 `app/admin`、`app/jobs`、`app/other` 分别承载不同模块；命令入口和启动流程位于 `cmd/`；通用中间件、模型、存储、DTO 与响应封装集中在 `common/`。运行配置和初始化 SQL 在 `config/`，Swagger 生成文件在 `docs/admin-swagger/`，静态资源在 `static/`，代码模板在 `template/`，仓库级测试与生成测试样例在 `test/`。
 
 ## Build, Test, and Development Commands
 - `go mod tidy`：提交前同步并清理模块依赖。

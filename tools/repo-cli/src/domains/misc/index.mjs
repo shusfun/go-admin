@@ -72,7 +72,7 @@ export async function runOpenAPI(context) {
       stdio: "inherit",
     });
   }
-  runCommandOrThrow(swagBinary, ["init", "-g", "main.go", "--parseDependency", "--parseDepth=6", "--instanceName", "admin", "-o", "./docs/admin"], {
+  runCommandOrThrow(swagBinary, ["init", "-g", "main.go", "--parseDependency", "--parseDepth=6", "--instanceName", "admin", "-o", "./docs/admin-swagger"], {
     cwd: context.repoRoot,
     env: process.env,
     stdio: "inherit",

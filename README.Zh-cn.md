@@ -174,7 +174,7 @@ pnpm repo:openapi
 
 该命令会完成以下工作：
 
-- 重新生成 `docs/admin/admin_swagger.json`
+- 重新生成 `docs/admin-swagger/admin_swagger.json`
 - 同步 OpenAPI 文件到 `frontend/packages/api/openapi/admin.json`
 - 生成前端可直接使用的 API client 与类型定义
 - 自动执行 `pnpm typecheck`
