@@ -1,5 +1,7 @@
 export * from "./primitives";
 export * from "./error-pages";
+export * from "./image-captcha-field";
+export * from "./table-patterns";
 export {
   AppFrameShell,
   ThemeToggle,

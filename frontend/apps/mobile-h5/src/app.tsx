@@ -49,7 +49,7 @@ function MobileWorkbench({
     return (
       <div className="mobile-auth">
         <section className="mobile-auth-card">
-          <small>Bootstrapping</small>
+          <small>正在准备</small>
           <h1>正在进入移动端</h1>
           <p>系统正在同步用户资料和移动端上下文。</p>
         </section>
@@ -65,7 +65,7 @@ function MobileWorkbench({
           <Route element={<StatusPage />} path="/status" />
           <Route element={<ProfilePage info={infoQuery.data} profile={profileQuery.data} />} path="/profile" />
         </Routes>
-        <SurfaceCard description="完全分离部署后，移动端和后台端能独立发版。" title="当前环境">
+        <SurfaceCard description="移动端与后台可分别更新，互不影响日常使用。" title="当前环境">
           <div className="mobile-inline">
             <span>租户 {tenant.tenantCode}</span>
             <button className="mobile-link-button" onClick={() => void onLogout()} type="button">

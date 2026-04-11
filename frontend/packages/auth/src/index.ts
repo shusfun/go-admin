@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppSession, ClientType } from "@go-admin/types";
 
 const SESSION_PREFIX = "go-admin:session";
@@ -57,4 +58,114 @@ export function toAuthorizationToken(session: AppSession | null) {
   }
 
   return `Bearer ${session.token}`;
+}
+
+export type ImageCaptchaPayload = {
+  image: string;
+  uuid: string;
+};
+
+type UseImageCaptchaOptions = {
+  autoLoad?: boolean;
+  debounceMs?: number;
+  onChange?: (payload: ImageCaptchaPayload | null) => void;
+  refreshToken?: number | string;
+};
+
+export function useImageCaptcha(
+  loader: () => Promise<ImageCaptchaPayload>,
+  {
+    autoLoad = true,
+    debounceMs = 800,
+    onChange,
+    refreshToken,
+  }: UseImageCaptchaOptions = {},
+) {
+  const [captcha, setCaptcha] = useState<ImageCaptchaPayload | null>(null);
+  const [loading, setLoading] = useState(false);
+  const loaderRef = useRef(loader);
+  const onChangeRef = useRef(onChange);
+  const debounceMsRef = useRef(debounceMs);
+  const inFlightRef = useRef(false);
+  const lastTriggerAtRef = useRef(0);
+  const requestIdRef = useRef(0);
+  const captchaRef = useRef<ImageCaptchaPayload | null>(null);
+  const refreshTokenRef = useRef(refreshToken);
+
+  useEffect(() => {
+    loaderRef.current = loader;
+  }, [loader]);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    debounceMsRef.current = debounceMs;
+  }, [debounceMs]);
+
+  const syncCaptcha = useCallback((nextCaptcha: ImageCaptchaPayload | null) => {
+    captchaRef.current = nextCaptcha;
+    setCaptcha(nextCaptcha);
+    onChangeRef.current?.(nextCaptcha);
+  }, []);
+
+  const refresh = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (inFlightRef.current) {
+      return captchaRef.current;
+    }
+
+    if (!force && now - lastTriggerAtRef.current < debounceMsRef.current) {
+      return captchaRef.current;
+    }
+
+    lastTriggerAtRef.current = now;
+    inFlightRef.current = true;
+    setLoading(true);
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+
+    try {
+      const nextCaptcha = await loaderRef.current();
+      if (requestId !== requestIdRef.current) {
+        return captchaRef.current;
+      }
+      syncCaptcha(nextCaptcha);
+      return nextCaptcha;
+    } catch {
+      if (requestId === requestIdRef.current) {
+        syncCaptcha(null);
+      }
+      return null;
+    } finally {
+      if (requestId === requestIdRef.current) {
+        inFlightRef.current = false;
+        setLoading(false);
+      }
+    }
+  }, [syncCaptcha]);
+
+  useEffect(() => {
+    if (!autoLoad) {
+      return;
+    }
+    void refresh(true);
+  }, [autoLoad, refresh]);
+
+  useEffect(() => {
+    if (refreshTokenRef.current === refreshToken) {
+      return;
+    }
+    refreshTokenRef.current = refreshToken;
+    void refresh(true);
+  }, [refresh, refreshToken]);
+
+  return {
+    captcha,
+    image: captcha?.image ?? "",
+    loading,
+    refresh,
+    uuid: captcha?.uuid ?? "",
+  };
 }

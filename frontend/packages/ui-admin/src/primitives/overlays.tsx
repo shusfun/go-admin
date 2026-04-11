@@ -153,19 +153,28 @@ TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 
 export const DropdownMenu = DropdownMenuPrimitive.Root;
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
+type DropdownMenuContentProps = React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> & {
+  portalled?: boolean;
+};
 export const DropdownMenuContent = forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
->(({ className, sideOffset = 8, ...props }, ref) => (
-  <DropdownMenuPrimitive.Portal>
+  DropdownMenuContentProps
+>(({ className, portalled = true, sideOffset = 8, ...props }, ref) => {
+  const content = (
     <DropdownMenuPrimitive.Content
       className={cn("z-50 min-w-[12rem] overflow-hidden rounded-2xl border border-border bg-popover p-1 text-popover-foreground shadow-[var(--shadow-soft)]", className)}
       ref={ref}
       sideOffset={sideOffset}
       {...props}
     />
-  </DropdownMenuPrimitive.Portal>
-));
+  );
+
+  if (!portalled) {
+    return content;
+  }
+
+  return <DropdownMenuPrimitive.Portal>{content}</DropdownMenuPrimitive.Portal>;
+});
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
 
 export const DropdownMenuItem = forwardRef<

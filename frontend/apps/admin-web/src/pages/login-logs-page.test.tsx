@@ -13,10 +13,6 @@ let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 const originalConsoleError = console.error;
 const originalConsoleWarn = console.warn;
 
-function findButton(label: string) {
-  return Array.from(document.querySelectorAll("button")).find((item) => item.textContent?.includes(label));
-}
-
 async function flushPromises(rounds = 5) {
   for (let index = 0; index < rounds; index += 1) {
     await act(async () => {
@@ -43,14 +39,6 @@ async function waitForCondition(assertion: () => void, timeoutMs = 2000) {
   }
 
   throw lastError instanceof Error ? lastError : new Error("等待断言超时");
-}
-
-async function clickButton(label: string) {
-  const button = findButton(label);
-  expect(button).toBeTruthy();
-  await act(async () => {
-    button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-  });
 }
 
 function createApi() {
@@ -138,21 +126,24 @@ afterEach(() => {
 });
 
 describe("LoginLogsPage", () => {
-  it("点击详情后通过 DetailDialog 展示完整日志内容", async () => {
+  it("选中日志后在详情面板展示完整内容", async () => {
     const api = createApi();
 
     await renderPage(api);
     await waitForCondition(() => {
       expect(document.body.textContent).toContain("admin");
-      expect(findButton("详情")).toBeTruthy();
+      expect(document.querySelector('[data-login-log-id="7"]')).toBeTruthy();
     });
 
-    await clickButton("详情");
+    await act(async () => {
+      document.querySelector('[data-login-log-id="7"]')?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
     await waitForCondition(() => {
       expect(api.admin.getLoginLog).toHaveBeenCalledWith(7);
-      expect(document.body.textContent).toContain("登录日志详情");
       expect(document.body.textContent).toContain("上海");
       expect(document.body.textContent).toContain("login success");
+      expect(document.body.textContent).toContain("详情区在桌面端固定在右侧");
     });
   });
 });

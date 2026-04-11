@@ -4,8 +4,12 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import {
   AdminPageStack,
+  AppVirtualList,
   AsyncActionButton,
+  Badge,
   Button,
+  Card,
+  CardContent,
   ConfirmDialog,
   DataTableSection,
   DetailPane,
@@ -30,7 +34,7 @@ import {
   Toolbar,
   toast,
 } from "@go-admin/ui-admin";
-import { createApiClient } from "@go-admin/api";
+import { createApiClient, toUserFacingErrorMessage } from "@go-admin/api";
 import type { SysDictDataRecord, SysDictTypeRecord } from "@go-admin/types";
 
 type DictTypeDraft = {
@@ -151,7 +155,7 @@ export function DictsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "dict-types"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "字典类型保存失败");
+      toast.error(toUserFacingErrorMessage(error, "字典类型保存失败"));
     },
   });
   const dataMutation = useMutation({
@@ -182,7 +186,7 @@ export function DictsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "dict-data"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "字典数据保存失败");
+      toast.error(toUserFacingErrorMessage(error, "字典数据保存失败"));
     },
   });
   const typeDeleteMutation = useMutation({
@@ -196,7 +200,7 @@ export function DictsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "dict-types"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "字典类型删除失败");
+      toast.error(toUserFacingErrorMessage(error, "字典类型删除失败"));
     },
   });
   const dataDeleteMutation = useMutation({
@@ -206,7 +210,7 @@ export function DictsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "dict-data"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "字典数据删除失败");
+      toast.error(toUserFacingErrorMessage(error, "字典数据删除失败"));
     },
   });
 
@@ -258,13 +262,13 @@ export function DictsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
           </Button>
         }
         description="管理系统字典类型与字典数据。"
-        kicker="Admin Module"
+        kicker="管理台"
         title="字典管理"
       />
 
       <MasterDetailLayout>
         <ListPane>
-          <FilterPanel description="左侧只负责类型选择与维护，详情区由右侧承接。">
+          <FilterPanel>
             <FormField label="字典名称">
               <Input onChange={(event) => setTypeKeyword(event.target.value)} placeholder="按名称过滤" value={typeKeyword} />
             </FormField>
@@ -315,29 +319,75 @@ export function DictsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
           </FilterPanel>
 
           <DataTableSection description={selectedType ? `当前共 ${(dataQuery.data?.list || []).length} 条数据。` : "右侧仅展示当前字典类型的数据。"} title="字典数据">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>标签</TableHead>
-                  <TableHead>值</TableHead>
-                  <TableHead>排序</TableHead>
-                  <TableHead>默认</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(dataQuery.data?.list || []).map((item) => (
-                  <TableRow key={item.dictCode}>
-                    <TableCell>{item.dictLabel}</TableCell>
-                    <TableCell>{item.dictValue}</TableCell>
-                    <TableCell>{item.dictSort}</TableCell>
-                    <TableCell>{item.isDefault === "Y" ? "是" : "否"}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={item.status === 2 ? "正常" : "停用"} />
-                    </TableCell>
-                    <TableCell>
-                      <RowActions>
+            <div className="flex flex-wrap items-center gap-2 rounded-[1.25rem] border border-border/70 bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
+              <Badge tone="muted">数据 {dataQuery.data?.list?.length || 0}</Badge>
+              <Badge tone="info">右侧详情承接编辑</Badge>
+              <Badge tone="primary">中小屏使用数据卡片</Badge>
+            </div>
+            <div className="hidden xl:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>标签</TableHead>
+                    <TableHead>值</TableHead>
+                    <TableHead>排序</TableHead>
+                    <TableHead>默认</TableHead>
+                    <TableHead>状态</TableHead>
+                    <TableHead>操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(dataQuery.data?.list || []).map((item) => (
+                    <TableRow key={item.dictCode}>
+                      <TableCell>{item.dictLabel}</TableCell>
+                      <TableCell>{item.dictValue}</TableCell>
+                      <TableCell>{item.dictSort}</TableCell>
+                      <TableCell>{item.isDefault === "Y" ? "是" : "否"}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={item.status === 2 ? "正常" : "停用"} />
+                      </TableCell>
+                      <TableCell>
+                        <RowActions>
+                          <Button onClick={() => openEditDataDialog(item)} size="sm" type="button" variant="outline">
+                            编辑
+                          </Button>
+                          <Button onClick={() => setDataDeleteTarget(item)} size="sm" type="button" variant="destructive">
+                            删除
+                          </Button>
+                        </RowActions>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="xl:hidden">
+              <AppVirtualList
+                className="max-h-[34rem]"
+                contentClassName="grid"
+                empty={<div className="px-4 py-8 text-sm text-muted-foreground">当前字典类型下暂无数据。</div>}
+                estimatedItemSize={148}
+                getItemKey={(item) => item.dictCode || item.dictValue}
+                items={dataQuery.data?.list || []}
+                overscan={4}
+              >
+                {(item) => (
+                  <Card className="rounded-none border-x-0 border-t-0 shadow-none first:rounded-t-[1.25rem] last:rounded-b-[1.25rem] last:border-b">
+                    <CardContent className="grid gap-4 px-4 py-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="grid gap-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-base font-semibold text-foreground">{item.dictLabel}</span>
+                            {item.isDefault === "Y" ? <Badge tone="primary">默认</Badge> : null}
+                          </div>
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                            <span>值 {item.dictValue}</span>
+                            <span>排序 {item.dictSort}</span>
+                          </div>
+                        </div>
+                        <StatusBadge status={item.status === 2 ? "正常" : "停用"} />
+                      </div>
+                      <RowActions className="justify-end border-t border-border/70 pt-3">
                         <Button onClick={() => openEditDataDialog(item)} size="sm" type="button" variant="outline">
                           编辑
                         </Button>
@@ -345,11 +395,11 @@ export function DictsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
                           删除
                         </Button>
                       </RowActions>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </CardContent>
+                  </Card>
+                )}
+              </AppVirtualList>
+            </div>
           </DataTableSection>
         </DetailPane>
       </MasterDetailLayout>

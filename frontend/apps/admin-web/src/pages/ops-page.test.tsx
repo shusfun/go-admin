@@ -115,7 +115,7 @@ function createApi() {
           duration: "10s",
           domain: "https://prod.example.com",
           status: "success",
-          summary: "发布完成",
+          summary: "代码更新完成",
         });
         return vi.fn();
       }),
@@ -180,10 +180,10 @@ describe("OpsPage", () => {
 
     await renderPage(api);
     await waitForCondition(() => {
-      expect(findButton("全部发布")).toBeTruthy();
+      expect(findButton("全部更新")).toBeTruthy();
     });
 
-    await clickButton("全部发布");
+    await clickButton("全部更新");
     await flushPromises();
 
     expect(document.body.textContent).toContain("请输入 prod-sh 确认");
@@ -198,7 +198,7 @@ describe("OpsPage", () => {
       setNativeValue(input, "prod-sh");
     });
 
-    await clickButton("确认发布");
+    await clickButton("确认更新");
     await flushPromises(8);
 
     expect(api.ops.createTask).toHaveBeenCalledWith({

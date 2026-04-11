@@ -60,4 +60,18 @@ describe("ui-admin error pages", () => {
     expect(document.body.textContent).not.toContain("地址失效");
     expect(document.body.textContent).not.toContain("建议下一步");
   });
+
+  it("全屏错误页在桌面宽度断点提前切到双列布局，避免 admin-web 出现页面滚动条", async () => {
+    await act(async () => {
+      root.render(<Error500 />);
+    });
+
+    const content = document.querySelector("section > div.relative.grid") as HTMLDivElement | null;
+    const illustrationWrap = document.querySelector("section img")?.parentElement as HTMLDivElement | null;
+    const image = document.querySelector("section img") as HTMLImageElement | null;
+
+    expect(content?.className).toContain("lg:grid-cols-[minmax(0,0.94fr)_minmax(22rem,1.06fr)]");
+    expect(illustrationWrap?.className).toContain("lg:min-h-[22rem]");
+    expect(image?.className).toContain("xl:max-h-[30rem]");
+  });
 });

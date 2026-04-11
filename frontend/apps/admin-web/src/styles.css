@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 @layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
   * {
     @apply border-border;
   }
@@ -12,6 +18,7 @@
   }
 
   body {
+    margin: 0;
     @apply bg-background text-foreground antialiased;
   }
 
@@ -22,7 +29,22 @@
 }
 
 @layer components {
+  :root {
+    --ui-admin-sidebar-item-hover-bg: hsl(var(--secondary) / 0.8);
+    --ui-admin-sidebar-item-open-bg: hsl(var(--secondary) / 0.58);
+    --ui-admin-sidebar-item-active-color: hsl(var(--primary));
+    --ui-admin-sidebar-item-hover-color: hsl(var(--foreground));
+  }
+
   .admin-locale-toggle {
-    @apply fixed right-4 top-4 z-50 min-w-[3.5rem] rounded-full px-3 text-xs font-semibold uppercase tracking-[0.18em] shadow-sm;
+    @apply h-10 w-10 rounded-full p-0 shadow-sm;
+  }
+
+  .admin-locale-toggle svg {
+    @apply h-[1.2em] w-[1.2em];
+  }
+
+  .admin-topbar-theme-toggle > button {
+    @apply border-0 shadow-none;
   }
 }

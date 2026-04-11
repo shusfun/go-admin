@@ -1,10 +1,16 @@
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { toUserFacingErrorMessage } from "@go-admin/api";
 import { useI18n } from "@go-admin/i18n";
 import {
   AppScrollbar,
+  AppVirtualList,
+  Badge,
   Button,
+  Card,
+  CardContent,
+  Checkbox,
   ConfirmDialog,
   DataTableSection,
   EmptyBlock,
@@ -16,6 +22,9 @@ import {
   Loading,
   PageHeader,
   Pagination,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   RowActions,
   Select,
   StatusBadge,
@@ -25,6 +34,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   Textarea,
   Toolbar,
   toast,
@@ -32,8 +44,10 @@ import {
 import type { PagePayload, QueryPayload } from "@go-admin/types";
 
 type Column<T> = {
+  key?: string;
   label: string;
   render: (row: T) => ReactNode;
+  alwaysVisible?: boolean;
 };
 
 type SearchField = {
@@ -69,10 +83,54 @@ type CrudDataPageProps<T extends object> = {
   getRowId: (item: T) => number | string;
   renderAside?: () => ReactNode;
   rowActions?: (item: T) => ReactNode;
+  viewPresets?: Array<{
+    key: string;
+    label: string;
+    description?: string;
+    columnKeys: string[];
+  }>;
 };
+
+const EMPTY_SEARCH_FIELDS: SearchField[] = [];
+const EMPTY_FORM_FIELDS: FormFieldType[] = [];
+const EMPTY_VIEW_PRESETS: NonNullable<CrudDataPageProps<object>["viewPresets"]> = [];
 
 function defaultDraftFactory() {
   return {};
+}
+
+function isStatusLabel(label: string) {
+  return ["状态", "结果", "健康状态"].some((keyword) => label.includes(keyword));
+}
+
+function isSameStringArray(left: string[], right: string[]) {
+  if (left === right) {
+    return true;
+  }
+
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((item, index) => item === right[index]);
+}
+
+function renderColumnValue<T extends object>(column: Column<T>, item: T) {
+  const value = column.render(item);
+
+  if (typeof value === "string" && isStatusLabel(column.label)) {
+    return <StatusBadge status={value} />;
+  }
+
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  return value;
+}
+
+function getColumnKey<T extends object>(column: Column<T>, index: number) {
+  return column.key || `${index}:${column.label}`;
 }
 
 export function CrudDataPage<T extends object>({
@@ -80,8 +138,8 @@ export function CrudDataPage<T extends object>({
   description,
   queryKey,
   columns,
-  searchFields = [],
-  formFields = [],
+  searchFields = EMPTY_SEARCH_FIELDS,
+  formFields = EMPTY_FORM_FIELDS,
   fetcher,
   createItem,
   updateItem,
@@ -91,6 +149,7 @@ export function CrudDataPage<T extends object>({
   getRowId,
   renderAside,
   rowActions,
+  viewPresets = EMPTY_VIEW_PRESETS as NonNullable<CrudDataPageProps<T>["viewPresets"]>,
 }: CrudDataPageProps<T>) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
@@ -100,8 +159,27 @@ export function CrudDataPage<T extends object>({
   const [editingId, setEditingId] = useState<number | string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<T | null>(null);
+  const [activeViewKey, setActiveViewKey] = useState(viewPresets[0]?.key || "all");
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState<string[]>([]);
 
   const params = useMemo<QueryPayload>(() => ({ ...filters, pageIndex, pageSize: 20 }), [filters, pageIndex]);
+  const normalizedColumns = useMemo(
+    () =>
+      columns.map((column, index) => ({
+        ...column,
+        key: getColumnKey(column, index),
+      })),
+    [columns],
+  );
+  const defaultVisibleColumnKeys = useMemo(() => {
+    const preset = viewPresets.find((item) => item.key === activeViewKey);
+    if (preset) {
+      return normalizedColumns
+        .filter((column, index) => index === 0 || preset.columnKeys.includes(column.key))
+        .map((column) => column.key);
+    }
+    return normalizedColumns.map((column) => column.key);
+  }, [activeViewKey, normalizedColumns, viewPresets]);
 
   const listQuery = useQuery({
     queryKey: ["admin-page", queryKey, params],
@@ -126,7 +204,7 @@ export function CrudDataPage<T extends object>({
       await queryClient.invalidateQueries({ queryKey: ["admin-page", queryKey] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("admin.crud.saveError"));
+      toast.error(toUserFacingErrorMessage(error, t("admin.crud.saveError")));
     },
   });
 
@@ -143,13 +221,45 @@ export function CrudDataPage<T extends object>({
       await queryClient.invalidateQueries({ queryKey: ["admin-page", queryKey] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("admin.crud.deleteError"));
+      toast.error(toUserFacingErrorMessage(error, t("admin.crud.deleteError")));
     },
   });
 
   const list = listQuery.data?.list || [];
   const total = listQuery.data?.count || 0;
   const totalPages = Math.max(1, Math.ceil(total / 20));
+  const visibleColumns = normalizedColumns.filter((column) => visibleColumnKeys.includes(column.key));
+  const primaryColumn = visibleColumns[0];
+  const secondaryColumn = visibleColumns[1];
+  const statusColumn = visibleColumns.find((column) => isStatusLabel(column.label));
+  const detailColumns = visibleColumns.filter((column) => column !== primaryColumn && column !== secondaryColumn && column !== statusColumn);
+  const summaryColumns = detailColumns.slice(0, 3);
+  const hasActions = Boolean(rowActions || createItem || updateItem || deleteItem);
+  const activeView = viewPresets.find((item) => item.key === activeViewKey);
+
+  useEffect(() => {
+    setActiveViewKey((current) => {
+      if (viewPresets.length === 0) {
+        return "all";
+      }
+      return viewPresets.some((item) => item.key === current) ? current : viewPresets[0].key;
+    });
+  }, [viewPresets]);
+
+  useEffect(() => {
+    setVisibleColumnKeys((current) => (isSameStringArray(current, defaultVisibleColumnKeys) ? current : defaultVisibleColumnKeys));
+  }, [defaultVisibleColumnKeys]);
+
+  function toggleColumnVisibility(columnKey: string, checked: boolean) {
+    setVisibleColumnKeys((current) => {
+      if (checked) {
+        return normalizedColumns
+          .filter((column) => current.includes(column.key) || column.key === columnKey)
+          .map((column) => column.key);
+      }
+      return current.filter((item) => item !== columnKey);
+    });
+  }
 
   function openCreateDialog() {
     setEditingId(null);
@@ -167,7 +277,7 @@ export function CrudDataPage<T extends object>({
     <div className="grid gap-6">
       <PageHeader
         description={description}
-        kicker="Admin Module"
+        kicker="管理台"
         title={title}
       />
 
@@ -218,32 +328,186 @@ export function CrudDataPage<T extends object>({
         ) : null}
         {!listQuery.isLoading && !listQuery.isError ? (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {columns.map((column) => (
-                    <TableHead key={column.label}>{column.label}</TableHead>
-                  ))}
-                  {(rowActions || createItem || updateItem || deleteItem) ? <TableHead>{t("admin.common.actions")}</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {list.length ? (
-                  list.map((item) => (
-                    <TableRow key={String(getRowId(item))}>
-                      {columns.map((column) => (
-                        <TableCell key={column.label}>
-                          {typeof column.render(item) === "string" &&
-                          ["状态", "结果", "健康状态"].some((keyword) => column.label.includes(keyword)) ? (
-                            <StatusBadge status={String(column.render(item))} />
-                          ) : (
-                            column.render(item)
-                          )}
-                        </TableCell>
-                      ))}
-                      {(rowActions || createItem || updateItem || deleteItem) ? (
-                        <TableCell>
-                          <RowActions>
+            <div className="grid gap-4">
+              <div className="grid gap-3 rounded-[1.25rem] border border-border/70 bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone="muted">共 {total} 条</Badge>
+                    <Badge tone="primary">{activeView?.label || "完整字段"}</Badge>
+                    <Badge tone="info">中小屏虚拟化</Badge>
+                  </div>
+                  <span>{activeView?.description || "桌面端保留完整表格，便于横向比对字段；中小屏自动切换为虚拟化卡片列表。"}</span>
+                </div>
+                {viewPresets.length || normalizedColumns.length > 1 ? (
+                  <div className="flex flex-col gap-3 border-t border-border/70 pt-3 xl:flex-row xl:items-center xl:justify-between">
+                    {viewPresets.length ? (
+                      <div className="grid gap-2">
+                        <Tabs onValueChange={setActiveViewKey} value={activeViewKey}>
+                          <TabsList className="h-auto flex-wrap justify-start">
+                            {viewPresets.map((preset) => (
+                              <TabsTrigger key={preset.key} value={preset.key}>
+                                {preset.label}
+                              </TabsTrigger>
+                            ))}
+                          </TabsList>
+                        </Tabs>
+                        {activeView?.description ? <span className="text-xs text-muted-foreground">{activeView.description}</span> : null}
+                      </div>
+                    ) : <span className="text-xs text-muted-foreground">当前展示全部字段，可按业务需要手动隐藏次要列。</span>}
+                    {normalizedColumns.length > 1 ? (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button type="button" variant="outline">
+                            列设置 · {visibleColumns.length}/{normalizedColumns.length}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="grid w-[18rem] gap-2 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="grid gap-0.5">
+                              <span className="text-sm font-medium text-foreground">显示字段</span>
+                              <span className="text-xs text-muted-foreground">首列保持常驻，避免摘要信息丢失。</span>
+                            </div>
+                            <Button
+                              onClick={() => setVisibleColumnKeys(defaultVisibleColumnKeys)}
+                              size="sm"
+                              type="button"
+                              variant="ghost"
+                            >
+                              恢复默认
+                            </Button>
+                          </div>
+                          <div className="grid gap-2">
+                            {normalizedColumns.map((column, index) => {
+                              const locked = index === 0 || Boolean(column.alwaysVisible);
+                              const checked = visibleColumnKeys.includes(column.key);
+                              return (
+                                <label className="flex items-center gap-3 rounded-xl border border-border/70 px-3 py-2 text-sm" key={column.key}>
+                                  <Checkbox
+                                    checked={checked}
+                                    disabled={locked}
+                                    onCheckedChange={(value) => toggleColumnVisibility(column.key, value === true)}
+                                  />
+                                  <span className="flex-1 text-foreground">{column.label}</span>
+                                  {locked ? <Badge tone="muted">固定</Badge> : null}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="hidden xl:grid gap-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {visibleColumns.map((column) => (
+                      <TableHead key={column.label}>{column.label}</TableHead>
+                    ))}
+                    {hasActions ? <TableHead>{t("admin.common.actions")}</TableHead> : null}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {list.length ? (
+                    list.map((item) => (
+                      <TableRow key={String(getRowId(item))}>
+                        {visibleColumns.map((column) => (
+                          <TableCell className={column === primaryColumn ? "min-w-[180px]" : undefined} key={column.label}>
+                            {renderColumnValue(column, item)}
+                          </TableCell>
+                        ))}
+                        {hasActions ? (
+                          <TableCell>
+                            <RowActions>
+                              {updateItem ? (
+                                <Button onClick={() => openEditDialog(item)} size="sm" type="button" variant="outline">
+                                  {t("admin.crud.actions.edit")}
+                                </Button>
+                              ) : null}
+                              {deleteItem ? (
+                                <Button onClick={() => setDeleteTarget(item)} size="sm" type="button" variant="destructive">
+                                  {t("admin.crud.actions.delete")}
+                                </Button>
+                              ) : null}
+                              {rowActions ? rowActions(item) : null}
+                            </RowActions>
+                          </TableCell>
+                        ) : null}
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell className="py-8" colSpan={visibleColumns.length + (hasActions ? 1 : 0)}>
+                        <EmptyBlock description={t("admin.crud.empty.description")} title={t("admin.crud.empty.title")} />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="grid gap-4 xl:hidden">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.25rem] border border-border/70 bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone="muted">共 {total} 条</Badge>
+                  <Badge tone="success">虚拟列表</Badge>
+                  <Badge tone="info">中小屏重排</Badge>
+                </div>
+                <span>主信息前置，低频字段折叠到卡片明细，避免继续横向堆列。</span>
+              </div>
+              {list.length ? (
+                <AppVirtualList
+                  className="max-h-[34rem]"
+                  contentClassName="grid"
+                  estimatedItemSize={176}
+                  getItemKey={(item) => String(getRowId(item))}
+                  items={list}
+                  overscan={4}
+                >
+                  {(item) => (
+                    <Card className="rounded-none border-x-0 border-t-0 shadow-none first:rounded-t-[1.25rem] last:rounded-b-[1.25rem] last:border-b">
+                      <CardContent className="grid gap-4 px-4 py-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="grid gap-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-base font-semibold text-foreground">{primaryColumn ? renderColumnValue(primaryColumn, item) : String(getRowId(item))}</span>
+                              {secondaryColumn ? (
+                                <span className="text-sm text-muted-foreground">{renderColumnValue(secondaryColumn, item)}</span>
+                              ) : null}
+                            </div>
+                            {summaryColumns.length ? (
+                              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                {summaryColumns.map((column) => (
+                                  <span key={column.label} className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-secondary/35 px-2.5 py-1">
+                                    <span className="font-medium text-foreground">{column.label}</span>
+                                    <span>{renderColumnValue(column, item)}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                          {statusColumn ? (
+                            <div className="flex items-start">
+                              {renderColumnValue(statusColumn, item)}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {detailColumns.map((column) => (
+                            <div className="grid gap-1" key={column.label}>
+                              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">{column.label}</span>
+                              <div className="text-sm leading-6 text-foreground">{renderColumnValue(column, item)}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {hasActions ? (
+                          <RowActions className="justify-end border-t border-border/70 pt-3">
                             {updateItem ? (
                               <Button onClick={() => openEditDialog(item)} size="sm" type="button" variant="outline">
                                 {t("admin.crud.actions.edit")}
@@ -256,19 +520,15 @@ export function CrudDataPage<T extends object>({
                             ) : null}
                             {rowActions ? rowActions(item) : null}
                           </RowActions>
-                        </TableCell>
-                      ) : null}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell className="py-8" colSpan={columns.length + 1}>
-                      <EmptyBlock description={t("admin.crud.empty.description")} title={t("admin.crud.empty.title")} />
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  )}
+                </AppVirtualList>
+              ) : (
+                <EmptyBlock description={t("admin.crud.empty.description")} title={t("admin.crud.empty.title")} />
+              )}
+            </div>
             <Pagination onNext={() => setPageIndex((current) => current + 1)} onPrevious={() => setPageIndex((current) => current - 1)} page={pageIndex} totalPages={totalPages} />
           </>
         ) : null}

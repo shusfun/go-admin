@@ -37,6 +37,7 @@ function createLocalStorageMock(): Storage {
 }
 
 const initialStatus = {
+  hasServerDefaults: true,
   needs_setup: true,
   step: "database",
   defaults: {
@@ -144,7 +145,7 @@ describe("SetupWizardPage 页面流程", () => {
       install: vi.fn().mockResolvedValue(undefined),
       testDatabase: vi.fn().mockResolvedValue(undefined),
     };
-    const onComplete = vi.fn();
+    const onComplete = vi.fn().mockResolvedValue(undefined);
 
     await act(async () => {
       root.render(
@@ -173,6 +174,7 @@ describe("SetupWizardPage 页面流程", () => {
         username: "admin",
       },
       database: initialStatus.defaults.database,
+      environment: "dev",
     });
 
     await act(async () => {
@@ -182,6 +184,11 @@ describe("SetupWizardPage 页面流程", () => {
 
     expect(setupApi.getStatus).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete).toHaveBeenCalledWith({
+      autoLogin: true,
+      password: "admin123",
+      username: "admin",
+    });
   });
 
   it("安装失败时展示错误反馈且不触发完成回调", async () => {
@@ -190,7 +197,7 @@ describe("SetupWizardPage 页面流程", () => {
       install: vi.fn().mockRejectedValue(new Error("数据库初始化失败")),
       testDatabase: vi.fn().mockResolvedValue(undefined),
     };
-    const onComplete = vi.fn();
+    const onComplete = vi.fn().mockResolvedValue(undefined);
 
     await act(async () => {
       root.render(
@@ -210,5 +217,74 @@ describe("SetupWizardPage 页面流程", () => {
     expect(setupApi.install).toHaveBeenCalledTimes(1);
     expect(document.body.textContent).toContain("数据库初始化失败");
     expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it("后端缺少可信默认值时阻止安装提交", async () => {
+    const setupApi = {
+      getStatus: vi.fn(),
+      install: vi.fn(),
+      testDatabase: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await act(async () => {
+      root.render(
+        <I18nProvider initialLocale="zh-CN" messages={adminMessages}>
+          <SetupWizardPage
+            initialStatus={{ ...initialStatus, hasServerDefaults: false, defaults: { ...initialStatus.defaults, environment: "prod" } }}
+            onComplete={vi.fn().mockResolvedValue(undefined)}
+            setupApi={setupApi as never}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    await advanceToAdminStep(setupApi);
+    await setInputValue("password", "admin123");
+    await setInputValue("confirmPassword", "admin123");
+    await clickButton("开始安装");
+    await flushPromises();
+
+    expect(setupApi.install).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("初始化信息暂未准备好，请刷新页面后重试。");
+  });
+
+  it("非开发环境安装完成后切回登录页而不是自动登录", async () => {
+    vi.useFakeTimers();
+
+    const setupApi = {
+      getStatus: vi.fn().mockResolvedValue({ ...initialStatus, needs_setup: false, defaults: { ...initialStatus.defaults, environment: "prod" } }),
+      install: vi.fn().mockResolvedValue(undefined),
+      testDatabase: vi.fn().mockResolvedValue(undefined),
+    };
+    const onComplete = vi.fn().mockResolvedValue(undefined);
+
+    await act(async () => {
+      root.render(
+        <I18nProvider initialLocale="zh-CN" messages={adminMessages}>
+          <SetupWizardPage
+            initialStatus={{ ...initialStatus, defaults: { ...initialStatus.defaults, environment: "prod" } }}
+            onComplete={onComplete}
+            setupApi={setupApi as never}
+          />
+        </I18nProvider>,
+      );
+    });
+
+    await advanceToAdminStep(setupApi);
+    await setInputValue("password", "admin123");
+    await setInputValue("confirmPassword", "admin123");
+    await clickButton("开始安装");
+    await flushPromises();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    await flushPromises(6);
+
+    expect(onComplete).toHaveBeenCalledWith({
+      autoLogin: false,
+      password: "admin123",
+      username: "admin",
+    });
   });
 });

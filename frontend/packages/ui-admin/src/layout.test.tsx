@@ -5,10 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   ConfirmDialog,
+  DetailSplitTablePattern,
   FormDialog,
+  GroupedMetricTablePattern,
   LogViewer,
   ThemeToggle,
   TreeSelectorPanel,
+  WideTablePatternGallery,
+  WorkbenchWideTablePattern,
 } from "./index";
 
 const setTheme = vi.fn();
@@ -199,5 +203,45 @@ describe("ui-admin components", () => {
     });
 
     expect(setTheme).toHaveBeenCalledWith("dark");
+  });
+
+  it("宽表方案组件集渲染三种方案标题", async () => {
+    await act(async () => {
+      root.render(<WideTablePatternGallery />);
+    });
+
+    expect(document.body.textContent).toContain("方案 A · 工作台宽表");
+    expect(document.body.textContent).toContain("方案 B · 列表 + 详情栏");
+    expect(document.body.textContent).toContain("方案 C · 分组宽表");
+  });
+
+  it("列表加详情方案在点击记录后更新详情内容", async () => {
+    await act(async () => {
+      root.render(<DetailSplitTablePattern />);
+    });
+
+    const trigger = document.querySelector('[data-record-id="log-3"]');
+    expect(trigger).toBeTruthy();
+
+    await act(async () => {
+      trigger?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(document.body.textContent).toContain("返利条款审批卡点");
+    expect(document.body.textContent).toContain("法务复核");
+  });
+
+  it("其余两种宽表方案可以独立渲染", async () => {
+    await act(async () => {
+      root.render(
+        <>
+          <WorkbenchWideTablePattern />
+          <GroupedMetricTablePattern />
+        </>,
+      );
+    });
+
+    expect(document.body.textContent).toContain("默认视图");
+    expect(document.body.textContent).toContain("按区域分组");
   });
 });

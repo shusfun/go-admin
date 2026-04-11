@@ -5,8 +5,12 @@ import {
   AdminPageStack,
   AdminTwoColumn,
   AppScrollbar,
+  AppVirtualList,
   AsyncActionButton,
+  Badge,
   Button,
+  Card,
+  CardContent,
   Checkbox,
   ConfirmDialog,
   FilterPanel,
@@ -29,7 +33,7 @@ import {
   TreeTableSection,
   toast,
 } from "@go-admin/ui-admin";
-import { createApiClient } from "@go-admin/api";
+import { createApiClient, toUserFacingErrorMessage } from "@go-admin/api";
 import type { SysApiRecord, SysMenuRecord } from "@go-admin/types";
 
 type FlatMenuRecord = SysMenuRecord & { level: number };
@@ -160,7 +164,7 @@ export function MenusPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "menus-tree"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "菜单保存失败");
+      toast.error(toUserFacingErrorMessage(error, "菜单保存失败"));
     },
   });
   const deleteMutation = useMutation({
@@ -170,7 +174,7 @@ export function MenusPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "menus-tree"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "菜单删除失败");
+      toast.error(toUserFacingErrorMessage(error, "菜单删除失败"));
     },
   });
 
@@ -228,7 +232,7 @@ export function MenusPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       setDialogTitle(`编辑菜单 · ${detail.title}`);
       setDraft(createMenuDraft(detail.parentId, detail));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "菜单详情加载失败");
+      toast.error(toUserFacingErrorMessage(error, "菜单详情加载失败"));
       closeDialog();
       return;
     }
@@ -251,71 +255,125 @@ export function MenusPage({ api }: { api: ReturnType<typeof createApiClient> }) 
           </Button>
         }
         description="管理系统菜单、目录与按钮权限。"
-        kicker="Admin Module"
+        kicker="管理台"
         title="菜单管理"
       />
 
-      <AdminTwoColumn>
-        <FilterPanel description="菜单更新时会保留现有关联 API，避免误清空权限绑定关系。">
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormField label="菜单名称">
-              <Input onChange={(event) => setTitleFilter(event.target.value)} placeholder="按标题过滤" value={titleFilter} />
-            </FormField>
-            <FormField label="显示状态">
-              <Select onValueChange={setVisibleFilter} options={visibleOptions} value={visibleFilter} />
-            </FormField>
-          </div>
-          <Toolbar>
-            <Button onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", "menus-tree"] })} type="button" variant="outline">
-              刷新数据
-            </Button>
-          </Toolbar>
-        </FilterPanel>
-
-        <FilterPanel description="菜单管理注意事项" title="操作说明">
-          <div className="space-y-2 text-sm leading-7 text-muted-foreground">
-            <p>目录、菜单、按钮三类节点共享一套表单，字段按后端 DTO 原样提交。</p>
-            <p>编辑时先拉取详情再回填 API 关联，避免 `sys_menu_api_rule` 被意外清空。</p>
-          </div>
-        </FilterPanel>
-      </AdminTwoColumn>
+      <FilterPanel>
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField label="菜单名称">
+            <Input onChange={(event) => setTitleFilter(event.target.value)} placeholder="按标题过滤" value={titleFilter} />
+          </FormField>
+          <FormField label="显示状态">
+            <Select onValueChange={setVisibleFilter} options={visibleOptions} value={visibleFilter} />
+          </FormField>
+        </div>
+        <Toolbar>
+          <Button onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", "menus-tree"] })} type="button" variant="outline">
+            刷新数据
+          </Button>
+        </Toolbar>
+      </FilterPanel>
 
       <TreeTableSection description={`当前共 ${rows.length} 个菜单节点。`} title="菜单树">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>菜单名称</TableHead>
-              <TableHead>路径 / 组件</TableHead>
-              <TableHead>类型</TableHead>
-              <TableHead>权限标识</TableHead>
-              <TableHead>显示状态</TableHead>
-              <TableHead>关联 API</TableHead>
-              <TableHead>操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.menuId}>
-                <TableCell>
-                  <div className="space-y-1">
-                    <div className="font-medium text-foreground">{`${"　".repeat(row.level)}${row.title}`}</div>
-                    <div className="text-xs text-muted-foreground">{row.menuName || "-"}</div>
+        <div className="flex flex-wrap items-center gap-2 rounded-[1.25rem] border border-border/70 bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
+          <Badge tone="muted">节点 {rows.length}</Badge>
+          <Badge tone="primary">树结构信息前置</Badge>
+          <Badge tone="info">路径与组件拆成主次信息</Badge>
+        </div>
+        <div className="hidden xl:block">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>菜单名称</TableHead>
+                <TableHead>路径 / 页面</TableHead>
+                <TableHead>类型</TableHead>
+                <TableHead>权限标识</TableHead>
+                <TableHead>显示状态</TableHead>
+                <TableHead>关联接口</TableHead>
+                <TableHead>操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.menuId}>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="font-medium text-foreground">{`${"　".repeat(row.level)}${row.title}`}</div>
+                      <div className="text-xs text-muted-foreground">{row.menuName || "-"}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div>{row.path || "-"}</div>
+                      <div className="text-xs text-muted-foreground">{row.component || "-"}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{menuTypeLabels[row.menuType] || row.menuType}</TableCell>
+                  <TableCell>{row.permission || "-"}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={row.visible === "0" ? "显示" : "隐藏"} />
+                  </TableCell>
+                  <TableCell>{row.sysApi?.length || 0}</TableCell>
+                  <TableCell>
+                    <RowActions>
+                      <Button onClick={() => void openEditDialog(row)} size="sm" type="button" variant="outline">
+                        编辑
+                      </Button>
+                      {row.menuType !== "F" ? (
+                        <Button onClick={() => openCreateDialog(row)} size="sm" type="button" variant="outline">
+                          新增子级
+                        </Button>
+                      ) : null}
+                      <Button onClick={() => setDeleteTarget(row)} size="sm" type="button" variant="destructive">
+                        删除
+                      </Button>
+                    </RowActions>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="xl:hidden">
+          <AppVirtualList
+            className="max-h-[34rem]"
+            contentClassName="grid"
+            empty={<div className="px-4 py-8 text-sm text-muted-foreground">暂无菜单节点。</div>}
+            estimatedItemSize={176}
+            getItemKey={(item) => item.menuId}
+            items={rows}
+            overscan={4}
+          >
+            {(row) => (
+              <Card className="rounded-none border-x-0 border-t-0 shadow-none first:rounded-t-[1.25rem] last:rounded-b-[1.25rem] last:border-b">
+                <CardContent className="grid gap-4 px-4 py-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="grid gap-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-base font-semibold text-foreground">{row.title}</span>
+                        <Badge tone="muted">层级 {row.level + 1}</Badge>
+                        <Badge tone="info">{menuTypeLabels[row.menuType] || row.menuType}</Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span>{row.menuName || "-"}</span>
+                        <span>{row.path || "-"}</span>
+                        <span>{row.component || "-"}</span>
+                      </div>
+                    </div>
+                    <StatusBadge status={row.visible === "0" ? "显示" : "隐藏"} />
                   </div>
-                </TableCell>
-                <TableCell>
-                  <div className="space-y-1">
-                    <div>{row.path || "-"}</div>
-                    <div className="text-xs text-muted-foreground">{row.component || "-"}</div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-1">
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">权限标识</span>
+                      <span className="text-sm leading-6 text-foreground">{row.permission || "-"}</span>
+                    </div>
+                    <div className="grid gap-1">
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">关联接口</span>
+                      <span className="text-sm leading-6 text-foreground">{row.sysApi?.length || 0} 个</span>
+                    </div>
                   </div>
-                </TableCell>
-                <TableCell>{menuTypeLabels[row.menuType] || row.menuType}</TableCell>
-                <TableCell>{row.permission || "-"}</TableCell>
-                <TableCell>
-                  <StatusBadge status={row.visible === "0" ? "显示" : "隐藏"} />
-                </TableCell>
-                <TableCell>{row.sysApi?.length || 0}</TableCell>
-                <TableCell>
-                  <RowActions>
+                  <RowActions className="justify-end border-t border-border/70 pt-3">
                     <Button onClick={() => void openEditDialog(row)} size="sm" type="button" variant="outline">
                       编辑
                     </Button>
@@ -328,15 +386,14 @@ export function MenusPage({ api }: { api: ReturnType<typeof createApiClient> }) 
                       删除
                     </Button>
                   </RowActions>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                </CardContent>
+              </Card>
+            )}
+          </AppVirtualList>
+        </div>
       </TreeTableSection>
 
       <FormDialog
-        description="菜单表单直接对应后端字段，提交后刷新整棵菜单树。"
         onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) {
@@ -352,7 +409,7 @@ export function MenusPage({ api }: { api: ReturnType<typeof createApiClient> }) 
           <div className="flex min-h-0 flex-1 flex-col">
             <AppScrollbar className="min-h-0 flex-1" viewportClassName="pr-1">
               <div className="grid gap-6">
-                <FormSection description="目录、菜单、按钮的核心字段统一在这里维护。" title="基础信息">
+                <FormSection title="基础信息">
                   <div className="grid gap-4 md:grid-cols-2">
                     <FormField label="上级菜单">
                       <Select
@@ -382,7 +439,7 @@ export function MenusPage({ api }: { api: ReturnType<typeof createApiClient> }) 
                       </FormField>
                     ) : null}
                     {draft.menuType !== "F" ? (
-                      <FormField label="组件路径">
+                      <FormField label="页面路径">
                         <Input onChange={(event) => setDraft((current) => ({ ...current, component: event.target.value }))} value={draft.component} />
                       </FormField>
                     ) : null}
@@ -410,7 +467,7 @@ export function MenusPage({ api }: { api: ReturnType<typeof createApiClient> }) 
                 </FormSection>
 
                 {draft.menuType !== "M" ? (
-                  <FormSection description="为该菜单绑定可访问的后端接口。" title="关联 API">
+                  <FormSection description="选择当前菜单可访问的接口权限。" title="关联接口">
                     <div className="grid gap-3 md:grid-cols-2">
                       {(apiOptionsQuery.data?.list || []).map((item: SysApiRecord) => {
                         const checked = draft.apis.includes(item.id);

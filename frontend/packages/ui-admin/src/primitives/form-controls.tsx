@@ -128,6 +128,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     <div
       className={cn(
         "flex w-full overflow-hidden rounded-xl border bg-background transition-all focus-within:ring-4",
+        controlSizeClasses[size],
         getControlStateClass(resolvedStatus),
         className,
       )}
@@ -136,8 +137,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       {prefix ? <span className="inline-flex items-center pl-3 text-muted-foreground">{prefix}</span> : null}
       <input
         className={cn(
-          "min-w-0 flex-1 bg-transparent px-3 outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
-          controlSizeClasses[size],
+          "h-full min-w-0 flex-1 bg-transparent px-3 outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
           prefix ? "pl-2" : "",
           suffix || clearable || append || passwordToggleEnabled ? "pr-2" : "",
         )}

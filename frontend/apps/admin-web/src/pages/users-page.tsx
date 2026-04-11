@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { CrudDataPage } from "../components/crud-data-page";
 import { Button, ConfirmDialog, FormActions, FormDialog, Input, SectionCard, toast } from "@go-admin/ui-admin";
-import { createApiClient } from "@go-admin/api";
+import { createApiClient, toUserFacingErrorMessage } from "@go-admin/api";
 import type { SysDeptRecord, SysPostRecord, SysRoleRecord, SysUserRecord } from "@go-admin/types";
 
 type SelectOption = {
@@ -90,7 +90,7 @@ export function UsersPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await statusMutation.mutateAsync({ userId: item.userId, status: nextStatus });
       toast.success(`用户「${item.username}」状态已更新`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "用户状态更新失败");
+      toast.error(toUserFacingErrorMessage(error, "用户状态更新失败"));
     }
   }
 
@@ -107,7 +107,7 @@ export function UsersPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await passwordMutation.mutateAsync({ userId: passwordTarget.userId, password: nextPassword.trim() });
       toast.success(`用户「${passwordTarget.username}」密码已重置`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "密码重置失败");
+      toast.error(toUserFacingErrorMessage(error, "密码重置失败"));
     }
   }
 
@@ -115,15 +115,15 @@ export function UsersPage({ api }: { api: ReturnType<typeof createApiClient> }) 
     <>
       <CrudDataPage<SysUserRecord>
         columns={[
-        { label: "账号", render: (row) => row.username as string },
-        { label: "昵称", render: (row) => row.nickName as string },
-        { label: "手机号", render: (row) => row.phone as string },
-        { label: "邮箱", render: (row) => row.email as string },
-        { label: "角色", render: (row) => roleMap.get(row.roleId) || String(row.roleId ?? "-") },
-        { label: "部门", render: (row) => deptMap.get(row.deptId) || String(row.deptId ?? "-") },
-        { label: "岗位", render: (row) => postMap.get(row.postId) || String(row.postId ?? "-") },
-        { label: "状态", render: (row) => (row.status === "2" ? "正常" : "停用") },
-      ]}
+          { key: "username", label: "账号", render: (row) => row.username as string, alwaysVisible: true },
+          { key: "nickName", label: "昵称", render: (row) => row.nickName as string },
+          { key: "phone", label: "手机号", render: (row) => row.phone as string },
+          { key: "email", label: "邮箱", render: (row) => row.email as string },
+          { key: "role", label: "角色", render: (row) => roleMap.get(row.roleId) || String(row.roleId ?? "-") },
+          { key: "dept", label: "部门", render: (row) => deptMap.get(row.deptId) || String(row.deptId ?? "-") },
+          { key: "post", label: "岗位", render: (row) => postMap.get(row.postId) || String(row.postId ?? "-") },
+          { key: "status", label: "状态", render: (row) => (row.status === "2" ? "正常" : "停用") },
+        ]}
         createDraft={() => ({
         username: "",
         password: "",
@@ -173,15 +173,7 @@ export function UsersPage({ api }: { api: ReturnType<typeof createApiClient> }) 
         ]}
         getRowId={(item) => Number(item.userId)}
         queryKey="users"
-        renderAside={() => (
-        <SectionCard title="操作说明" description="用户管理功能说明">
-          <div className="space-y-2 text-sm leading-7 text-muted-foreground">
-            <p>角色、部门、岗位列已映射为名称显示。</p>
-            <p>支持状态切换与密码重置。</p>
-            <p>角色权限分配遵循后端既有规则。</p>
-          </div>
-        </SectionCard>
-        )}
+
         rowActions={(item) => (
           <>
             <Button disabled={statusMutation.isPending} onClick={() => setStatusTarget(item)} size="sm" type="button" variant="outline">
@@ -208,6 +200,26 @@ export function UsersPage({ api }: { api: ReturnType<typeof createApiClient> }) 
         title="用户管理"
         toDraft={(item) => ({ ...item, password: "" })}
         updateItem={(payload) => api.admin.updateUser(payload as { userId: number })}
+        viewPresets={[
+          {
+            key: "overview",
+            label: "主视图",
+            description: "保留账号、昵称、角色、部门和状态，适合权限与组织关系排查。",
+            columnKeys: ["username", "nickName", "role", "dept", "status"],
+          },
+          {
+            key: "contact",
+            label: "联系方式",
+            description: "突出手机号、邮箱和部门信息，适合联络与通知场景。",
+            columnKeys: ["username", "phone", "email", "dept", "status"],
+          },
+          {
+            key: "staffing",
+            label: "任职信息",
+            description: "突出角色、部门、岗位与状态，适合组织编制核对。",
+            columnKeys: ["username", "role", "dept", "post", "status"],
+          },
+        ]}
       />
       <FormDialog
         description={passwordTarget ? `当前用户：${passwordTarget.username}` : undefined}

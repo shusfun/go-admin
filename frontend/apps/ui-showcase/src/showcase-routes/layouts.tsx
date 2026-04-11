@@ -1421,7 +1421,7 @@ function AdminNavigationPage() {
         { description: "菜单树。", name: "menuTree", required: true, type: "AppMenuNode[]" },
         { description: "折叠态。", name: "collapsed", type: "boolean" },
         { description: "导航触发回调。", name: "onNavigate / setCollapsed / onLogout", type: "function" },
-        { description: "用户卡内容。", name: "userCard", type: "ReactNode" },
+        { description: "用户摘要。", name: "avatar / name / roleName", type: "string" },
       ]}
       categoryLabel="文档骨架"
       demos={[
@@ -1433,31 +1433,22 @@ function AdminNavigationPage() {
             <div className="grid gap-6">
               <AdminTopbar
                 breadcrumbs={[{ href: "/", label: "后台" }, { label: "组件展示站" }]}
-                onLogout={() => {
-                  toast.message("这里只做导航展示");
-                }}
                 pageTitle="发布控制台"
                 tenantCode="local"
-                userLabel="张三"
               />
               <AdminThreeColumn>
                 <AdminSidebar
+                  avatar=""
                   collapsed={false}
                   currentPath="/system/users"
                   menuTree={mockMenuTree}
+                  name="张三"
                   onLogout={() => {
                     toast.message("这里只做导航展示");
                   }}
                   onNavigate={() => undefined}
+                  roleName="系统管理员"
                   setCollapsed={() => undefined}
-                  userCard={
-                    <Card>
-                      <CardContent className="p-4">
-                        <p className="text-sm font-medium text-foreground">用户卡片区域</p>
-                        <p className="mt-1 text-sm text-muted-foreground">IdentityCard 由 AdminAppShell 实际承接。</p>
-                      </CardContent>
-                    </Card>
-                  }
                 />
                 <Card>
                   <CardHeader>
@@ -1491,13 +1482,15 @@ function AdminNavigationPage() {
                 </CardHeader>
                 <CardContent>
                   <AdminSidebar
+                    avatar=""
                     collapsed
                     currentPath="/system/users"
                     menuTree={mockMenuTree}
+                    name="张三"
                     onLogout={() => undefined}
                     onNavigate={() => undefined}
+                    roleName="系统管理员"
                     setCollapsed={() => undefined}
-                    userCard={<div className="px-3 py-2 text-xs text-muted-foreground">折叠态用户信息</div>}
                   />
                 </CardContent>
               </Card>

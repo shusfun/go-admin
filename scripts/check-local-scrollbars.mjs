@@ -11,14 +11,7 @@ const targetDirs = [
 const validExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".css"]);
 const overflowPattern = /\boverflow(?:-[xy])?-auto\b/g;
 const inlineAllowMarker = "scroll-rule: allow-local-overflow";
-const allowlist = new Map([
-  [
-    "frontend/apps/ui-showcase/src/app.tsx",
-    [
-      'contentClassName="px-4 py-6 md:px-8 md:py-8 xl:min-h-0 xl:overflow-y-auto"',
-    ],
-  ],
-]);
+const pageOverflowMarker = "scroll-rule: allow-page-content-overflow";
 
 async function collectFiles(dir) {
   const fullDir = path.join(repoRoot, dir);
@@ -41,12 +34,13 @@ async function collectFiles(dir) {
 }
 
 function isAllowed(relativePath, line, previousLine) {
-  const allowedSnippets = allowlist.get(relativePath);
-  if (allowedSnippets?.some((snippet) => line.includes(snippet))) {
-    return true;
-  }
-
-  return line.includes(inlineAllowMarker) || previousLine.includes(inlineAllowMarker);
+  void relativePath;
+  return (
+    line.includes(inlineAllowMarker)
+    || previousLine.includes(inlineAllowMarker)
+    || line.includes(pageOverflowMarker)
+    || previousLine.includes(pageOverflowMarker)
+  );
 }
 
 const violations = [];

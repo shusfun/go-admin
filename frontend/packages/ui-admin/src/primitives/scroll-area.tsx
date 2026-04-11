@@ -1,5 +1,5 @@
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
-import { cloneElement, forwardRef, isValidElement } from "react";
+import { cloneElement, forwardRef, isValidElement, useLayoutEffect, useRef } from "react";
 
 import { cn } from "../lib/utils";
 
@@ -12,14 +12,6 @@ function assignRef<T>(ref: React.Ref<T | null> | undefined, value: T | null) {
   if (ref) {
     (ref as React.MutableRefObject<T | null>).current = value;
   }
-}
-
-function mergeRefs<T>(...refs: Array<React.Ref<T | null> | undefined>) {
-  return (value: T | null) => {
-    for (const ref of refs) {
-      assignRef(ref, value);
-    }
-  };
 }
 
 export type AppScrollbarProps = React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> & {
@@ -51,6 +43,15 @@ Scrollbar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName;
 export const AppScrollbar = forwardRef<React.ElementRef<typeof ScrollAreaPrimitive.Root>, AppScrollbarProps>(
   ({ children, className, rootSlot, type = "hover", viewportClassName, viewportProps, viewportRef, ...props }, ref) => {
     const rootClassName = cn("relative overflow-hidden", className);
+    const innerViewportRef = useRef<React.ElementRef<typeof ScrollAreaPrimitive.Viewport> | null>(null);
+
+    useLayoutEffect(() => {
+      assignRef(viewportRef, innerViewportRef.current);
+      return () => {
+        assignRef(viewportRef, null);
+      };
+    }, [viewportRef]);
+
     const content = (
       <>
         <ScrollAreaPrimitive.Viewport
@@ -60,7 +61,7 @@ export const AppScrollbar = forwardRef<React.ElementRef<typeof ScrollAreaPrimiti
             viewportClassName,
             viewportProps?.className,
           )}
-          ref={mergeRefs(viewportRef)}
+          ref={innerViewportRef}
         >
           {children}
         </ScrollAreaPrimitive.Viewport>

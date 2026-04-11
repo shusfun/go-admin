@@ -1,4 +1,8 @@
 /** @type {import('tailwindcss').Config} */
+function colorToken(name) {
+  return `hsl(var(${name}) / <alpha-value>)`;
+}
+
 const sharedTheme = {
   extend: {
     borderRadius: {
@@ -15,37 +19,37 @@ const sharedTheme = {
     },
     colors: {
       accent: {
-        DEFAULT: "hsl(var(--accent))",
-        foreground: "hsl(var(--accent-foreground))",
+        DEFAULT: colorToken("--accent"),
+        foreground: colorToken("--accent-foreground"),
       },
-      background: "hsl(var(--background))",
-      border: "hsl(var(--border))",
+      background: colorToken("--background"),
+      border: colorToken("--border"),
       card: {
-        DEFAULT: "hsl(var(--card))",
-        foreground: "hsl(var(--card-foreground))",
+        DEFAULT: colorToken("--card"),
+        foreground: colorToken("--card-foreground"),
       },
       destructive: {
-        DEFAULT: "hsl(var(--destructive))",
-        foreground: "hsl(var(--destructive-foreground))",
+        DEFAULT: colorToken("--destructive"),
+        foreground: colorToken("--destructive-foreground"),
       },
-      foreground: "hsl(var(--foreground))",
-      input: "hsl(var(--input))",
+      foreground: colorToken("--foreground"),
+      input: colorToken("--input"),
       muted: {
-        DEFAULT: "hsl(var(--muted))",
-        foreground: "hsl(var(--muted-foreground))",
+        DEFAULT: colorToken("--muted"),
+        foreground: colorToken("--muted-foreground"),
       },
       popover: {
-        DEFAULT: "hsl(var(--popover))",
-        foreground: "hsl(var(--popover-foreground))",
+        DEFAULT: colorToken("--popover"),
+        foreground: colorToken("--popover-foreground"),
       },
       primary: {
-        DEFAULT: "hsl(var(--primary))",
-        foreground: "hsl(var(--primary-foreground))",
+        DEFAULT: colorToken("--primary"),
+        foreground: colorToken("--primary-foreground"),
       },
-      ring: "hsl(var(--ring))",
+      ring: colorToken("--ring"),
       secondary: {
-        DEFAULT: "hsl(var(--secondary))",
-        foreground: "hsl(var(--secondary-foreground))",
+        DEFAULT: colorToken("--secondary"),
+        foreground: colorToken("--secondary-foreground"),
       },
     },
     fontFamily: {

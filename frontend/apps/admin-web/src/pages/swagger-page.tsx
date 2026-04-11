@@ -8,7 +8,7 @@ function resolveToolUrl(path: string) {
 export function SwaggerPage() {
   return (
     <ToolLinkPage
-      description="查看和调试后端 API 接口文档。"
+      description="查看系统接口文档与使用说明。"
       links={[
         {
           label: "Swagger 文档",

@@ -31,6 +31,9 @@ import {
   TabsList,
   TabsTrigger,
   TaskStatusCard,
+  DetailSplitTablePattern,
+  GroupedMetricTablePattern,
+  WorkbenchWideTablePattern,
 } from "@go-admin/ui-admin";
 import { Bell, Database, Shield, UserRound } from "lucide-react";
 import { useState } from "react";
@@ -906,6 +909,46 @@ function VirtualListPage() {
   );
 }
 
+function WideTablePatternsPage() {
+  return (
+    <ShowcaseDocPage
+      apiItems={[
+        { description: "标准业务列表方案，包含视图 tabs、横向滚动、sticky 身份列和虚拟化开关。", name: "WorkbenchWideTablePattern", required: true, type: "React component" },
+        { description: "日志/工单型方案，主列表摘要化，详情信息移入右侧详情栏。", name: "DetailSplitTablePattern", required: true, type: "React component" },
+        { description: "分组盘点型方案，按区域或阶段切块，每组内部支持宽表和虚拟化。", name: "GroupedMetricTablePattern", required: true, type: "React component" },
+      ]}
+      categoryLabel="数据展示"
+      demos={[
+        {
+          code: `<WorkbenchWideTablePattern />`,
+          content: <WorkbenchWideTablePattern />,
+          description: "适合订单、用户、商品这类标准 CRUD 工作台。中等宽度下单元格自动换行，小屏保留横向滚动而不把页面整体拖宽。",
+          title: "方案 A · 工作台宽表",
+        },
+        {
+          code: `<DetailSplitTablePattern />`,
+          content: <DetailSplitTablePattern />,
+          description: "适合日志、审批、工单。主列表只保留扫读信息，长文本、备注和原始负载都在详情栏里承接。",
+          title: "方案 B · 列表 + 详情栏",
+        },
+        {
+          code: `<GroupedMetricTablePattern />`,
+          content: <GroupedMetricTablePattern />,
+          description: "适合区域经营盘点、履约看板、分阶段报表。组头先给语义，再在组内横向比指标。",
+          title: "方案 C · 分组宽表",
+        },
+      ]}
+      description="这页不是在展示单个低阶表格控件，而是在展示三种更接近真实 B 端后台的宽表骨架：工作台宽表、列表 + 详情栏、分组宽表。三套方案都已经接了虚拟化开关，并针对中等宽度做了换行与重排处理。"
+      notes={[
+        "宽表先做视图分流，再谈虚拟化；虚拟化只解决性能，不解决信息架构。",
+        "身份列优先做复合单元格，减少 1 到 3 个散列，避免在中屏时直接爆宽。",
+        "日志、备注、原始负载不应该继续占主表列，应该通过详情栏、展开区或独立详情承接。",
+      ]}
+      title="Wide Table Patterns"
+    />
+  );
+}
+
 export const dataRoutes: ShowcaseRoute[] = [
   { component: TablePage, label: "Table", path: "/data/table", shortLabel: "TBL", summaryKey: "showcase.route.data.table.summary" },
   { component: PaginationPage, label: "Pagination", path: "/data/pagination", shortLabel: "PAG", summaryKey: "showcase.route.data.pagination.summary" },
@@ -915,6 +958,7 @@ export const dataRoutes: ShowcaseRoute[] = [
   { component: IconPage, label: "Icon", path: "/data/icon", shortLabel: "ICN", summaryKey: "showcase.route.data.icon.summary" },
   { component: LogViewerPage, label: "LogViewer", path: "/data/log-viewer", shortLabel: "LOG", summaryKey: "showcase.route.data.log-viewer.summary" },
   { component: VirtualListPage, label: "AppVirtualList", path: "/data/virtual-list", shortLabel: "VTL", summaryKey: "showcase.route.data.virtual-list.summary" },
+  { component: WideTablePatternsPage, label: "Wide Table Patterns", path: "/data/wide-table-patterns", shortLabel: "WDT", summaryKey: "showcase.route.data.wide-table-patterns.summary" },
   { component: DetailGridPage, label: "DetailGrid", path: "/data/detail-grid", shortLabel: "DTL", summaryKey: "showcase.route.data.detail-grid.summary" },
   { component: TaskStatusCardPage, label: "TaskStatusCard", path: "/data/task-status-card", shortLabel: "TSK", summaryKey: "showcase.route.data.task-status-card.summary" },
   { component: CommitListPage, label: "CommitList", path: "/data/commit-list", shortLabel: "CMT", summaryKey: "showcase.route.data.commit-list.summary" },

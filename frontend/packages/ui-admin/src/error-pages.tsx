@@ -73,8 +73,8 @@ function ErrorPage({
   return (
     <section
       className={cn(
-        "relative overflow-hidden rounded-[2rem] border border-border/70 bg-[linear-gradient(160deg,hsl(var(--background))_0%,color-mix(in_srgb,hsl(var(--card))_88%,white)_42%,color-mix(in_srgb,hsl(var(--primary))_10%,hsl(var(--card)))_100%)] text-foreground shadow-[0_24px_80px_-48px_rgba(15,23,42,0.55)] dark:bg-[linear-gradient(160deg,color-mix(in_srgb,hsl(var(--background))_92%,#020617)_0%,color-mix(in_srgb,hsl(var(--card))_72%,#020617)_46%,color-mix(in_srgb,hsl(var(--primary))_24%,#020617)_100%)]",
-        compact ? "min-h-0" : "min-h-[calc(100dvh-2rem)]",
+        "relative overflow-hidden bg-[linear-gradient(160deg,hsl(var(--background))_0%,color-mix(in_srgb,hsl(var(--card))_88%,white)_42%,color-mix(in_srgb,hsl(var(--primary))_10%,hsl(var(--card)))_100%)] text-foreground dark:bg-[linear-gradient(160deg,color-mix(in_srgb,hsl(var(--background))_92%,#020617)_0%,color-mix(in_srgb,hsl(var(--card))_72%,#020617)_46%,color-mix(in_srgb,hsl(var(--primary))_24%,#020617)_100%)]",
+        compact ? "min-h-0 rounded-[2rem] border border-border/70 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.55)]" : "h-full min-h-full rounded-none border-0 shadow-none",
         className,
       )}
       {...props}
@@ -87,11 +87,13 @@ function ErrorPage({
 
       <div
         className={cn(
-          "relative grid gap-10 px-6 py-7 md:px-8 md:py-8",
-          compact ? "xl:grid-cols-[minmax(0,0.95fr)_minmax(20rem,1.05fr)] xl:items-center" : "xl:min-h-[46rem] xl:grid-cols-[minmax(0,0.88fr)_minmax(26rem,1.12fr)] xl:items-center xl:px-12 xl:py-12",
+          "relative grid gap-8 px-6 py-6 md:gap-10 md:px-8 md:py-8",
+          compact
+            ? "xl:grid-cols-[minmax(0,0.95fr)_minmax(20rem,1.05fr)] xl:items-center"
+            : "min-h-full content-center lg:grid-cols-[minmax(0,0.94fr)_minmax(22rem,1.06fr)] lg:items-center lg:px-10 lg:py-10 xl:grid-cols-[minmax(0,0.88fr)_minmax(26rem,1.12fr)] xl:px-12 xl:py-12",
         )}
       >
-        <div className="grid gap-6">
+        <div className="min-w-0 grid gap-6">
           <div className="flex flex-wrap items-center gap-3">
             {badge}
             {code ? (
@@ -120,14 +122,19 @@ function ErrorPage({
           ) : null}
         </div>
 
-        <div className={cn("relative flex items-center justify-center", compact ? "min-h-[20rem]" : "min-h-[24rem] md:min-h-[30rem]")}>
+        <div
+          className={cn(
+            "relative flex min-w-0 items-center justify-center",
+            compact ? "min-h-[20rem]" : "min-h-[16rem] sm:min-h-[20rem] lg:min-h-[22rem] xl:min-h-[30rem]",
+          )}
+        >
           <div className="absolute inset-0 rounded-[2rem] border border-white/35 bg-white/55 shadow-inner dark:border-white/10 dark:bg-white/5" />
           <div className="absolute inset-x-6 top-6 h-px bg-gradient-to-r from-transparent via-white/75 to-transparent dark:via-white/20" />
           <img
             alt={illustrationAlt}
             className={cn(
-              "relative z-10 max-h-[24rem] w-full max-w-[34rem] object-contain drop-shadow-[0_20px_60px_rgba(15,23,42,0.16)] dark:brightness-110 dark:contrast-110 dark:drop-shadow-[0_28px_80px_rgba(2,6,23,0.72)]",
-              compact ? "md:max-h-[22rem]" : "md:max-h-[30rem]",
+              "relative z-10 max-h-[20rem] w-full max-w-[34rem] object-contain drop-shadow-[0_20px_60px_rgba(15,23,42,0.16)] dark:brightness-110 dark:contrast-110 dark:drop-shadow-[0_28px_80px_rgba(2,6,23,0.72)]",
+              compact ? "md:max-h-[22rem]" : "md:max-h-[24rem] xl:max-h-[30rem]",
               illustrationClassName,
             )}
             draggable={false}

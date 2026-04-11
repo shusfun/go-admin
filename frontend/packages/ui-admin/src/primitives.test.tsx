@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AppScrollbar, AppVirtualList, Backtop, DatePicker, DateRangePicker, Form, Input, Textarea, type DateRangePickerValue } from "./index";
+import { AppScrollbar, AppVirtualList, Backtop, buildImageVariantSource, DatePicker, DateRangePicker, Form, ImageCaptchaField, Input, Textarea, type DateRangePickerValue } from "./index";
 
 let host: HTMLDivElement;
 let root: Root;
@@ -227,6 +227,20 @@ describe("ui-admin primitives", () => {
     expect(toggle?.getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("Input 将尺寸类挂载到外层容器，避免在 grid 拉伸时壳子与输入区高度脱节", async () => {
+    await act(async () => {
+      root.render(<Input placeholder="请输入验证码" />);
+    });
+
+    const input = document.querySelector("input") as HTMLInputElement | null;
+    const shell = input?.parentElement as HTMLDivElement | null;
+
+    expect(shell).toBeTruthy();
+    expect(shell?.className).toContain("h-10");
+    expect(shell?.className).toContain("text-sm");
+    expect(input?.className).not.toContain("h-10");
+  });
+
   it("Input 可关闭 password 明文切换能力", async () => {
     await act(async () => {
       root.render(<PasswordToggleDisabledDemo />);
@@ -237,6 +251,74 @@ describe("ui-admin primitives", () => {
 
     expect(input?.type).toBe("password");
     expect(toggle).toBeNull();
+  });
+
+  it("ImageCaptchaField 在短时间重复点击时只发起一条刷新请求，并在冷却后允许再次刷新", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-10T16:30:00+08:00"));
+
+    let resolveRefresh: ((value: { image: string; uuid: string }) => void) | undefined;
+    const getCaptcha = vi
+      .fn<() => Promise<{ image: string; uuid: string }>>()
+      .mockResolvedValueOnce({ image: "data:image/png;base64,first", uuid: "first" })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveRefresh = resolve;
+          }),
+      )
+      .mockResolvedValue({ image: "data:image/png;base64,third", uuid: "third" });
+
+    try {
+      await act(async () => {
+        root.render(
+          <ImageCaptchaField
+            getCaptcha={getCaptcha}
+            imageAlt="captcha"
+            inputProps={{ placeholder: "请输入验证码" }}
+            refreshLabel="刷新验证码"
+          />,
+        );
+      });
+      await flushAct();
+
+      const button = host.querySelector("button") as HTMLButtonElement | null;
+      expect(button).toBeTruthy();
+      expect(getCaptcha).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        vi.advanceTimersByTime(801);
+      });
+
+      await act(async () => {
+        button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+
+      expect(getCaptcha).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        resolveRefresh?.({ image: "data:image/png;base64,second", uuid: "second" });
+      });
+      await flushAct();
+
+      await act(async () => {
+        button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      expect(getCaptcha).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        vi.advanceTimersByTime(801);
+      });
+
+      await act(async () => {
+        button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      expect(getCaptcha).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("Form 根据 layout 输出对应布局类名", async () => {
@@ -695,5 +777,20 @@ describe("ui-admin primitives", () => {
     const updatedMonthToggles = Array.from(document.querySelectorAll("button")).filter((item) => item.getAttribute("aria-label") === "切换月份面板");
     expect(updatedMonthToggles[0]?.textContent).toBe("四月");
     expect(updatedMonthToggles[1]?.textContent).toBe("八月");
+  });
+
+  it("Image 资源对象会按目标尺寸选择最合适的变体路径", () => {
+    const source = {
+      path: "/static/uploadfile/avatar/demo.webp",
+      size: 512,
+      variants: [
+        { path: "/static/uploadfile/avatar/demo@64.webp", size: 64 },
+        { path: "/static/uploadfile/avatar/demo@128.webp", size: 128 },
+        { path: "/static/uploadfile/avatar/demo@256.webp", size: 256 },
+      ],
+    };
+
+    expect(buildImageVariantSource(source, 128)).toBe("/static/uploadfile/avatar/demo@128.webp");
+    expect(buildImageVariantSource(source, 512)).toBe("/static/uploadfile/avatar/demo.webp");
   });
 });

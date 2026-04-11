@@ -5,8 +5,12 @@ import {
   AdminPageStack,
   AdminTwoColumn,
   AppScrollbar,
+  AppVirtualList,
   AsyncActionButton,
+  Badge,
   Button,
+  Card,
+  CardContent,
   ConfirmDialog,
   FilterPanel,
   FormActions,
@@ -27,7 +31,7 @@ import {
   TreeTableSection,
   toast,
 } from "@go-admin/ui-admin";
-import { createApiClient } from "@go-admin/api";
+import { createApiClient, toUserFacingErrorMessage } from "@go-admin/api";
 import type { SysDeptRecord } from "@go-admin/types";
 
 type FlatDeptRecord = SysDeptRecord & { level: number };
@@ -105,7 +109,7 @@ export function DeptsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "depts-tree"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "部门保存失败");
+      toast.error(toUserFacingErrorMessage(error, "部门保存失败"));
     },
   });
   const deleteMutation = useMutation({
@@ -115,7 +119,7 @@ export function DeptsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "depts-tree"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "部门删除失败");
+      toast.error(toUserFacingErrorMessage(error, "部门删除失败"));
     },
   });
 
@@ -167,7 +171,7 @@ export function DeptsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       setDialogTitle(`编辑部门 · ${detail.deptName}`);
       setDraft(createDeptDraft(detail.parentId, detail));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "部门详情加载失败");
+      toast.error(toUserFacingErrorMessage(error, "部门详情加载失败"));
       closeDialog();
       return;
     }
@@ -183,59 +187,100 @@ export function DeptsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
           </Button>
         }
         description="管理组织架构与部门层级。"
-        kicker="Admin Module"
+        kicker="管理台"
         title="部门管理"
       />
 
-      <AdminTwoColumn>
-        <FilterPanel description="可按部门名称筛选。">
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormField label="部门名称">
-              <Input onChange={(event) => setDeptNameFilter(event.target.value)} placeholder="按部门名称过滤" value={deptNameFilter} />
-            </FormField>
-            <FormField label="状态">
-              <Select onValueChange={setStatusFilter} options={statusOptions} value={statusFilter} />
-            </FormField>
-          </div>
-          <Toolbar>
-            <Button onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", "depts-tree"] })} type="button" variant="outline">
-              刷新数据
-            </Button>
-          </Toolbar>
-        </FilterPanel>
-
-        <FilterPanel description="部门树操作说明" title="操作说明">
-          <div className="space-y-2 text-sm leading-7 text-muted-foreground">
-            <p>新增与编辑都会刷新整棵部门树。</p>
-            <p>父部门选择会自动排除当前节点及其后代，避免形成循环引用。</p>
-          </div>
-        </FilterPanel>
-      </AdminTwoColumn>
+      <FilterPanel>
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField label="部门名称">
+            <Input onChange={(event) => setDeptNameFilter(event.target.value)} placeholder="按部门名称过滤" value={deptNameFilter} />
+          </FormField>
+          <FormField label="状态">
+            <Select onValueChange={setStatusFilter} options={statusOptions} value={statusFilter} />
+          </FormField>
+        </div>
+        <Toolbar>
+          <Button onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", "depts-tree"] })} type="button" variant="outline">
+            刷新数据
+          </Button>
+        </Toolbar>
+      </FilterPanel>
 
       <TreeTableSection description={`当前共 ${rows.length} 个部门节点。`} title="部门树">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>部门名称</TableHead>
-              <TableHead>负责人</TableHead>
-              <TableHead>手机号</TableHead>
-              <TableHead>邮箱</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead>操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.deptId}>
-                <TableCell>{`${"　".repeat(row.level)}${row.deptName}`}</TableCell>
-                <TableCell>{row.leader || "-"}</TableCell>
-                <TableCell>{row.phone || "-"}</TableCell>
-                <TableCell>{row.email || "-"}</TableCell>
-                <TableCell>
-                  <StatusBadge status={row.status === 2 ? "正常" : "停用"} />
-                </TableCell>
-                <TableCell>
-                  <RowActions>
+        <div className="flex flex-wrap items-center gap-2 rounded-[1.25rem] border border-border/70 bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
+          <Badge tone="muted">节点 {rows.length}</Badge>
+          <Badge tone="info">层级信息前置</Badge>
+          <Badge tone="primary">中小屏改为树卡片</Badge>
+        </div>
+        <div className="hidden xl:block">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>部门名称</TableHead>
+                <TableHead>负责人</TableHead>
+                <TableHead>手机号</TableHead>
+                <TableHead>邮箱</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead>操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.deptId}>
+                  <TableCell>{`${"　".repeat(row.level)}${row.deptName}`}</TableCell>
+                  <TableCell>{row.leader || "-"}</TableCell>
+                  <TableCell>{row.phone || "-"}</TableCell>
+                  <TableCell>{row.email || "-"}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={row.status === 2 ? "正常" : "停用"} />
+                  </TableCell>
+                  <TableCell>
+                    <RowActions>
+                      <Button onClick={() => void openEditDialog(row)} size="sm" type="button" variant="outline">
+                        编辑
+                      </Button>
+                      <Button onClick={() => openCreateDialog(row)} size="sm" type="button" variant="outline">
+                        新增子级
+                      </Button>
+                      <Button onClick={() => setDeleteTarget(row)} size="sm" type="button" variant="destructive">
+                        删除
+                      </Button>
+                    </RowActions>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="xl:hidden">
+          <AppVirtualList
+            className="max-h-[34rem]"
+            contentClassName="grid"
+            empty={<div className="px-4 py-8 text-sm text-muted-foreground">暂无部门节点。</div>}
+            estimatedItemSize={156}
+            getItemKey={(item) => item.deptId}
+            items={rows}
+            overscan={4}
+          >
+            {(row) => (
+              <Card className="rounded-none border-x-0 border-t-0 shadow-none first:rounded-t-[1.25rem] last:rounded-b-[1.25rem] last:border-b">
+                <CardContent className="grid gap-4 px-4 py-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="grid gap-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-base font-semibold text-foreground">{row.deptName}</span>
+                        <Badge tone="muted">层级 {row.level + 1}</Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span>负责人 {row.leader || "-"}</span>
+                        <span>{row.phone || "-"}</span>
+                        <span>{row.email || "-"}</span>
+                      </div>
+                    </div>
+                    <StatusBadge status={row.status === 2 ? "正常" : "停用"} />
+                  </div>
+                  <RowActions className="justify-end border-t border-border/70 pt-3">
                     <Button onClick={() => void openEditDialog(row)} size="sm" type="button" variant="outline">
                       编辑
                     </Button>
@@ -246,15 +291,14 @@ export function DeptsPage({ api }: { api: ReturnType<typeof createApiClient> }) 
                       删除
                     </Button>
                   </RowActions>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                </CardContent>
+              </Card>
+            )}
+          </AppVirtualList>
+        </div>
       </TreeTableSection>
 
       <FormDialog
-        description="部门树结构由后端维护路径，前端只负责录入业务字段。"
         onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) {

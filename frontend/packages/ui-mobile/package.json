@@ -9,11 +9,14 @@
     "./styles.css": "./src/styles.css"
   },
   "dependencies": {
+    "@go-admin/auth": "workspace:*",
+    "@go-admin/types": "workspace:*",
     "react": "^19.2.0",
     "react-router-dom": "^7.9.4"
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
+    "test": "vitest run",
     "typecheck": "tsc --project tsconfig.json"
   }
 }

@@ -2,8 +2,8 @@ import { Component, Suspense, lazy, useEffect, useRef, useState, type ErrorInfo,
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
-import { createApiClient, ApiError, createSetupApi } from "@go-admin/api";
-import type { SetupStatus } from "@go-admin/api";
+import { createApiClient, ApiError, createSetupApi, toUserFacingErrorMessage } from "@go-admin/api";
+import type { SetupApi, SetupStatus } from "@go-admin/api";
 import { createSessionManager } from "@go-admin/auth";
 import { adaptMenuTree, deriveTenantCode, findMenuByPath } from "@go-admin/core";
 import { useI18n } from "@go-admin/i18n";
@@ -11,6 +11,14 @@ import { AdminAppShell, Button, Card, CardContent, CardDescription, CardHeader, 
 import type { AppMenuNode, AppSession, InfoResponse, ProfileResponse } from "@go-admin/types";
 
 import { AdminLocaleToggle } from "./components/admin-locale-toggle";
+import {
+  buildRememberedLoginDefaults,
+  clearRememberedLogin,
+  readRememberedLogin,
+  writeRememberedLogin,
+} from "./lib/remembered-login";
+import { resolveAdminBranding, resolveAdminDocumentTitle, type AdminBranding } from "./lib/app-branding";
+import type { SetupCompletionPayload } from "./pages/setup-wizard-page";
 
 const LoginPage = lazy(async () => ({ default: (await import("./pages/login-page")).LoginPage }));
 const SetupWizardPage = lazy(async () => ({ default: (await import("./pages/setup-wizard-page")).SetupWizardPage }));
@@ -28,8 +36,6 @@ const LoginLogsPage = lazy(async () => ({ default: (await import("./pages/login-
 const OperaLogsPage = lazy(async () => ({ default: (await import("./pages/opera-logs-page")).OperaLogsPage }));
 const ServerMonitorPage = lazy(async () => ({ default: (await import("./pages/server-monitor-page")).ServerMonitorPage }));
 const SwaggerPage = lazy(async () => ({ default: (await import("./pages/swagger-page")).SwaggerPage }));
-const BuildToolPage = lazy(async () => ({ default: (await import("./pages/build-tool-page")).BuildToolPage }));
-const CodegenPage = lazy(async () => ({ default: (await import("./pages/codegen-page")).CodegenPage }));
 const ScheduleJobsPage = lazy(async () => ({ default: (await import("./pages/schedule-jobs-page")).ScheduleJobsPage }));
 const ScheduleLogsPage = lazy(async () => ({ default: (await import("./pages/schedule-logs-page")).ScheduleLogsPage }));
 const OpsPage = lazy(async () => ({ default: (await import("./pages/ops-page")).OpsPage }));
@@ -54,18 +60,26 @@ function goBackOrHome() {
 }
 
 function getErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return null;
+  return toUserFacingErrorMessage(error, "页面暂时无法打开，请稍后重试");
 }
 
-function ErrorScreenFrame({ children }: { children: ReactNode }) {
+function ErrorScreenFrame({
+  children,
+  fullscreen = false,
+}: {
+  children: ReactNode;
+  fullscreen?: boolean;
+}) {
   return (
-    <div className="min-h-[100dvh] bg-background px-4 py-4 md:px-6 md:py-6">
-      <AdminLocaleToggle />
-      <div className="mx-auto max-w-[1600px]">{children}</div>
+    <div
+      className={[
+        "overflow-hidden bg-background px-4 py-4 md:px-6 md:py-6",
+        fullscreen ? "h-[100dvh]" : "min-h-full",
+      ].join(" ")}
+    >
+      <div className="mx-auto flex h-full min-h-full max-w-[1600px] flex-col">
+        <div className="flex flex-1 min-h-full min-w-0 flex-col [&>*]:h-full [&>*]:min-h-full">{children}</div>
+      </div>
     </div>
   );
 }
@@ -103,11 +117,13 @@ function AdminNotFoundPage() {
 function AdminServerErrorPage({
   description,
   error,
+  fullscreen = false,
   onRetry,
   title,
 }: {
   description?: string;
   error?: unknown;
+  fullscreen?: boolean;
   onRetry?: () => void;
   title?: string;
 }) {
@@ -115,7 +131,7 @@ function AdminServerErrorPage({
   const errorMessage = getErrorMessage(error);
 
   return (
-    <ErrorScreenFrame>
+    <ErrorScreenFrame fullscreen={fullscreen}>
       <Error500
         action={
           <Button onClick={onRetry ?? (() => window.location.reload())} type="button">
@@ -169,11 +185,12 @@ function AdminAppErrorBoundary({ children }: PropsWithChildren) {
   return (
     <AdminAppErrorBoundaryInner
       fallback={(error) => (
-        <AdminServerErrorPage
-          description={t("admin.error.500.boundaryDescription")}
-          error={error}
-          title={t("admin.error.500.boundaryTitle")}
-        />
+      <AdminServerErrorPage
+        description={t("admin.error.500.boundaryDescription")}
+        error={error}
+        fullscreen
+        title={t("admin.error.500.boundaryTitle")}
+      />
       )}
     >
       {children}
@@ -198,26 +215,32 @@ function LoadingScreen() {
   const { t } = useI18n();
 
   return (
-    <div className="grid min-h-[100dvh] place-items-center bg-background px-6">
-      <AdminLocaleToggle />
-      <Card className="w-full max-w-xl">
-        <CardHeader>
-          <CardTitle>{t("admin.loading.title")}</CardTitle>
-          <CardDescription>{t("admin.loading.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Loading label={t("admin.loading.label")} />
-        </CardContent>
-      </Card>
+    <div className="min-h-[100dvh] bg-background px-6 py-6">
+      <div className="mx-auto grid max-w-xl gap-4">
+        <div className="flex justify-end">
+          <AdminLocaleToggle />
+        </div>
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>{t("admin.loading.title")}</CardTitle>
+            <CardDescription>{t("admin.loading.description")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Loading label={t("admin.loading.label")} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
 function AdminWorkbench({
   api,
+  branding,
   onLogout,
 }: {
   api: ReturnType<typeof createApiClient>;
+  branding: AdminBranding;
   onLogout: () => Promise<void>;
 }) {
   const { t } = useI18n();
@@ -244,6 +267,7 @@ function AdminWorkbench({
       <AdminServerErrorPage
         description={t("admin.error.500.bootstrapDescription")}
         error={bootstrapError}
+        fullscreen
         onRetry={() => {
           void infoQuery.refetch();
           void profileQuery.refetch();
@@ -258,6 +282,7 @@ function AdminWorkbench({
     return (
       <AdminServerErrorPage
         description={t("admin.error.500.bootstrapDescription")}
+        fullscreen
         title={t("admin.error.500.bootstrapTitle")}
       />
     );
@@ -267,6 +292,7 @@ function AdminWorkbench({
     <BrowserRouter>
       <ShellContent
         api={api}
+        branding={branding}
         info={infoQuery.data}
         menuTree={menuQuery.data}
         onLogout={onLogout}
@@ -278,12 +304,14 @@ function AdminWorkbench({
 
 function ShellContent({
   api,
+  branding,
   info,
   menuTree,
   onLogout,
   profile,
 }: {
   api: ReturnType<typeof createApiClient>;
+  branding: AdminBranding;
   info: InfoResponse;
   menuTree: AppMenuNode[];
   onLogout: () => Promise<void>;
@@ -291,70 +319,85 @@ function ShellContent({
 }) {
   const location = useLocation();
   const currentMenu = findMenuByPath(menuTree, location.pathname);
+  const pageTitle = currentMenu?.title || (location.pathname === "/ops-service" ? "运维服务" : location.pathname === "/profile" ? "个人中心" : "控制台");
+
+  useEffect(() => {
+    document.title = resolveAdminDocumentTitle(pageTitle, branding.name);
+  }, [branding.name, pageTitle]);
 
   return (
-    <>
-      <AdminLocaleToggle />
-      <AdminAppShell
-        avatar={info.avatar}
-        currentPath={location.pathname}
-        menuTree={menuTree}
-        onLogout={() => void onLogout()}
-        tenantCode={tenant.tenantCode}
-        userName={info.name || info.userName}
-        userRole={info.roles.join(" / ")}
-      >
-        <Suspense fallback={<LoadingScreen />}>
-          <Routes>
-            <Route
-              element={<DashboardPage info={info} menuTree={menuTree} profile={profile} tenantCode={tenant.tenantCode} />}
-              path="/"
-            />
-            <Route element={<AdminNotFoundPage />} path="/404" />
-            <Route element={<AdminServerErrorPage />} path="/500" />
-            <Route element={<UsersPage api={api} />} path="/admin/sys-user" />
-            <Route element={<MenusPage api={api} />} path="/admin/sys-menu" />
-            <Route element={<RolesPage api={api} />} path="/admin/sys-role" />
-            <Route element={<DeptsPage api={api} />} path="/admin/sys-dept" />
-            <Route element={<PostsPage api={api} />} path="/admin/sys-post" />
-            <Route element={<DictsPage api={api} />} path="/admin/dict" />
-            <Route element={<DictsPage api={api} />} path="/admin/dict/data/:dictId" />
-            <Route element={<ConfigsPage api={api} />} path="/admin/sys-config" />
-            <Route element={<SetConfigPage api={api} />} path="/admin/sys-config/set" />
-            <Route element={<ApisPage api={api} />} path="/admin/sys-api" />
-            <Route element={<LoginLogsPage api={api} />} path="/admin/sys-login-log" />
-            <Route element={<OperaLogsPage api={api} />} path="/admin/sys-oper-log" />
-            <Route element={<ServerMonitorPage api={api} />} path="/sys-tools/monitor" />
-            <Route element={<SwaggerPage />} path="/dev-tools/swagger" />
-            <Route element={<BuildToolPage />} path="/dev-tools/build" />
-            <Route element={<CodegenPage />} path="/dev-tools/gen" />
-            <Route element={<CodegenPage />} path="/dev-tools/editTable" />
-            <Route element={<ScheduleJobsPage api={api} />} path="/schedule/manage" />
-            <Route element={<ScheduleLogsPage api={api} />} path="/schedule/log" />
-            <Route element={<OpsPage api={api} />} path="/ops-service" />
-            <Route element={<ProfilePage info={info} profile={profile} />} path="/profile" />
-            <Route element={currentMenu ? <ModulePage currentMenu={currentMenu} /> : <AdminNotFoundPage />} path="*" />
-          </Routes>
-        </Suspense>
-      </AdminAppShell>
-    </>
+    <AdminAppShell
+      avatar={info.avatar}
+      brandLogo={branding.logo}
+      brandTitle={branding.name}
+      currentPath={location.pathname}
+      menuTree={menuTree}
+      onLogout={() => void onLogout()}
+      tenantCode={tenant.tenantCode}
+      topbarActions={<AdminLocaleToggle />}
+      userName={info.name || info.userName}
+      userRole={info.roles.join(" / ")}
+    >
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route
+            element={<DashboardPage info={info} menuTree={menuTree} profile={profile} tenantCode={tenant.tenantCode} />}
+            path="/"
+          />
+          <Route element={<AdminNotFoundPage />} path="/404" />
+          <Route element={<AdminServerErrorPage />} path="/500" />
+          <Route element={<UsersPage api={api} />} path="/admin/sys-user" />
+          <Route element={<MenusPage api={api} />} path="/admin/sys-menu" />
+          <Route element={<RolesPage api={api} />} path="/admin/sys-role" />
+          <Route element={<DeptsPage api={api} />} path="/admin/sys-dept" />
+          <Route element={<PostsPage api={api} />} path="/admin/sys-post" />
+          <Route element={<DictsPage api={api} />} path="/admin/dict" />
+          <Route element={<DictsPage api={api} />} path="/admin/dict/data/:dictId" />
+          <Route element={<ConfigsPage api={api} />} path="/admin/sys-config" />
+          <Route element={<SetConfigPage api={api} />} path="/admin/sys-config/set" />
+          <Route element={<ApisPage api={api} />} path="/admin/sys-api" />
+          <Route element={<LoginLogsPage api={api} />} path="/admin/sys-login-log" />
+          <Route element={<OperaLogsPage api={api} />} path="/admin/sys-oper-log" />
+          <Route element={<ServerMonitorPage api={api} />} path="/sys-tools/monitor" />
+          <Route element={<SwaggerPage />} path="/dev-tools/swagger" />
+          <Route element={<ScheduleJobsPage api={api} />} path="/schedule/manage" />
+          <Route element={<ScheduleLogsPage api={api} />} path="/schedule/log" />
+          <Route element={<OpsPage api={api} />} path="/ops-service" />
+          <Route element={<ProfilePage api={api} info={info} profile={profile} />} path="/profile" />
+          <Route element={currentMenu ? <ModulePage currentMenu={currentMenu} /> : <AdminNotFoundPage />} path="*" />
+        </Routes>
+      </Suspense>
+    </AdminAppShell>
   );
 }
 
-function AppContent() {
+export function AppContent({ setupApiClient = setupApi }: { setupApiClient?: SetupApi } = {}) {
   const { t } = useI18n();
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
   const [authenticated, setAuthenticated] = useState(Boolean(sessionManager.read()?.token));
+  const [loginDefaults, setLoginDefaults] = useState(() => buildRememberedLoginDefaults(readRememberedLogin()));
+  const [loginNotice, setLoginNotice] = useState<{ message: string; tone?: "danger" | "warning" } | null>(null);
   const api = useAdminApi(setAuthenticated);
   const checkedRef = useRef(false);
+  const appConfigQuery = useQuery({
+    queryKey: ["public", "app-config"],
+    queryFn: () => api.system.getAppConfig(),
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+  const branding = resolveAdminBranding(appConfigQuery.data);
+
+  useEffect(() => {
+    document.title = resolveAdminDocumentTitle(needsSetup ? "系统初始化配置" : undefined, branding.name);
+  }, [branding.name, needsSetup]);
 
   // 启动时检测后端是否处于 Setup Wizard 模式
   useEffect(() => {
     if (checkedRef.current) return;
     checkedRef.current = true;
 
-    setupApi
+    setupApiClient
       .getStatus()
       .then((status) => {
         setSetupStatus(status);
@@ -363,7 +406,11 @@ function AppContent() {
       .catch(() => setNeedsSetup(false)); // 接口不可用时视为已安装
   }, []);
 
-  async function handleLogin(payload: { username: string; password: string; code?: string; uuid?: string }) {
+  async function handleLogin(
+    payload: { username: string; password: string; code?: string; uuid?: string; remember?: boolean },
+    options: { syncRememberedLogin?: boolean } = {},
+  ) {
+    const { syncRememberedLogin = true } = options;
     const result = await api.auth.login(payload);
     const nextSession: AppSession = {
       token: result.token,
@@ -372,6 +419,24 @@ function AppContent() {
       clientType: "admin",
     };
     sessionManager.write(nextSession);
+    if (syncRememberedLogin) {
+      if (payload.remember) {
+        writeRememberedLogin({
+          password: payload.password,
+          username: payload.username,
+        });
+        setLoginDefaults(
+          buildRememberedLoginDefaults({
+            password: payload.password,
+            remember: true,
+            username: payload.username,
+          }),
+        );
+      } else {
+        clearRememberedLogin();
+        setLoginDefaults(buildRememberedLoginDefaults(null));
+      }
+    }
     setAuthenticated(true);
   }
 
@@ -380,7 +445,44 @@ function AppContent() {
       await api.auth.logout();
     } finally {
       sessionManager.clear();
+      setLoginDefaults(buildRememberedLoginDefaults(readRememberedLogin()));
       setAuthenticated(false);
+    }
+  }
+
+  async function handleSetupComplete(payload: SetupCompletionPayload) {
+    setLoginDefaults({
+      password: payload.password,
+      remember: false,
+      username: payload.username,
+    });
+
+    if (!payload.autoLogin) {
+      setLoginNotice({
+        message: t("admin.setup.loginRequired"),
+        tone: "warning",
+      });
+      setNeedsSetup(false);
+      return;
+    }
+
+    try {
+      await handleLogin(
+        {
+          password: payload.password,
+          username: payload.username,
+        },
+        { syncRememberedLogin: false },
+      );
+      setLoginNotice(null);
+    } catch (error) {
+      const message = toUserFacingErrorMessage(error, t("admin.workbench.loginError"));
+      setLoginNotice({
+        message: t("admin.setup.autoLoginFailed", undefined, { message }),
+        tone: "warning",
+      });
+    } finally {
+      setNeedsSetup(false);
     }
   }
 
@@ -393,7 +495,7 @@ function AppContent() {
   if (needsSetup && setupStatus) {
     return (
       <Suspense fallback={<LoadingScreen />}>
-        <SetupWizardPage initialStatus={setupStatus} setupApi={setupApi} onComplete={() => setNeedsSetup(false)} />
+        <SetupWizardPage initialStatus={setupStatus} onComplete={handleSetupComplete} setupApi={setupApiClient} />
       </Suspense>
     );
   }
@@ -403,6 +505,8 @@ function AppContent() {
     return (
       <Suspense fallback={<LoadingScreen />}>
         <LoginPage
+          brandLogo={branding.logo}
+          brandName={branding.name}
           getCaptcha={async () => {
             const captcha = await api.auth.getCaptcha();
             return {
@@ -410,7 +514,10 @@ function AppContent() {
               uuid: captcha.id,
             };
           }}
+          initialValues={loginDefaults}
+          notice={loginNotice}
           onSubmit={async (values) => {
+            setLoginNotice(null);
             try {
               await handleLogin(values);
             } catch (error) {
@@ -427,7 +534,7 @@ function AppContent() {
   }
 
   // 阶段 4：已登录，进入管理后台
-  return <AdminWorkbench api={api} onLogout={handleLogout} />;
+  return <AdminWorkbench api={api} branding={branding} onLogout={handleLogout} />;
 }
 
 export function App() {

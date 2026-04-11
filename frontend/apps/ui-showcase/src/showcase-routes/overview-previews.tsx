@@ -33,6 +33,23 @@ type PreviewKind =
   | "auth"
   | "brand";
 
+const PREVIEW_FILTERS = {
+  blueMedium: "drop-shadow(0 8px 16px rgba(37, 99, 235, 0.18))",
+  slateSmallStrong: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.10))",
+  slateSmall: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.08))",
+  slateSmallSoft: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.06))",
+  focusBlue: "drop-shadow(0 6px 12px rgba(59, 130, 246, 0.12))",
+  slateMediumStrong: "drop-shadow(0 8px 16px rgba(15, 23, 42, 0.10))",
+  slateMedium: "drop-shadow(0 8px 16px rgba(15, 23, 42, 0.08))",
+  slateFloatStrong: "drop-shadow(0 8px 18px rgba(15, 23, 42, 0.14))",
+  slateFloat: "drop-shadow(0 8px 18px rgba(15, 23, 42, 0.10))",
+  slateFloatSoft: "drop-shadow(0 8px 18px rgba(15, 23, 42, 0.08))",
+  slateLargeStrong: "drop-shadow(0 12px 20px rgba(15, 23, 42, 0.18))",
+  slateLarge: "drop-shadow(0 10px 20px rgba(15, 23, 42, 0.14))",
+  slateLargeSoft: "drop-shadow(0 10px 20px rgba(15, 23, 42, 0.10))",
+  blueLarge: "drop-shadow(0 10px 20px rgba(37, 99, 235, 0.16))",
+} as const;
+
 function Frame({ children, dark = false }: { children: ReactNode; dark?: boolean }) {
   return (
     <div
@@ -101,7 +118,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         {kind === "button" && (
           <>
             <rect fill="#dbeafe" height="42" rx="16" width="118" x="61" y="52" />
-            <g style={{ filter: "drop-shadow(0 8px 16px rgba(37, 99, 235, 0.18))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.blueMedium }}>
               <rect fill="#409eff" height="34" rx="10" width="96" x="72" y="56" />
               <circle cx="92" cy="73" fill="rgba(255,255,255,0.88)" r="4" />
               <PreviewText anchor="middle" fill="#fff" size={12} weight={700} x={126} y={76}>Action</PreviewText>
@@ -112,19 +129,19 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "badge" && (
           <>
-            <g style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.10))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateSmallStrong }}>
               <rect fill="#fff" height="28" rx="10" stroke="#dbe4f0" width="62" x="44" y="56" />
               <PreviewText anchor="middle" fill="#475569" size={11} weight={700} x={75} y={73}>消息</PreviewText>
               <circle cx="102" cy="52" fill="#f56c6c" r="8" />
               <PreviewText anchor="middle" fill="#fff" size={9} weight={700} x={102} y={55}>2</PreviewText>
             </g>
-            <g style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.10))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateSmallStrong }}>
               <rect fill="#fff" height="28" rx="10" stroke="#dbe4f0" width="70" x="124" y="56" />
               <PreviewText anchor="middle" fill="#475569" size={11} weight={700} x={159} y={73}>任务</PreviewText>
               <rect fill="#67c23a" height="18" rx="9" width="18" x="180" y="50" />
               <path d="M185 59.5l3 3 6-7" fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
             </g>
-            <g style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.10))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateSmallStrong }}>
               <rect fill="#fff8eb" height="24" rx="9" stroke="#f3d9a8" width="72" x="84" y="100" />
               <PreviewText anchor="middle" fill="#d97706" size={10} weight={700} x={120} y={115}>Beta</PreviewText>
             </g>
@@ -132,7 +149,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "breadcrumb" && (
           <>
-            <g style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateSmall }}>
               <rect fill="#fff" height="42" rx="12" stroke="#dbe4f0" width="162" x="39" y="55" />
             </g>
             <PreviewText fill="#64748b" size={11} weight={600} x={56} y={81}>首页</PreviewText>
@@ -144,7 +161,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "status" && (
           <>
-            <g style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateSmall }}>
               <rect fill="#fff" height="82" rx="14" stroke="#dbe4f0" width="162" x="39" y="39" />
             </g>
             <line stroke="#e5edf5" x1="52" x2="188" y1="81" y2="81" />
@@ -166,13 +183,13 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "input" && (
           <>
-            <g style={{ filter: "drop-shadow(0 6px 12px rgba(59, 130, 246, 0.12))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.focusBlue }}>
               <rect fill="#fff" height="34" rx="10" stroke="#9cc5ff" strokeWidth="1.4" width="164" x="38" y="38" />
               <circle cx="56" cy="55" fill="none" r="5" stroke="#8aa4c1" strokeWidth="1.6" />
               <line stroke="#8aa4c1" strokeLinecap="round" strokeWidth="1.6" x1="59.5" x2="64.5" y1="58.5" y2="63.5" />
               <PreviewText fill="#94a3b8" size={11} weight={600} x={70} y={59}>搜索组件</PreviewText>
             </g>
-            <g style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateSmall }}>
               <rect fill="#fff" height="34" rx="10" stroke="#dbe4f0" width="164" x="38" y="84" />
               <PreviewText fill="#64748b" size={11} weight={700} x={54} y={105}>状态</PreviewText>
               <rect fill="#eef6ff" height="20" rx="10" stroke="#cfe2ff" width="44" x="122" y="91" />
@@ -183,7 +200,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "calendar" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 16px rgba(15, 23, 42, 0.10))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateMediumStrong }}>
               <rect fill="#fff" height="112" rx="16" stroke="#dbe4f0" width="132" x="54" y="24" />
               <rect fill="#f8fbff" height="24" rx="16" width="132" x="54" y="24" />
               <PreviewText fill="#334155" size={11} weight={700} x={70} y={40}>April</PreviewText>
@@ -199,7 +216,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "choice" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 16px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateMedium }}>
               <rect fill="#fff" height="92" rx="16" stroke="#dbe4f0" width="148" x="46" y="34" />
             </g>
             <rect fill="#409eff" height="16" rx="5" width="16" x="60" y="50" />
@@ -215,12 +232,12 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "upload" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 16px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateMedium }}>
               <rect fill="#fff" height="56" rx="14" stroke="#b7d7ff" strokeDasharray="5 5" width="156" x="42" y="24" />
             </g>
             <path d="M120 40v18m0-18-8 8m8-8 8 8" fill="none" stroke="#409eff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
             <PreviewText anchor="middle" fill="#409eff" size={11} weight={700} x={120} y={68}>点击上传</PreviewText>
-            <g style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateSmall }}>
               <rect fill="#fff" height="24" rx="10" stroke="#dbe4f0" width="124" x="58" y="96" />
               <rect fill="#eef6ff" height="14" rx="7" stroke="#cfe2ff" width="28" x="66" y="101" />
               <PreviewText anchor="middle" fill="#409eff" size={9} weight={700} x={80} y={111}>PNG</PreviewText>
@@ -231,7 +248,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "form" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 16px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateMedium }}>
               <rect fill="#fff" height="118" rx="16" stroke="#dbe4f0" width="144" x="48" y="20" />
             </g>
             <PreviewText fill="#64748b" size={10} weight={700} x={62} y={39}>名称</PreviewText>
@@ -246,14 +263,14 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "notice" && (
           <>
-            <g style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.06))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateSmallSoft }}>
               <rect fill="#ecf5ff" height="28" rx="10" stroke="#cfe2ff" width="164" x="38" y="44" />
               <circle cx="56" cy="58" fill="#409eff" r="6" />
               <PreviewText anchor="middle" fill="#fff" size={9} weight={700} x={56} y={61}>i</PreviewText>
               <PreviewText fill="#2563eb" size={11} weight={700} x={70} y={62}>同步完成</PreviewText>
               <path d="M184 52l8 8m0-8-8 8" fill="none" stroke="#7eaee9" strokeLinecap="round" strokeWidth="1.7" />
             </g>
-            <g style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.06))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateSmallSoft }}>
               <rect fill="#fff8eb" height="28" rx="10" stroke="#f3deae" width="164" x="38" y="88" />
               <circle cx="56" cy="102" fill="#f59e0b" r="6" />
               <PreviewText anchor="middle" fill="#fff" size={9} weight={700} x={56} y={105}>!</PreviewText>
@@ -272,7 +289,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "skeleton" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 16px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateMedium }}>
               <rect fill="#fff" height="92" rx="16" stroke="#dbe4f0" width="148" x="46" y="34" />
             </g>
             <circle cx="68" cy="62" fill="#edf3f8" r="12" />
@@ -284,14 +301,14 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "toast" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 18px rgba(15, 23, 42, 0.14))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateFloatStrong }}>
               <rect fill="#fff" height="36" rx="10" stroke="#dbe4f0" width="114" x="96" y="30" />
               <circle cx="114" cy="48" fill="#22c55e" r="7" />
               <path d="M111 48l2 2 4-5" fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
               <PreviewText fill="#334155" size={11} weight={700} x={128} y={46}>保存成功</PreviewText>
               <Bar fill="#cbd5e1" h={4} w={42} x={128} y={52} />
             </g>
-            <g style={{ filter: "drop-shadow(0 8px 18px rgba(15, 23, 42, 0.10))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateFloat }}>
               <rect fill="#fff" height="36" rx="10" stroke="#dbe4f0" width="114" x="66" y="84" />
               <circle cx="84" cy="102" fill="#409eff" r="7" />
               <PreviewText anchor="middle" fill="#fff" size={9} weight={700} x={84} y={105}>i</PreviewText>
@@ -303,7 +320,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         {kind === "dialog" && (
           <>
             <rect fill="rgba(15,23,42,0.10)" height="126" rx="20" width="188" x="26" y="17" />
-            <g style={{ filter: "drop-shadow(0 12px 20px rgba(15, 23, 42, 0.18))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateLargeStrong }}>
               <rect fill="#fff" height="94" rx="16" stroke="#dbe4f0" width="128" x="56" y="34" />
             </g>
             <PreviewText fill="#334155" size={12} weight={700} x={72} y={54}>确认操作</PreviewText>
@@ -316,11 +333,11 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "popover" && (
           <>
-            <g style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateSmall }}>
               <rect fill="#fff" height="28" rx="8" stroke="#dbe4f0" width="60" x="40" y="64" />
               <PreviewText anchor="middle" fill="#409eff" size={10} weight={700} x={70} y={82}>更多</PreviewText>
             </g>
-            <g style={{ filter: "drop-shadow(0 10px 20px rgba(15, 23, 42, 0.14))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateLarge }}>
               <path d="M135 45l8 8h-16Z" fill="#fff" stroke="#dbe4f0" strokeLinejoin="round" />
               <rect fill="#fff" height="64" rx="12" stroke="#dbe4f0" width="92" x="118" y="52" />
               <Bar fill="#94a3b8" h={5} w={42} x={134} y={68} />
@@ -332,7 +349,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "table" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 18px rgba(15, 23, 42, 0.10))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateFloat }}>
               <rect fill="#fff" height="108" rx="16" stroke="#dbe4f0" width="188" x="26" y="24" />
             </g>
             <Bar fill="#b7c4d1" h={6} w={46} x={40} y={42} />
@@ -354,7 +371,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "pagination" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 18px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateFloatSoft }}>
               <rect fill="#fff" height="48" rx="14" stroke="#dbe4f0" width="158" x="41" y="56" />
             </g>
             <rect fill="#fff" height="24" rx="8" stroke="#dbe4f0" width="24" x="56" y="68" />
@@ -371,7 +388,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "tabs" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 18px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateFloatSoft }}>
               <rect fill="#fff" height="98" rx="16" stroke="#dbe4f0" width="164" x="38" y="28" />
             </g>
             <rect fill="#f8fbff" height="24" width="164" x="38" y="28" />
@@ -399,7 +416,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "avatar" && (
           <>
-            <g style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateSmall }}>
               <circle cx="84" cy="76" fill="#dbeafe" r="20" />
               <circle cx="120" cy="66" fill="#c7f0e0" r="20" />
               <circle cx="156" cy="76" fill="#fde7c2" r="20" />
@@ -418,7 +435,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
               const x = 56 + (index % 2) * 60;
               const y = 42 + Math.floor(index / 2) * 38;
               return (
-                <g key={`icon-${index}`} style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.08))" }}>
+                <g key={`icon-${index}`} style={{ filter: PREVIEW_FILTERS.slateSmall }}>
                   <rect fill="#fff" height="28" rx="10" stroke="#dbe4f0" width="44" x={x} y={y} />
                   {index === 0 && <path d="M78 49c0-6-4-10-8-10s-8 4-8 10v7l-4 4h24l-4-4Z" fill="#409eff" />}
                   {index === 1 && <path d="M132 41l3.4 7 7.6 1.1-5.5 5.4 1.3 7.6-6.8-3.7-6.8 3.7 1.3-7.6-5.5-5.4 7.6-1.1Z" fill="#f59e0b" />}
@@ -446,7 +463,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
               const x = 44 + (index % 2) * 76;
               const y = 34 + Math.floor(index / 2) * 44;
               return (
-                <g key={`metric-${index}`} style={{ filter: "drop-shadow(0 6px 12px rgba(15, 23, 42, 0.06))" }}>
+                <g key={`metric-${index}`} style={{ filter: PREVIEW_FILTERS.slateSmallSoft }}>
                   <rect fill="#fff" height="34" rx="12" stroke="#dbe4f0" width="64" x={x} y={y} />
                   <Bar fill="#c4d2df" h={5} w={18} x={x + 10} y={y + 9} />
                   <PreviewText fill="#334155" size={12} weight={700} x={x + 10} y={y + 25}>{["1.8k", "92%", "48", "12m"][index]}</PreviewText>
@@ -457,7 +474,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "layout" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 18px rgba(15, 23, 42, 0.10))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateFloat }}>
               <rect fill="#fff" height="112" rx="16" stroke="#dbe4f0" width="188" x="26" y="24" />
             </g>
             <rect fill="#f8fbff" height="16" rx="16" width="188" x="26" y="24" />
@@ -473,7 +490,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "watermark" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 18px rgba(15, 23, 42, 0.10))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateFloat }}>
               <rect fill="#fff" height="112" rx="16" stroke="#dbe4f0" width="188" x="26" y="24" />
             </g>
             <rect fill="#f8fbff" height="16" rx="16" width="188" x="26" y="24" />
@@ -504,7 +521,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "loading" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 18px rgba(15, 23, 42, 0.10))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateFloat }}>
               <rect fill="#fff" height="96" rx="16" stroke="#dbe4f0" width="156" x="42" y="32" />
             </g>
             <circle cx="120" cy="66" fill="none" r="14" stroke="#dbeafe" strokeWidth="6" />
@@ -515,7 +532,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "tree" && (
           <>
-            <g style={{ filter: "drop-shadow(0 8px 18px rgba(15, 23, 42, 0.08))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateFloatSoft }}>
               <rect fill="#fff" height="104" rx="16" stroke="#dbe4f0" width="164" x="38" y="28" />
             </g>
             <PreviewText fill="#94a3b8" size={10} weight={700} x={54} y={48}>权限树</PreviewText>
@@ -532,7 +549,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "auth" && (
           <>
-            <g style={{ filter: "drop-shadow(0 10px 20px rgba(15, 23, 42, 0.10))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.slateLargeSoft }}>
               <rect fill="#eaf4ff" height="100" rx="20" width="80" x="28" y="30" />
               <rect fill="#fff" height="100" rx="18" stroke="#dbe4f0" width="102" x="112" y="30" />
             </g>
@@ -547,7 +564,7 @@ function Canvas({ kind }: { kind: PreviewKind }) {
         )}
         {kind === "brand" && (
           <>
-            <g style={{ filter: "drop-shadow(0 10px 20px rgba(37, 99, 235, 0.16))" }}>
+            <g style={{ filter: PREVIEW_FILTERS.blueLarge }}>
               <rect fill="#409eff" height="42" rx="14" width="42" x="72" y="48" />
             </g>
             <PreviewText anchor="middle" fill="#fff" size={20} weight={700} x={93} y={76}>S</PreviewText>

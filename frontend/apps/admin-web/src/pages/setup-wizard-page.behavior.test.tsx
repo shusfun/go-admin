@@ -54,7 +54,7 @@ function createSetupApi(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     testDatabase: vi.fn().mockResolvedValue(undefined),
     install: vi.fn().mockResolvedValue(undefined),
-    getStatus: vi.fn().mockResolvedValue({ needs_setup: false, step: "complete", defaults }),
+    getStatus: vi.fn().mockResolvedValue({ hasServerDefaults: true, needs_setup: false, step: "complete", defaults }),
     ...overrides,
   };
 }
@@ -120,7 +120,7 @@ describe("SetupWizardPage 行为测试", () => {
     act(() => {
       root.render(
         <I18nProvider initialLocale="zh-CN" messages={adminMessages}>
-          <SetupWizardPage initialStatus={{ defaults } as any} setupApi={setupApi as any} onComplete={vi.fn()} />
+          <SetupWizardPage initialStatus={{ hasServerDefaults: true, defaults } as any} onComplete={vi.fn().mockResolvedValue(undefined)} setupApi={setupApi as any} />
         </I18nProvider>,
       );
     });

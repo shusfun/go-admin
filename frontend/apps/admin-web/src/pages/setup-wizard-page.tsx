@@ -15,7 +15,7 @@ import {
   InlineNotice,
   Input,
 } from "@go-admin/ui-admin";
-import type { SetupApi } from "@go-admin/api";
+import { toUserFacingErrorMessage, type SetupApi } from "@go-admin/api";
 
 function createDbSchema(t: ReturnType<typeof useI18n>["t"]) {
   return z.object({
@@ -58,10 +58,16 @@ function getStepLabels(t: ReturnType<typeof useI18n>["t"]): SetupStepLabels {
 type DBFormValues = z.infer<ReturnType<typeof createDbSchema>>;
 type AdminFormValues = z.infer<ReturnType<typeof createAdminSchema>>;
 
+export type SetupCompletionPayload = {
+  autoLogin: boolean;
+  password: string;
+  username: string;
+};
+
 type SetupWizardPageProps = {
   initialStatus: SetupStatus;
   setupApi: SetupApi;
-  onComplete: () => void;
+  onComplete: (payload: SetupCompletionPayload) => Promise<void>;
 };
 
 type SetupStatus = Awaited<ReturnType<SetupApi["getStatus"]>>;
@@ -83,12 +89,17 @@ export function SetupWizardPage({ initialStatus, setupApi, onComplete }: SetupWi
     if (!dbValues) {
       return;
     }
+    if (!initialStatus.hasServerDefaults) {
+      setInstallError(t("admin.setup.serverDefaultsMissing"));
+      return;
+    }
 
     setInstalling(true);
     setInstallError("");
     setCompletionHint("");
     try {
       await setupApi.install({
+        environment: defaults.environment,
         database: dbValues,
         admin: {
           username: values.username,
@@ -101,13 +112,17 @@ export function SetupWizardPage({ initialStatus, setupApi, onComplete }: SetupWi
 
       const ready = await waitForSetupCompletion(() => setupApi.getStatus());
       if (ready) {
-        onComplete();
+        await onComplete({
+          autoLogin: defaults.environment === "dev",
+          password: values.password,
+          username: values.username,
+        });
         return;
       }
 
       setCompletionHint(t("admin.setup.hint"));
     } catch (error) {
-      setInstallError(error instanceof Error ? error.message : t("admin.setup.fallbackError"));
+      setInstallError(toUserFacingErrorMessage(error, t("admin.setup.fallbackError")));
     } finally {
       setInstalling(false);
     }
@@ -117,13 +132,14 @@ export function SetupWizardPage({ initialStatus, setupApi, onComplete }: SetupWi
     <AuthLayout
       aside={<SetupAside defaults={defaults} environmentLabel={environmentLabel} />}
       description={t("admin.setup.description")}
-      kicker="Setup Wizard"
+      kicker={t("admin.setup.layout.title")}
       title={t("admin.setup.title")}
     >
       <SetupSurface
         currentStep={currentStep}
         defaults={defaults}
         environmentLabel={environmentLabel}
+        hasServerDefaults={initialStatus.hasServerDefaults}
         stepLabels={stepLabels}
         stepStatusText={t("admin.setup.step.description", undefined, { current: stepIndex + 1, total: STEPS.length, label: stepLabels[currentStep] })}
       >
@@ -189,6 +205,7 @@ function SetupSurface({
   currentStep,
   defaults,
   environmentLabel,
+  hasServerDefaults,
   stepLabels,
   stepStatusText,
 }: {
@@ -196,6 +213,7 @@ function SetupSurface({
   currentStep: Step;
   defaults: SetupStatus["defaults"];
   environmentLabel: string;
+  hasServerDefaults: boolean;
   stepLabels: SetupStepLabels;
   stepStatusText: string;
 }) {
@@ -221,6 +239,11 @@ function SetupSurface({
               </div>
             </div>
             <SetupStepRail currentIndex={currentIndex} stepLabels={stepLabels} />
+            {!hasServerDefaults ? (
+              <InlineNotice title={t("admin.setup.notice.serverDefaultsMissing.title")} type="warning">
+                {t("admin.setup.notice.serverDefaultsMissing.description")}
+              </InlineNotice>
+            ) : null}
             <div className="grid gap-3 rounded-[1.5rem] border border-border/60 bg-background/75 p-4 lg:hidden">
               <SetupFact label={t("admin.setup.fact.databaseAddress")} value={`${defaults.database.host}:${defaults.database.port}`} />
               <SetupFact label={t("admin.setup.fact.databaseName")} value={defaults.database.dbname} />
@@ -339,7 +362,7 @@ function DatabaseStep({
       await setupApi.testDatabase(form.getValues());
       setTestResult({ ok: true, msg: t("admin.setup.db.success") });
     } catch (error) {
-      setTestResult({ ok: false, msg: error instanceof Error ? error.message : t("admin.setup.testFailed") });
+      setTestResult({ ok: false, msg: toUserFacingErrorMessage(error, t("admin.setup.testFailed")) });
     } finally {
       setTesting(false);
     }

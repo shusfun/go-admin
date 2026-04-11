@@ -12,7 +12,7 @@ export function ApisPage({ api }: { api: ReturnType<typeof createApiClient> }) {
         { label: "处理器", render: (row) => row.handle as string },
         { label: "类型", render: (row) => (row.type as string) || "-" },
       ]}
-      description="查看和管理后端接口记录。"
+      description="查看系统接口清单与访问方式。"
       fetcher={(params) => api.admin.listApis(params)}
       formFields={[
         { key: "title", label: "标题" },

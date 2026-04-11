@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { toUserFacingErrorMessage } from "@go-admin/api";
+import { MobileImageCaptchaField } from "@go-admin/ui-mobile";
 
 const loginSchema = z.object({
   username: z.string().min(1, "请输入账号"),
@@ -20,8 +22,8 @@ export function LoginPage({
   onSubmit: (values: LoginFormValues & { uuid?: string }) => Promise<void>;
   tenantCode: string;
 }) {
-  const [captchaImage, setCaptchaImage] = useState("");
   const [captchaId, setCaptchaId] = useState("");
+  const [captchaRefreshToken, setCaptchaRefreshToken] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const form = useForm<LoginFormValues>({
@@ -33,25 +35,10 @@ export function LoginPage({
     resolver: zodResolver(loginSchema),
   });
 
-  async function refreshCaptcha() {
-    try {
-      const captcha = await getCaptcha();
-      setCaptchaImage(captcha.image);
-      setCaptchaId(captcha.uuid);
-    } catch {
-      setCaptchaImage("");
-      setCaptchaId("");
-    }
-  }
-
-  useEffect(() => {
-    void refreshCaptcha();
-  }, []);
-
   return (
     <div className="mobile-auth">
       <section className="mobile-auth-card">
-        <small>Tenant {tenantCode}</small>
+        <small>当前租户 {tenantCode}</small>
         <h1>用户登录</h1>
         <p>请输入账号和密码。</p>
         <form
@@ -65,8 +52,8 @@ export function LoginPage({
                 uuid: captchaId || undefined,
               });
             } catch (error) {
-              setErrorMessage(error instanceof Error ? error.message : "登录失败");
-              await refreshCaptcha();
+              setErrorMessage(toUserFacingErrorMessage(error, "登录失败"));
+              setCaptchaRefreshToken((current) => current + 1);
             } finally {
               setSubmitting(false);
             }
@@ -82,18 +69,14 @@ export function LoginPage({
           </label>
           <label>
             <span>验证码</span>
-            <div className="mobile-auth-captcha">
-              <input {...form.register("code")} placeholder="开发环境可留空" />
-              {captchaImage ? (
-                <button className="mobile-auth-preview" onClick={() => void refreshCaptcha()} type="button">
-                  <img alt="captcha" src={captchaImage} />
-                </button>
-              ) : (
-                <button className="mobile-auth-preview" onClick={() => void refreshCaptcha()} type="button">
-                  刷新
-                </button>
-              )}
-            </div>
+            <MobileImageCaptchaField
+              getCaptcha={getCaptcha}
+              imageAlt="captcha"
+              inputProps={{ ...form.register("code"), placeholder: "请输入验证码" }}
+              onCaptchaChange={(payload) => setCaptchaId(payload?.uuid ?? "")}
+              refreshLabel="刷新"
+              refreshToken={captchaRefreshToken}
+            />
           </label>
           {errorMessage ? <div className="mobile-auth-error">{errorMessage}</div> : null}
           <button className="mobile-primary" disabled={submitting} type="submit">

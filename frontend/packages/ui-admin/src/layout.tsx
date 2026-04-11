@@ -1,12 +1,48 @@
-import { useEffect, useId, useMemo, useState, type HTMLAttributes, type PropsWithChildren, type ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { useEffect, useId, useMemo, useRef, useState, type HTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PropsWithChildren, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useTheme, type ThemeMode } from "@go-admin/design-tokens";
-import { ChevronDown, LogOut, MoonStar, PanelLeftClose, PanelLeftOpen, Search, Sun, SunMoon, UserRound } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  BookMarked,
+  BriefcaseBusiness,
+  Bug,
+  ChevronDown,
+  Clock3,
+  Compass,
+  FileCode2,
+  FileJson2,
+  FolderKanban,
+  GitBranch,
+  Hammer,
+  History,
+  LayoutDashboard,
+  LayoutGrid,
+  Logs,
+  LogOut,
+  MoonStar,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+  Server,
+  Settings2,
+  ShieldEllipsis,
+  Sun,
+  SunMoon,
+  Table2,
+  UploadCloud,
+  UserRound,
+  Users,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 
-import type { AppMenuNode } from "@go-admin/types";
+import type { AppMenuNode, ImageAsset } from "@go-admin/types";
 
 import {
   AppScrollbar,
+  Image,
   Badge,
   Breadcrumb,
   Button,
@@ -23,14 +59,13 @@ import {
   DialogHeader,
   DialogTitle,
   Drawer,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   EmptyLogState,
   EmptyState,
   FormActions,
   Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   ReadonlyCodeBlock,
   Table,
   TableBody,
@@ -47,6 +82,81 @@ import { cn } from "./lib/utils";
 
 const SIDEBAR_KEY = "go-admin-sidebar-collapsed";
 const NAV_KEY = "go-admin-nav-open";
+
+const MENU_ICON_MAP: Record<string, LucideIcon> = {
+  "api-doc": FileJson2,
+  "api-server": Server,
+  "app-group-fill": LayoutGrid,
+  bug: Bug,
+  build: Hammer,
+  code: FileCode2,
+  dashboard: LayoutDashboard,
+  "dev-tools": Hammer,
+  druid: Activity,
+  education: BookMarked,
+  guide: Compass,
+  job: FolderKanban,
+  logininfor: History,
+  log: Logs,
+  pass: BriefcaseBusiness,
+  peoples: Users,
+  skill: ShieldEllipsis,
+  swagger: FileJson2,
+  "system-tools": Settings2,
+  "time-range": Clock3,
+  tree: GitBranch,
+  "tree-table": Table2,
+  upload: UploadCloud,
+  user: UserRound,
+  "line-chart": BarChart3,
+};
+
+function resolveMenuIcon(icon: string) {
+  return MENU_ICON_MAP[icon.trim().toLowerCase()] ?? LayoutGrid;
+}
+
+function SidebarMenuIcon({ className, icon }: { className?: string; icon: string }) {
+  const Icon = resolveMenuIcon(icon);
+  return (
+    <span className={cn("inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", className)}>
+      <Icon className="h-3.5 w-3.5" strokeWidth={2.1} />
+    </span>
+  );
+}
+
+function BrandIdentityFrame({
+  compact = false,
+  logo,
+  title = "统一后台工作台",
+}: {
+  compact?: boolean;
+  logo?: string | ImageAsset | null;
+  title?: string;
+}) {
+  const normalizedTitle = title.trim() || "统一后台工作台";
+  const markText = normalizedTitle.replace(/\s+/g, "").slice(0, 2) || "GA";
+
+  return (
+    <div
+      className={cn(
+        "relative flex shrink-0 items-center justify-center overflow-hidden border border-border/70 bg-gradient-to-br from-background via-background to-secondary/70 shadow-sm",
+        compact ? "h-10 w-10 rounded-[1rem]" : "h-14 w-14 rounded-[1.25rem]",
+      )}
+    >
+      {logo ? (
+        <div className="flex h-full w-full items-center justify-center bg-background/90 p-2">
+          <Image alt={normalizedTitle} className="h-full w-full object-contain" src={logo} />
+        </div>
+      ) : (
+        <span className={cn("font-semibold tracking-[0.14em] text-primary", compact ? "text-[10px]" : "text-sm")}>{markText}</span>
+      )}
+    </div>
+  );
+}
+
+function SidebarBrandMark({ logo, title = "统一后台工作台" }: { logo?: string | ImageAsset | null; title?: string }) {
+  return <BrandIdentityFrame compact logo={logo} title={title} />;
+}
 
 function readStoredBoolean(key: string, fallback: boolean) {
   if (typeof window === "undefined") {
@@ -101,18 +211,24 @@ export function AppFrameShell({
     typeof mobileSidebar === "function" ? mobileSidebar({ closeSidebar }) : (mobileSidebar ?? desktopSidebar);
 
   return (
-    <div className={cn("min-h-[100dvh] bg-background text-foreground", backgroundClassName)}>
-      <div className={cn("flex min-h-[100dvh]", rootClassName)}>
+    <div className={cn("h-[100dvh] overflow-hidden bg-background text-foreground", backgroundClassName)}>
+      <div className={cn("flex h-full min-h-0", rootClassName)}>
         <div className={cn("hidden shrink-0", desktopSidebarClassName)}>{desktopSidebar}</div>
         <Drawer className={mobileDrawerClassName} onOpenChange={setMobileOpen} open={mobileOpen}>
           {resolvedMobileSidebar}
         </Drawer>
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col relative">
           {mobileBar ? mobileBar({ closeSidebar, openSidebar: () => setMobileOpen(true) }) : null}
-          {header}
-          <main className={cn("min-w-0 flex-1", contentClassName)}>
-            <div className={cn("mx-auto w-full", contentInnerClassName)}>{children}</div>
-          </main>
+          <AppScrollbar
+            className="min-h-0 flex-1"
+            rootSlot={<main className="min-w-0 flex flex-col relative" />}
+            viewportClassName="h-full"
+          >
+            {header}
+            <div className={cn("flex-1", contentClassName)}>
+              <div className={cn("mx-auto min-h-full w-full", contentInnerClassName)}>{children}</div>
+            </div>
+          </AppScrollbar>
         </div>
       </div>
     </div>
@@ -258,9 +374,9 @@ export function GlobalSearch({
           <DialogDescription className="sr-only" id="global-search-description">
             {description}
           </DialogDescription>
-          <div className="grid gap-4 p-5">
+          <div className="grid gap-4 p-4">
             <div className="grid gap-3 border-b border-border/70 pb-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">{title}</div>
+              <div className="text-[11px] font-medium text-muted-foreground">{title}</div>
               <Input
                 autoFocus
                 onChange={(event) => setQuery(event.target.value)}
@@ -274,7 +390,7 @@ export function GlobalSearch({
                 <div className="grid gap-4">
                   {Object.entries(groupedItems).map(([section, groupItems]) => (
                     <div className="grid gap-2" key={section}>
-                      <div className="px-1 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">{section}</div>
+                      <div className="px-1 text-[11px] font-medium text-muted-foreground">{section}</div>
                       <div className="grid gap-2">
                         {groupItems.map((item) => (
                           <button
@@ -343,8 +459,8 @@ export function MetricCard({
 }) {
   return (
     <Card className="overflow-hidden">
-      <CardContent className="space-y-3 p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">{label}</p>
+      <CardContent className="space-y-3 p-4">
+        <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
         <div className="text-3xl font-semibold tracking-tight text-foreground">{value}</div>
         <p className="text-sm leading-6 text-muted-foreground">{detail}</p>
       </CardContent>
@@ -382,18 +498,27 @@ export function PageHeader({
   kicker?: ReactNode;
   title: ReactNode;
 }) {
+  const [actionNode, setActionNode] = useState<HTMLElement | null>(null);
+  const [descNode, setDescNode] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setActionNode(document.getElementById("admin-topbar-actions-portal"));
+    setDescNode(document.getElementById("admin-topbar-description-portal"));
+  }, []);
+
   return (
-    <div className="grid gap-4 rounded-[1.75rem] border border-border bg-card px-6 py-5 shadow-[var(--shadow-card)]">
-      {breadcrumbs?.length ? <Breadcrumb items={breadcrumbs} /> : null}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-2">
-          {kicker ? <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">{kicker}</p> : null}
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">{title}</h1>
-          {description ? <div className="max-w-3xl text-sm leading-7 text-muted-foreground">{description}</div> : null}
-        </div>
-        {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
-      </div>
-    </div>
+    <>
+      {actions && actionNode ? createPortal(actions, actionNode) : null}
+      {(description || kicker) && descNode
+        ? createPortal(
+            <div className="flex items-center gap-3 border-l border-border/40 pl-4 text-xs text-muted-foreground md:text-sm">
+              {kicker ? <span className="rounded bg-secondary/50 px-1.5 py-0.5 font-medium">{kicker}</span> : null}
+              {description ? <span className="line-clamp-1 max-w-[500px]">{description}</span> : null}
+            </div>,
+            descNode,
+          )
+        : null}
+    </>
   );
 }
 
@@ -488,55 +613,61 @@ export function DetailDialog({
 
 export function AdminTopbar({
   breadcrumbs,
-  onLogout,
   pageTitle,
   tenantCode,
-  userLabel,
+  topbarActions,
 }: {
   breadcrumbs: Array<{ href?: string; label: string }>;
-  onLogout: () => void;
   pageTitle: string;
   tenantCode: string;
-  userLabel: string;
+  topbarActions?: ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-20 hidden items-center justify-between gap-4 border-b border-border bg-background/92 px-5 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/75 md:flex md:px-8">
-      <div className="grid gap-2">
-        <Breadcrumb items={breadcrumbs} />
+    <header className="sticky top-0 z-20 hidden items-center justify-between gap-4 border-b border-border/40 bg-background/60 px-5 py-3 backdrop-blur-md supports-[backdrop-filter]:bg-background/40 md:flex md:px-6">
+      <div className="flex items-center gap-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-foreground">{pageTitle}</h2>
+          <h2 className="text-base font-semibold text-foreground md:text-lg">{pageTitle}</h2>
           <Badge tone="muted">租户 {tenantCode}</Badge>
         </div>
+        <div id="admin-topbar-description-portal" className="empty:hidden" />
       </div>
       <div className="flex items-center gap-2">
-        <ThemeToggle />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button className="gap-2" type="button" variant="outline">
-              <UserRound className="h-4 w-4" />
-              <span className="hidden sm:inline">{userLabel}</span>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              退出登录
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div id="admin-topbar-actions-portal" className="flex items-center gap-2 empty:hidden" />
+        {topbarActions}
+        <div className="admin-topbar-theme-toggle">
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );
 }
 
-export function BrandBlock() {
+export function BrandBlock({
+  description,
+  kicker,
+  logo,
+  title = "统一后台工作台",
+}: {
+  description?: ReactNode;
+  kicker?: ReactNode;
+  logo?: string | ImageAsset | null;
+  title?: ReactNode;
+}) {
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Go Admin</p>
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">统一后台工作台</h1>
-        <p className="text-sm leading-6 text-muted-foreground">后台管理系统</p>
+    <div className="rounded-[1.5rem] border border-border/80 bg-gradient-to-br from-background via-background to-secondary/35 p-4 shadow-[var(--shadow-card)]">
+      <div className="flex items-start gap-3.5">
+        <BrandIdentityFrame logo={logo} title={String(title)} />
+        <div className={cn("min-w-0", kicker || description ? "space-y-2" : "flex min-h-14 items-center")}>
+          {kicker ? (
+            <div className="inline-flex rounded-full border border-border/70 bg-secondary/55 px-2.5 py-1 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
+              {kicker}
+            </div>
+          ) : null}
+          <div className="space-y-1">
+            <h1 className="text-lg font-semibold leading-tight tracking-tight text-foreground">{title}</h1>
+            {description ? <p className="text-sm leading-6 text-muted-foreground">{description}</p> : null}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -548,7 +679,7 @@ export function IdentityCard({
   roleName,
   tenantCode,
 }: {
-  avatar: string;
+  avatar: string | ImageAsset | null;
   name: string;
   roleName: string;
   tenantCode: string;
@@ -557,7 +688,7 @@ export function IdentityCard({
     <Card className="overflow-hidden border-border/80 bg-secondary/50">
       <CardContent className="flex items-center gap-4 p-4">
         <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-background text-sm font-semibold text-foreground shadow-sm">
-          {avatar ? <img alt={name} className="h-full w-full object-cover" src={avatar} /> : name.slice(0, 1)}
+          {avatar ? <Image alt={name} className="h-full w-full object-cover" src={avatar} /> : name.slice(0, 1)}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-foreground">{name}</p>
@@ -585,6 +716,73 @@ function getNodeTrail(nodes: AppMenuNode[], pathname: string, trail: AppMenuNode
   return [];
 }
 
+function getVisibleChildren(node: AppMenuNode[]) {
+  return node.filter((child) => !child.hidden);
+}
+
+function normalizeNavPath(path: string) {
+  if (path === "/") {
+    return "/";
+  }
+  return path.replace(/\/$/, "");
+}
+
+function isNodeActive(node: AppMenuNode, currentPath: string): boolean {
+  const normalizedCurrentPath = normalizeNavPath(currentPath);
+  const normalizedNodePath = normalizeNavPath(node.fullPath);
+
+  if (normalizedNodePath === normalizedCurrentPath) {
+    return true;
+  }
+
+  return getVisibleChildren(node.children).some((child) => isNodeActive(child, currentPath));
+}
+
+function isNodeExactActive(node: AppMenuNode, currentPath: string): boolean {
+  return normalizeNavPath(node.fullPath) === normalizeNavPath(currentPath);
+}
+
+function getSidebarItemTone({ active, current }: { active: boolean; current: boolean }) {
+  if (current) {
+    return "font-medium text-primary";
+  }
+
+  if (active) {
+    return "text-primary";
+  }
+
+  return "text-muted-foreground hover:text-foreground";
+}
+
+function SidebarNavItemContent({
+  active,
+  collapsed,
+  current,
+  icon,
+  label,
+  trailing,
+}: {
+  active: boolean;
+  collapsed: boolean;
+  current?: boolean;
+  icon: string;
+  label: string;
+  trailing?: ReactNode;
+}) {
+  const textTone = active || current ? "text-primary" : "text-inherit";
+
+  return (
+    <>
+      <SidebarMenuIcon
+        className={cn("ui-admin-sidebar-item-icon bg-transparent transition-colors", collapsed && "h-8 w-8")}
+        icon={icon}
+      />
+      {!collapsed ? <span className={cn("ui-admin-sidebar-item-label min-w-0 flex-1 truncate text-left transition-colors", textTone)}>{label}</span> : null}
+      {!collapsed && trailing ? <span className={cn("ui-admin-sidebar-item-arrow shrink-0 transition-colors", textTone)}>{trailing}</span> : null}
+    </>
+  );
+}
+
 function SidebarNavNode({
   collapsed,
   currentPath,
@@ -597,48 +795,161 @@ function SidebarNavNode({
   currentPath: string;
   onNavigate: () => void;
   openKeys: string[];
-  setOpenKeys: (next: string[]) => void;
+  setOpenKeys: React.Dispatch<React.SetStateAction<string[]>>;
   node: AppMenuNode;
 }) {
   if (node.hidden) {
     return null;
   }
 
-  const hasChildren = node.children.some((child) => !child.hidden);
+  const visibleChildren = getVisibleChildren(node.children);
+  const hasChildren = visibleChildren.length > 0;
   const isOpen = openKeys.includes(node.fullPath);
+  const isActive = isNodeActive(node, currentPath);
+  const isCurrent = isNodeExactActive(node, currentPath);
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
+  const closeTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  function toggleOpen() {
+    setOpenKeys((current) =>
+      current.includes(node.fullPath)
+        ? current.filter((item) => item !== node.fullPath)
+        : [...current, node.fullPath],
+    );
+  }
+
+  function openFlyout() {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setFlyoutOpen(true);
+  }
+
+  function scheduleFlyoutClose() {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = window.setTimeout(() => {
+      setFlyoutOpen(false);
+      closeTimerRef.current = null;
+    }, 120);
+  }
+
+  if (collapsed && hasChildren) {
+    return (
+      <div className="grid gap-1">
+        <Popover onOpenChange={setFlyoutOpen} open={flyoutOpen}>
+          <PopoverTrigger asChild>
+            <button
+              aria-expanded={flyoutOpen}
+              aria-haspopup="menu"
+              aria-label={node.title}
+              data-active={isActive ? "true" : "false"}
+              data-current={isCurrent ? "true" : "false"}
+              data-open={!isActive && flyoutOpen ? "true" : "false"}
+              className={cn(
+                "ui-admin-sidebar-item group flex h-9 w-full items-center justify-center rounded-md px-0 transition-colors",
+                getSidebarItemTone({ active: isActive, current: isCurrent }),
+              )}
+              onClick={() => setFlyoutOpen((current) => !current)}
+              onFocus={openFlyout}
+              onMouseEnter={openFlyout}
+              onMouseLeave={scheduleFlyoutClose}
+              type="button"
+            >
+              <SidebarNavItemContent active={isActive} collapsed current={isCurrent} icon={node.icon} label={node.title} />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="w-56 rounded-md border-border/80 p-1"
+            onFocus={openFlyout}
+            onMouseEnter={openFlyout}
+            onMouseLeave={scheduleFlyoutClose}
+            side="right"
+            sideOffset={10}
+          >
+            <div className="px-3 pb-1.5 pt-1 text-[11px] text-muted-foreground">{node.title}</div>
+            <div className="grid gap-1">
+              {visibleChildren.map((child) => (
+                <SidebarNavNode
+                  collapsed={false}
+                  currentPath={currentPath}
+                  key={child.fullPath}
+                  node={child}
+                  onNavigate={() => {
+                    setFlyoutOpen(false);
+                    onNavigate();
+                  }}
+                  openKeys={openKeys}
+                  setOpenKeys={setOpenKeys}
+                />
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-1">
-      <div className="flex items-center gap-2">
-        <NavLink
-          className={({ isActive }) =>
-            cn(
-              "flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
-              isActive || currentPath === node.fullPath ? "bg-primary/10 font-medium text-primary" : "",
-            )
-          }
-          onClick={onNavigate}
-          to={node.fullPath}
+      {hasChildren ? (
+        <button
+          aria-expanded={isOpen}
+          data-active={isActive ? "true" : "false"}
+          data-current={isCurrent ? "true" : "false"}
+          data-open={!isActive && !isCurrent && isOpen ? "true" : "false"}
+          className={cn(
+            "ui-admin-sidebar-item flex h-9 w-full min-w-0 items-center gap-2.5 rounded-md px-3 py-0 text-sm transition-colors",
+            getSidebarItemTone({ active: isActive, current: isCurrent }),
+          )}
+          onClick={toggleOpen}
+          type="button"
         >
-          <span className={cn("truncate", collapsed && "sr-only")}>{node.title}</span>
-        </NavLink>
-        {hasChildren && !collapsed ? (
-          <button
-            className="rounded-xl p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-            onClick={() =>
-              setOpenKeys(
-                isOpen ? openKeys.filter((item) => item !== node.fullPath) : [...openKeys, node.fullPath],
-              )
-            }
-            type="button"
-          >
-            <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen ? "rotate-180" : "")} />
-          </button>
-        ) : null}
-      </div>
+          <SidebarNavItemContent
+            active={isActive}
+            collapsed={false}
+            current={isCurrent}
+            icon={node.icon}
+            label={node.title}
+            trailing={<ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", isOpen ? "rotate-180" : "")} />}
+          />
+        </button>
+      ) : (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <NavLink
+              aria-label={collapsed ? node.title : undefined}
+              data-active={isActive ? "true" : "false"}
+              data-current={isCurrent ? "true" : "false"}
+              data-open="false"
+              className={cn(
+                "ui-admin-sidebar-item group flex h-9 min-w-0 items-center gap-2.5 rounded-md px-3 py-0 text-sm transition-colors",
+                getSidebarItemTone({ active: isActive, current: isCurrent }),
+                collapsed && "h-9 justify-center px-0",
+              )}
+              onClick={onNavigate}
+              to={node.fullPath}
+            >
+              <SidebarNavItemContent active={isActive} collapsed={collapsed} current={isCurrent} icon={node.icon} label={node.title} />
+            </NavLink>
+          </TooltipTrigger>
+          {collapsed ? <TooltipContent side="right">{node.title}</TooltipContent> : null}
+        </Tooltip>
+      )}
       {hasChildren && isOpen && !collapsed ? (
         <div className="ml-3 grid gap-1 border-l border-border pl-3">
-          {node.children.map((child) => (
+          {visibleChildren.map((child) => (
             <SidebarNavNode
               collapsed={collapsed}
               currentPath={currentPath}
@@ -651,6 +962,155 @@ function SidebarNavNode({
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function SidebarUtilityLink({
+  collapsed,
+  currentPath,
+  icon: Icon,
+  label,
+  onNavigate,
+  to,
+}: {
+  collapsed: boolean;
+  currentPath: string;
+  icon: LucideIcon;
+  label: string;
+  onNavigate: () => void;
+  to: string;
+}) {
+  const isCurrent = normalizeNavPath(currentPath) === normalizeNavPath(to);
+  const textTone = isCurrent ? "text-primary" : "text-inherit";
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <NavLink
+          aria-label={collapsed ? label : undefined}
+          data-active={isCurrent ? "true" : "false"}
+          data-current={isCurrent ? "true" : "false"}
+          data-open="false"
+          className={cn(
+            "ui-admin-sidebar-item group flex h-9 min-w-0 items-center gap-2.5 rounded-md px-3 py-0 text-sm transition-colors",
+            getSidebarItemTone({ active: isCurrent, current: isCurrent }),
+            collapsed && "h-9 justify-center px-0",
+          )}
+          onClick={onNavigate}
+          to={to}
+        >
+          <span
+            className={cn(
+              "ui-admin-sidebar-item-icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-transparent transition-colors",
+              isCurrent ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" strokeWidth={2.1} />
+          </span>
+          {!collapsed ? <span className={cn("ui-admin-sidebar-item-label min-w-0 flex-1 truncate transition-colors", textTone)}>{label}</span> : null}
+        </NavLink>
+      </TooltipTrigger>
+      {collapsed ? <TooltipContent side="right">{label}</TooltipContent> : null}
+    </Tooltip>
+  );
+}
+
+function SidebarAccountRow({
+  avatar,
+  collapsed,
+  name,
+  onNavigate,
+  onLogout,
+  roleName,
+}: {
+  avatar: string | ImageAsset | null;
+  collapsed: boolean;
+  name: string;
+  onNavigate?: () => void;
+  onLogout: () => void;
+  roleName: string;
+}) {
+  const navigate = useNavigate();
+  const roleLabel = roleName || "未分配角色";
+
+  function openProfile() {
+    navigate("/profile");
+    onNavigate?.();
+  }
+
+  function handleProfileKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    event.preventDefault();
+    openProfile();
+  }
+
+  function handleLogoutClick(event: ReactMouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    onLogout();
+  }
+
+  if (collapsed) {
+    return (
+      <div className="grid justify-items-center gap-2 pt-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              aria-label={`${name}，${roleLabel}`}
+            className="flex h-8 w-8 cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-secondary/65 text-xs font-semibold text-foreground transition-colors hover:bg-secondary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              onClick={openProfile}
+              onKeyDown={handleProfileKeyDown}
+              role="link"
+              tabIndex={0}
+            >
+              {avatar ? <Image alt={name} className="h-full w-full object-cover" src={avatar} /> : name.slice(0, 1)}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <div className="grid gap-0.5">
+              <span>{name}</span>
+              <span className="text-[11px] opacity-80">{roleLabel}</span>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button className="h-8 w-8 rounded-xl" onClick={handleLogoutClick} size="icon" type="button" variant="ghost">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">退出登录</TooltipContent>
+        </Tooltip>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border/70 bg-secondary/35 px-2.5 py-2 transition-colors hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      onClick={openProfile}
+      onKeyDown={handleProfileKeyDown}
+      role="link"
+      tabIndex={0}
+    >
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-background text-xs font-semibold text-foreground shadow-sm">
+        {avatar ? <Image alt={name} className="h-full w-full object-cover" src={avatar} /> : name.slice(0, 1)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-foreground">{name}</p>
+        <p className="truncate text-xs text-muted-foreground">{roleLabel}</p>
+      </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button className="h-8 w-8 rounded-lg" onClick={handleLogoutClick} size="icon" type="button" variant="ghost">
+            <LogOut className="h-3.5 w-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>退出登录</TooltipContent>
+      </Tooltip>
     </div>
   );
 }
@@ -685,7 +1145,7 @@ export function TreeNav({
 
   return (
     <div className="grid gap-2">
-      {!sidebarCollapsed ? <p className="px-2 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">导航</p> : null}
+      {!sidebarCollapsed ? <p className="px-2 text-[11px] font-semibold text-muted-foreground">导航</p> : null}
       {menuTree.filter((node) => !node.hidden).map((node) => (
         <SidebarNavNode
           collapsed={sidebarCollapsed}
@@ -702,77 +1162,94 @@ export function TreeNav({
 }
 
 export function AdminSidebar({
+  avatar,
+  brandDescription,
+  brandKicker,
+  brandLogo,
+  brandTitle,
   collapsed,
   currentPath,
   menuTree,
+  name,
   onLogout,
   onNavigate,
+  roleName,
   setCollapsed,
-  userCard,
 }: {
+  avatar: string | ImageAsset | null;
+  brandDescription?: ReactNode;
+  brandKicker?: ReactNode;
+  brandLogo?: string | ImageAsset | null;
+  brandTitle?: string;
   collapsed: boolean;
   currentPath: string;
   menuTree: AppMenuNode[];
+  name: string;
   onLogout: () => void;
   onNavigate: () => void;
+  roleName: string;
   setCollapsed: (collapsed: boolean) => void;
-  userCard: ReactNode;
 }) {
   return (
-    <aside
-      className={cn(
-        "hidden h-[100dvh] flex-col border-r border-border bg-card px-4 py-5 md:flex",
-        collapsed ? "w-24" : "w-[18.5rem]",
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        {!collapsed ? <BrandBlock /> : <div className="text-lg font-semibold text-foreground">SA</div>}
-        <TooltipProvider delayDuration={150}>
+    <TooltipProvider delayDuration={120}>
+      <aside
+        className={cn(
+          "hidden h-[100dvh] flex-col border-r border-border bg-card md:flex",
+          collapsed ? "w-16 px-2.5 py-3" : "w-[18.5rem] px-4 py-5",
+        )}
+      >
+        <div className={cn("gap-3", collapsed ? "grid justify-items-center" : "flex items-start justify-between")}>
+          {collapsed ? (
+            <SidebarBrandMark logo={brandLogo} title={brandTitle} />
+          ) : (
+            <BrandBlock description={brandDescription} kicker={brandKicker} logo={brandLogo} title={brandTitle} />
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button onClick={() => setCollapsed(!collapsed)} size="icon" type="button" variant="ghost">
                 {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{collapsed ? "展开侧栏" : "折叠侧栏"}</TooltipContent>
+            <TooltipContent side={collapsed ? "right" : "bottom"}>{collapsed ? "展开侧栏" : "折叠侧栏"}</TooltipContent>
           </Tooltip>
-        </TooltipProvider>
-      </div>
-      <div className="mt-5">{collapsed ? null : userCard}</div>
-      <AppScrollbar className="mt-5 min-h-0 flex-1" viewportClassName="pr-1">
-        <TreeNav currentPath={currentPath} menuTree={menuTree} onNavigate={onNavigate} sidebarCollapsed={collapsed} />
-      </AppScrollbar>
-      <div className="mt-5 grid gap-2">
-        <NavLink className="rounded-control px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" onClick={onNavigate} to="/ops-service">
-          {collapsed ? "运" : "运维服务"}
-        </NavLink>
-        <NavLink className="rounded-control px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" onClick={onNavigate} to="/profile">
-          {collapsed ? "我" : "个人中心"}
-        </NavLink>
-        <Button className="justify-start" onClick={onLogout} type="button" variant="ghost">
-          <LogOut className="h-4 w-4" />
-          {!collapsed ? "退出登录" : null}
-        </Button>
-      </div>
-    </aside>
+        </div>
+        <AppScrollbar className="mt-5 min-h-0 flex-1" viewportClassName="pr-1">
+          <TreeNav currentPath={currentPath} menuTree={menuTree} onNavigate={onNavigate} sidebarCollapsed={collapsed} />
+        </AppScrollbar>
+        <div className="mt-5 grid gap-2 border-t border-border/80 pt-4">
+          <SidebarUtilityLink collapsed={collapsed} currentPath={currentPath} icon={Wrench} label="运维服务" onNavigate={onNavigate} to="/ops-service" />
+          <SidebarAccountRow avatar={avatar} collapsed={collapsed} name={name} onNavigate={onNavigate} onLogout={onLogout} roleName={roleName} />
+        </div>
+      </aside>
+    </TooltipProvider>
   );
 }
 
 export function AdminAppShell({
   avatar,
+  brandDescription,
+  brandKicker,
+  brandLogo,
+  brandTitle,
   children,
   currentPath,
   menuTree,
   onLogout,
   tenantCode,
+  topbarActions,
   userName,
   userRole,
 }: PropsWithChildren<{
-  avatar: string;
+  avatar: string | ImageAsset | null;
+  brandDescription?: ReactNode;
+  brandKicker?: ReactNode;
+  brandLogo?: string | ImageAsset | null;
+  brandTitle?: string;
   currentPath: string;
   menuTree: AppMenuNode[];
   onLogout: () => void;
   tenantCode: string;
+  topbarActions?: ReactNode;
   userName: string;
   userRole: string;
 }>) {
@@ -786,31 +1263,35 @@ export function AdminAppShell({
   const currentNode = trail.at(-1);
   const breadcrumbs = [{ href: "/", label: "后台" }, ...trail.map((node) => ({ href: node.fullPath, label: node.title }))];
   const pageTitle = currentNode?.title || (currentPath === "/ops-service" ? "运维服务" : currentPath === "/profile" ? "个人中心" : "控制台");
-  const userCard = <IdentityCard avatar={avatar} name={userName} roleName={userRole} tenantCode={tenantCode} />;
 
   return (
     <AppFrameShell
-      contentClassName="px-4 py-5 md:px-8 md:py-6"
-      contentInnerClassName="grid max-w-[1440px] gap-6"
+      contentClassName="p-4 md:px-5 md:py-5"
+      contentInnerClassName="grid max-w-[1440px] gap-4"
       desktopSidebar={
         <AdminSidebar
+          avatar={avatar}
+          brandDescription={brandDescription}
+          brandKicker={brandKicker}
+          brandLogo={brandLogo}
+          brandTitle={brandTitle}
           collapsed={collapsed}
           currentPath={currentPath}
           menuTree={menuTree}
+          name={userName}
           onLogout={onLogout}
           onNavigate={() => undefined}
+          roleName={userRole}
           setCollapsed={setCollapsed}
-          userCard={userCard}
         />
       }
       desktopSidebarClassName="md:flex"
       header={
         <AdminTopbar
           breadcrumbs={breadcrumbs}
-          onLogout={onLogout}
           pageTitle={pageTitle}
           tenantCode={tenantCode}
-          userLabel={userName}
+          topbarActions={topbarActions}
         />
       }
       mobileBar={({ openSidebar }) => (
@@ -824,11 +1305,14 @@ export function AdminAppShell({
       )}
       mobileSidebar={({ closeSidebar }) => (
         <div className="flex h-full flex-col gap-4">
-          <BrandBlock />
-          {userCard}
+          <BrandBlock description={brandDescription} kicker={brandKicker} logo={brandLogo} title={brandTitle} />
           <AppScrollbar className="min-h-0 flex-1" viewportClassName="pr-1">
             <TreeNav currentPath={currentPath} menuTree={menuTree} onNavigate={closeSidebar} />
           </AppScrollbar>
+          <div className="grid gap-2 border-t border-border/80 pt-4">
+            <SidebarUtilityLink collapsed={false} currentPath={currentPath} icon={Wrench} label="运维服务" onNavigate={closeSidebar} to="/ops-service" />
+            <SidebarAccountRow avatar={avatar} collapsed={false} name={userName} onNavigate={closeSidebar} onLogout={onLogout} roleName={userRole} />
+          </div>
         </div>
       )}
     >
@@ -839,7 +1323,7 @@ export function AdminAppShell({
 
 export function AdminShell({ children, sidebar }: PropsWithChildren<{ sidebar: ReactNode }>) {
   return (
-    <div className="grid min-h-[100dvh] gap-6 px-6 py-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+    <div className="grid min-h-[100dvh] gap-4 px-4 py-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
       <div>{sidebar}</div>
       <div>{children}</div>
     </div>
@@ -847,15 +1331,15 @@ export function AdminShell({ children, sidebar }: PropsWithChildren<{ sidebar: R
 }
 
 export function AdminPageStack({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("grid gap-6", className)} {...props} />;
+  return <div className={cn("grid gap-4", className)} {...props} />;
 }
 
 export function AdminTwoColumn({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("grid gap-6 xl:grid-cols-2", className)} {...props} />;
+  return <div className={cn("grid gap-4 xl:grid-cols-2", className)} {...props} />;
 }
 
 export function AdminThreeColumn({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]", className)} {...props} />;
+  return <div className={cn("grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]", className)} {...props} />;
 }
 
 type TreeLikeNode = {
@@ -991,7 +1475,7 @@ export function TreeSelectorPanel({
 }
 
 export function MasterDetailLayout({ children, className }: PropsWithChildren<{ className?: string }>) {
-  return <div className={cn("grid gap-6 xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]", className)}>{children}</div>;
+  return <div className={cn("grid gap-4 xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]", className)}>{children}</div>;
 }
 
 export function ListPane({ children, className }: PropsWithChildren<{ className?: string }>) {
@@ -1016,7 +1500,7 @@ export function LogViewer({
   title?: ReactNode;
 }) {
   return (
-    <div className={cn("grid gap-4 rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-card)]", className)}>
+    <div className={cn("grid gap-4 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <h3 className="text-base font-semibold text-foreground">{title}</h3>
@@ -1094,8 +1578,8 @@ export function StatStrip({
     <div className={cn("grid gap-4 md:grid-cols-2 xl:grid-cols-4", className)}>
       {items.map((item, index) => (
         <Card key={`${String(item.label)}-${index}`}>
-          <CardContent className="space-y-2 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">{item.label}</p>
+          <CardContent className="space-y-2 p-4">
+            <p className="text-[11px] font-medium text-muted-foreground">{item.label}</p>
             <p className="text-3xl font-semibold tracking-tight text-foreground">{item.value}</p>
           </CardContent>
         </Card>
@@ -1181,7 +1665,7 @@ export function AuthLayout({
   aside,
   children,
   description,
-  kicker = "Admin Access",
+  kicker = "管理入口",
   title,
 }: {
   aside?: ReactNode;
@@ -1271,7 +1755,7 @@ export function WizardLayout({
   title: ReactNode;
 }) {
   return (
-    <AuthPanel description={description} kicker="Setup Wizard" title={title}>
+    <AuthPanel description={description} kicker="初始化引导" title={title}>
       <div className="grid gap-6">
         <WizardSteps currentStep={currentStep} steps={steps} />
         {children}

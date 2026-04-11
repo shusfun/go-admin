@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { CrudDataPage } from "../components/crud-data-page";
 import { Button, ConfirmDialog, SectionCard, toast } from "@go-admin/ui-admin";
-import { createApiClient } from "@go-admin/api";
+import { createApiClient, toUserFacingErrorMessage } from "@go-admin/api";
 import type { SysJobRecord } from "@go-admin/types";
 
 const jobGroupOptions = [
@@ -52,7 +52,7 @@ export function ScheduleJobsPage({ api }: { api: ReturnType<typeof createApiClie
       await serviceMutation.mutateAsync({ action, jobId: item.jobId });
       toast.success(action === "start" ? "任务已启动调度服务" : "任务已从调度服务移除");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "任务服务操作失败");
+      toast.error(toUserFacingErrorMessage(error, "任务服务操作失败"));
     }
   }
 

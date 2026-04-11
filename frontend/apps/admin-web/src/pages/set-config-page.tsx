@@ -2,7 +2,70 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AdminPageStack, AdminThreeColumn, Button, DetailGrid, FormActions, FormField, PageHeader, SectionCard, Textarea, toast } from "@go-admin/ui-admin";
-import { createApiClient } from "@go-admin/api";
+import { createApiClient, toUserFacingErrorMessage } from "@go-admin/api";
+
+type ConfigMeta = {
+  description: string;
+  label: string;
+  rows?: number;
+  valueLabels?: Record<string, string>;
+};
+
+const CONFIG_META: Record<string, ConfigMeta> = {
+  sys_app_logo: {
+    description: "配置系统品牌图标地址，前后台公共品牌位会优先读取这里。",
+    label: "系统 Logo",
+    rows: 3,
+  },
+  sys_app_name: {
+    description: "配置系统名称，用于页面标题、品牌区和前台公共展示。",
+    label: "系统名称",
+  },
+  sys_index_sideTheme: {
+    description: "配置后台侧栏主题风格。",
+    label: "侧栏主题",
+    valueLabels: {
+      "theme-dark": "深色主题",
+      "theme-light": "浅色主题",
+    },
+  },
+  sys_index_skinName: {
+    description: "配置后台默认皮肤色。",
+    label: "皮肤样式",
+    valueLabels: {
+      "skin-blue": "蓝色皮肤",
+      "skin-green": "绿色皮肤",
+      "skin-purple": "紫色皮肤",
+      "skin-red": "红色皮肤",
+      "skin-yellow": "黄色皮肤",
+    },
+  },
+  sys_user_initPassword: {
+    description: "新建账号时使用的默认初始密码，请按安全要求定期调整。",
+    label: "初始密码",
+  },
+};
+
+const CONFIG_ORDER = ["sys_app_logo", "sys_app_name", "sys_index_sideTheme", "sys_index_skinName", "sys_user_initPassword"];
+
+function getConfigMeta(key: string): ConfigMeta {
+  return CONFIG_META[key] || {
+    description: "未配置专用说明，保存时将按原始配置键提交。",
+    label: key,
+  };
+}
+
+function getConfigDescription(key: string, value: string) {
+  const meta = getConfigMeta(key);
+  const segments = [meta.description, `配置键：${key}`];
+  const mappedValue = meta.valueLabels?.[value];
+
+  if (mappedValue) {
+    segments.push(`当前值含义：${mappedValue}（${value}）`);
+  }
+
+  return segments.join(" ");
+}
 
 export function SetConfigPage({ api }: { api: ReturnType<typeof createApiClient> }) {
   const queryClient = useQueryClient();
@@ -20,7 +83,7 @@ export function SetConfigPage({ api }: { api: ReturnType<typeof createApiClient>
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "set-config"] });
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : "系统设置保存失败";
+      const message = toUserFacingErrorMessage(error, "系统设置保存失败");
       setFeedback(message);
       toast.error(message);
     },
@@ -29,6 +92,28 @@ export function SetConfigPage({ api }: { api: ReturnType<typeof createApiClient>
     const base = configQuery.data || {};
     return Object.entries(draft).filter(([key, value]) => base[key] !== value);
   }, [configQuery.data, draft]);
+  const orderedEntries = useMemo(() => {
+    const orderMap = new Map(CONFIG_ORDER.map((key, index) => [key, index]));
+
+    return Object.entries(draft).sort(([leftKey], [rightKey]) => {
+      const leftOrder = orderMap.get(leftKey);
+      const rightOrder = orderMap.get(rightKey);
+
+      if (leftOrder !== undefined && rightOrder !== undefined) {
+        return leftOrder - rightOrder;
+      }
+
+      if (leftOrder !== undefined) {
+        return -1;
+      }
+
+      if (rightOrder !== undefined) {
+        return 1;
+      }
+
+      return leftKey.localeCompare(rightKey, "zh-CN");
+    });
+  }, [draft]);
 
   useEffect(() => {
     if (configQuery.data) {
@@ -38,12 +123,15 @@ export function SetConfigPage({ api }: { api: ReturnType<typeof createApiClient>
 
   return (
     <AdminPageStack>
-      <PageHeader description="管理系统运行时参数配置。" kicker="Admin Module" title="参数设置" />
+      <PageHeader description="管理系统当前运行中的参数配置。" kicker="管理台" title="参数设置" />
       <AdminThreeColumn>
-        <SectionCard title="配置项" description="直接编辑各配置项的当前值。">
+        <SectionCard title="配置项" description="在这里调整系统正在使用的配置内容。">
           <div className="grid gap-4">
-            {Object.entries(draft).map(([key, value]) => (
-              <FormField key={key} label={key}>
+            {orderedEntries.map(([key, value]) => {
+              const meta = getConfigMeta(key);
+
+              return (
+              <FormField key={key} description={getConfigDescription(key, value)} label={meta.label}>
                 <Textarea
                   onChange={(event) =>
                     setDraft((current) => ({
@@ -51,10 +139,12 @@ export function SetConfigPage({ api }: { api: ReturnType<typeof createApiClient>
                       [key]: event.target.value,
                     }))
                   }
+                  rows={meta.rows ?? 2}
                   value={value}
                 />
               </FormField>
-            ))}
+              );
+            })}
           </div>
           <FormActions className="justify-start">
             <Button
@@ -79,7 +169,7 @@ export function SetConfigPage({ api }: { api: ReturnType<typeof createApiClient>
               type="button"
               variant="outline"
             >
-              恢复当前服务端值
+              恢复当前配置
             </Button>
           </FormActions>
           {feedback ? <p className="text-sm text-primary">{feedback}</p> : null}

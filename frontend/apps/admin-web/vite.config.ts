@@ -73,6 +73,10 @@ export default defineConfig(({ command }) => ({
         target: backendTarget,
         changeOrigin: true,
       },
+      "/swagger": {
+        target: backendTarget,
+        changeOrigin: true,
+      },
     },
   },
 }));

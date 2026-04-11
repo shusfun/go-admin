@@ -1,5 +1,8 @@
-import { type PropsWithChildren } from "react";
+import { type PropsWithChildren, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
+
+export * from "./image-captcha-field";
+export * from "./image-display";
 
 export function MobileShell({ children }: PropsWithChildren) {
   return (
@@ -9,12 +12,25 @@ export function MobileShell({ children }: PropsWithChildren) {
   );
 }
 
-export function MobileHero({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
+export function MobileHero({
+  eyebrow,
+  title,
+  description,
+  media,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  media?: ReactNode;
+}) {
   return (
     <section className="mobile-card mobile-hero">
-      <small>{eyebrow}</small>
-      <h1>{title}</h1>
-      <p>{description}</p>
+      <div className="mobile-hero__content">
+        <small>{eyebrow}</small>
+        <h1>{title}</h1>
+        <p>{description}</p>
+      </div>
+      {media ? <div className="mobile-hero__media">{media}</div> : null}
     </section>
   );
 }

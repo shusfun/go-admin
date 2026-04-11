@@ -1,34 +1,36 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   AdminPageStack,
+  AppVirtualList,
+  Badge,
   Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   ConfirmDialog,
-  DataTableSection,
   DateRangePicker,
   type DateRangePickerValue,
-  DetailDialog,
   DetailGrid,
+  DetailPane,
+  EmptyBlock,
   FilterPanel,
   FormField,
   Input,
+  ListPane,
+  MasterDetailLayout,
   PageHeader,
   Pagination,
   ReadonlyCodeBlock,
-  RowActions,
   Select,
   StatusBadge,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Toolbar,
   toast,
 } from "@go-admin/ui-admin";
-import { createApiClient } from "@go-admin/api";
+import { createApiClient, toUserFacingErrorMessage } from "@go-admin/api";
 import type { SysOperaLogRecord } from "@go-admin/types";
 
 const statusOptions = [
@@ -73,6 +75,10 @@ function toRangeParams(range?: DateRangePickerValue) {
   };
 }
 
+function getOperaStatusLabel(status?: string | number) {
+  return String(status) === "1" ? "正常" : "关闭";
+}
+
 export function OperaLogsPage({ api }: { api: ReturnType<typeof createApiClient> }) {
   const queryClient = useQueryClient();
   const [pageIndex, setPageIndex] = useState(1);
@@ -80,7 +86,7 @@ export function OperaLogsPage({ api }: { api: ReturnType<typeof createApiClient>
   const [operUrl, setOperUrl] = useState("");
   const [status, setStatus] = useState("");
   const [dateRange, setDateRange] = useState<DateRangePickerValue>();
-  const [detailId, setDetailId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SysOperaLogRecord | null>(null);
 
   const listQuery = useQuery({
@@ -95,11 +101,28 @@ export function OperaLogsPage({ api }: { api: ReturnType<typeof createApiClient>
         ...toRangeParams(dateRange),
       }),
   });
+
+  const rows = listQuery.data?.list || [];
+  const total = listQuery.data?.count || 0;
+  const totalPages = Math.max(1, Math.ceil(total / 20));
+
+  useEffect(() => {
+    if (!rows.length) {
+      setSelectedId(null);
+      return;
+    }
+
+    if (!rows.some((row) => row.id === selectedId)) {
+      setSelectedId(rows[0].id);
+    }
+  }, [rows, selectedId]);
+
   const detailQuery = useQuery({
-    enabled: detailId !== null,
-    queryKey: ["admin-page", "opera-log-detail", detailId],
-    queryFn: () => api.admin.getOperaLog(detailId as number),
+    enabled: selectedId !== null,
+    queryKey: ["admin-page", "opera-log-detail", selectedId],
+    queryFn: () => api.admin.getOperaLog(selectedId as number),
   });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => api.admin.deleteOperaLogs({ ids: [id] }),
     onSuccess: async () => {
@@ -107,44 +130,63 @@ export function OperaLogsPage({ api }: { api: ReturnType<typeof createApiClient>
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "opera-logs"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "操作日志删除失败");
+      toast.error(toUserFacingErrorMessage(error, "操作日志删除失败"));
     },
   });
 
-  const rows = listQuery.data?.list || [];
-  const total = listQuery.data?.count || 0;
-  const totalPages = Math.max(1, Math.ceil(total / 20));
+  const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId) ?? null, [rows, selectedId]);
   const detail = detailQuery.data;
 
   return (
     <AdminPageStack>
-      <PageHeader description="查询系统操作日志记录。" kicker="Admin Module" title="操作日志" />
+      <PageHeader
+        kicker="管理台"
+        title="操作日志"
+      />
 
-      <FilterPanel description="支持按模块、操作类型和时间范围筛选。">
+      <FilterPanel>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <FormField label="模块">
-            <Input onChange={(event) => {
-              setPageIndex(1);
-              setTitle(event.target.value);
-            }} placeholder="按模块过滤" value={title} />
+            <Input
+              onChange={(event) => {
+                setPageIndex(1);
+                setTitle(event.target.value);
+              }}
+              placeholder="按模块过滤"
+              value={title}
+            />
           </FormField>
           <FormField label="访问地址">
-            <Input onChange={(event) => {
-              setPageIndex(1);
-              setOperUrl(event.target.value);
-            }} placeholder="按访问地址过滤" value={operUrl} />
+            <Input
+              onChange={(event) => {
+                setPageIndex(1);
+                setOperUrl(event.target.value);
+              }}
+              placeholder="按访问地址过滤"
+              value={operUrl}
+            />
           </FormField>
           <FormField label="状态">
-            <Select onValueChange={(value) => {
-              setPageIndex(1);
-              setStatus(value);
-            }} options={statusOptions} value={status} />
+            <Select
+              onValueChange={(value) => {
+                setPageIndex(1);
+                setStatus(value);
+              }}
+              options={statusOptions}
+              value={status}
+            />
           </FormField>
           <FormField label="操作时间">
-            <DateRangePicker onChange={(value) => {
-              setPageIndex(1);
-              setDateRange(value);
-            }} shortcuts={createCommonShortcuts()} value={dateRange} valueFormat="YYYY-MM-DD HH:mm:ss" defaultTime={RANGE_DEFAULT_TIME} />
+            <DateRangePicker
+              defaultTime={RANGE_DEFAULT_TIME}
+              onChange={(value) => {
+                setPageIndex(1);
+                setDateRange(value);
+              }}
+              shortcuts={createCommonShortcuts()}
+              value={dateRange}
+              valueFormat="YYYY-MM-DD HH:mm:ss"
+            />
           </FormField>
         </div>
         <Toolbar>
@@ -154,71 +196,134 @@ export function OperaLogsPage({ api }: { api: ReturnType<typeof createApiClient>
         </Toolbar>
       </FilterPanel>
 
-      <DataTableSection description={`当前共 ${total} 条记录。`} title="日志列表">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>模块</TableHead>
-              <TableHead>请求方式</TableHead>
-              <TableHead>访问地址</TableHead>
-              <TableHead>操作人</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead>耗时</TableHead>
-              <TableHead>操作时间</TableHead>
-              <TableHead>操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell>{row.title || "-"}</TableCell>
-                <TableCell>{row.requestMethod || "-"}</TableCell>
-                <TableCell>{row.operUrl || "-"}</TableCell>
-                <TableCell>{row.operName || "-"}</TableCell>
-                <TableCell>
-                  <StatusBadge status={row.status === "1" ? "正常" : "关闭"} />
-                </TableCell>
-                <TableCell>{row.latencyTime || "-"}</TableCell>
-                <TableCell>{formatDateTime(row.operTime as string)}</TableCell>
-                <TableCell>
-                  <RowActions>
-                    <Button onClick={() => setDetailId(row.id)} size="sm" type="button" variant="outline">
-                      详情
-                    </Button>
-                    <Button onClick={() => setDeleteTarget(row)} size="sm" type="button" variant="destructive">
-                      删除
-                    </Button>
-                  </RowActions>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <Pagination onNext={() => setPageIndex((current) => current + 1)} onPrevious={() => setPageIndex((current) => current - 1)} page={pageIndex} totalPages={totalPages} />
-      </DataTableSection>
+      <MasterDetailLayout className="items-start xl:grid-cols-[minmax(0,1.18fr)_minmax(360px,0.82fr)]">
+        <ListPane>
+          <Card className="border-border/70 bg-card">
+            <CardHeader className="gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="text-base">摘要列表</CardTitle>
+                  <CardDescription>左侧概览近期关键操作记录。</CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge tone="muted">共 {total} 条</Badge>
+                  <Badge tone="success">虚拟化开启</Badge>
+                  <Badge tone="info">参数外移</Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <AppVirtualList
+                className="max-h-[34rem]"
+                contentClassName="grid"
+                empty={<EmptyBlock description="当前筛选条件下没有操作日志。" title="暂无记录" />}
+                estimatedItemSize={124}
+                getItemKey={(item) => item.id}
+                items={rows}
+                overscan={5}
+              >
+                {(row) => {
+                  const selected = row.id === selectedId;
+                  return (
+                    <button
+                      className={[
+                        "grid w-full gap-3 border-b border-border/80 px-4 py-4 text-left transition-colors",
+                        "md:grid-cols-[minmax(0,1.6fr)_104px_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.8fr)_104px_118px_172px]",
+                        selected ? "bg-primary/7 hover:bg-primary/9" : "bg-card hover:bg-secondary/55",
+                      ].join(" ")}
+                      data-opera-log-id={row.id}
+                      onClick={() => setSelectedId(row.id)}
+                      type="button"
+                    >
+                      <div className="grid gap-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-foreground">{row.title || "-"}</span>
+                          <Badge size="small" tone="muted">
+                            {row.requestMethod || "-"}
+                          </Badge>
+                        </div>
+                        <div className="line-clamp-2 text-xs leading-6 text-muted-foreground">{row.operUrl || "-"}</div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs leading-6 text-muted-foreground">
+                          <span>{row.operName || "-"}</span>
+                          <span>{row.operIp || "-"}</span>
+                          <span>{formatDateTime(row.operTime as string)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-start md:justify-center xl:justify-start">
+                        <StatusBadge status={getOperaStatusLabel(row.status)} />
+                      </div>
+                      <div className="grid gap-1 text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">请求概览</span>
+                        <span>{row.requestMethod || "-"}</span>
+                        <span>{row.latencyTime || "-"} ms</span>
+                      </div>
+                      <div className="hidden xl:grid gap-1 text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">最近操作</span>
+                        <span>{formatDateTime(row.operTime as string)}</span>
+                      </div>
+                    </button>
+                  );
+                }}
+              </AppVirtualList>
+              <Pagination onNext={() => setPageIndex((current) => current + 1)} onPrevious={() => setPageIndex((current) => current - 1)} page={pageIndex} totalPages={totalPages} />
+            </CardContent>
+          </Card>
+        </ListPane>
 
-      <DetailDialog description="请求元数据、请求参数和返回结果统一放入详情弹层。" onOpenChange={(open) => !open && setDetailId(null)} open={detailId !== null} title="操作日志详情">
-        {detail ? (
-          <div className="grid gap-4">
-            <DetailGrid
-              items={[
-                { label: "请求地址", value: detail.operUrl || "-" },
-                { label: "登录信息", value: `${detail.operName || "-"} / ${detail.operIp || "-"} / ${detail.operLocation || "-"}` },
-                { label: "请求方式", value: detail.requestMethod || "-" },
-                { label: "耗时", value: detail.latencyTime || "-" },
-                { label: "操作状态", value: detail.status === "1" ? "正常" : "关闭" },
-                { label: "操作时间", value: formatDateTime(detail.operTime as string) },
-                { label: "部门", value: detail.deptName || "-" },
-                { label: "UA", value: detail.userAgent || "-" },
-              ]}
-            />
-            <ReadonlyCodeBlock title="请求参数">{detail.operParam || "-"}</ReadonlyCodeBlock>
-            <ReadonlyCodeBlock title="返回结果">{detail.jsonResult || "-"}</ReadonlyCodeBlock>
-          </div>
-        ) : (
-          <div className="py-4 text-sm text-muted-foreground">正在加载详情...</div>
-        )}
-      </DetailDialog>
+        <DetailPane>
+          <Card className="border-border/70 bg-card">
+            <CardHeader className="gap-3">
+              {selectedRow ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge status={getOperaStatusLabel(selectedRow.status)} />
+                    <Badge tone="muted">{selectedRow.requestMethod || "-"}</Badge>
+                    <Badge tone="info">{selectedRow.operName || "-"}</Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <CardTitle>{selectedRow.title || "操作日志详情"}</CardTitle>
+                    <CardDescription>查看选中记录的完整请求报文与处理结果。</CardDescription>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <CardTitle>操作日志详情</CardTitle>
+                  <CardDescription>请选择一条日志查看详情。</CardDescription>
+                </>
+              )}
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              {detail ? (
+                <>
+                  <DetailGrid
+                    items={[
+                      { label: "请求地址", value: detail.operUrl || "-" },
+                      { label: "登录信息", value: `${detail.operName || "-"} / ${detail.operIp || "-"} / ${detail.operLocation || "-"}` },
+                      { label: "请求方式", value: detail.requestMethod || "-" },
+                      { label: "耗时", value: `${detail.latencyTime || "-"} ms` },
+                      { label: "操作状态", value: getOperaStatusLabel(detail.status) },
+                      { label: "操作时间", value: formatDateTime(detail.operTime as string) },
+                      { label: "部门", value: detail.deptName || "-" },
+                      { label: "UA", value: detail.userAgent || "-" },
+                    ]}
+                  />
+                  <ReadonlyCodeBlock title="请求参数">{detail.operParam || "-"}</ReadonlyCodeBlock>
+                  <ReadonlyCodeBlock title="返回结果">{detail.jsonResult || "-"}</ReadonlyCodeBlock>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button onClick={() => setDeleteTarget(detail)} size="small" type="button" variant="destructive">
+                      删除当前日志
+                    </Button>
+                  </div>
+                </>
+              ) : selectedRow ? (
+                <div className="py-4 text-sm text-muted-foreground">正在加载详情...</div>
+              ) : (
+                <div className="py-4 text-sm text-muted-foreground">请选择一条日志查看详情。</div>
+              )}
+            </CardContent>
+          </Card>
+        </DetailPane>
+      </MasterDetailLayout>
 
       <ConfirmDialog
         description={deleteTarget ? `操作日志「${deleteTarget.title || "-"}」将被删除。` : ""}

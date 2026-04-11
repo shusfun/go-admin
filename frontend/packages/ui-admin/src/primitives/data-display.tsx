@@ -1,17 +1,20 @@
 import { ArrowUp, ChevronLeft, ChevronRight, LoaderCircle, TriangleAlert, UserRound, type LucideIcon } from "lucide-react";
 import {
+  forwardRef,
   useEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
   type HTMLAttributes,
+  type ImgHTMLAttributes,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   type TdHTMLAttributes,
   type ThHTMLAttributes,
 } from "react";
+import type { ImageAsset } from "@go-admin/types";
 
 import { cn } from "../lib/utils";
 import { Button } from "./button";
@@ -28,6 +31,131 @@ function clampPercentage(value: number) {
 }
 
 const BACKTOP_DRAG_THRESHOLD = 6;
+const DEFAULT_IMAGE_VARIANT_SIZES = [64, 128, 256, 512];
+type ImageSource = string | ImageAsset | null | undefined;
+
+function normalizeVariantSizes(variantSizes?: number[]) {
+  const sizes = (variantSizes ?? DEFAULT_IMAGE_VARIANT_SIZES).filter((value) => Number.isFinite(value) && value > 0);
+  return Array.from(new Set(sizes)).sort((left, right) => left - right);
+}
+
+function normalizePathValue(source: string | null | undefined) {
+  const value = source?.trim() ?? "";
+  if (!value) {
+    return "";
+  }
+  if (value.startsWith("static/")) {
+    return `/${value}`;
+  }
+  return value;
+}
+
+export function normalizeImageSource(source: ImageSource) {
+  if (typeof source === "string" || source == null) {
+    return normalizePathValue(source);
+  }
+
+  return {
+    ...source,
+    path: normalizePathValue(source.path),
+    variants: (source.variants ?? []).map((item) => ({
+      ...item,
+      path: normalizePathValue(item.path),
+    })),
+  } satisfies ImageAsset;
+}
+
+function isAbsoluteHttpUrl(source: string) {
+  return source.startsWith("http://") || source.startsWith("https://");
+}
+
+function isSameOriginSource(source: string) {
+  if (!isAbsoluteHttpUrl(source)) {
+    return source.startsWith("/");
+  }
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    return new URL(source).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+export function resolveImageVariantSize(displaySize: number, devicePixelRatio = 1, variantSizes?: number[]) {
+  const sizes = normalizeVariantSizes(variantSizes);
+  if (sizes.length === 0) {
+    return null;
+  }
+
+  const requiredPixels = Math.max(1, Math.ceil(displaySize * Math.max(1, devicePixelRatio)));
+  return sizes.find((size) => size >= requiredPixels) ?? sizes[sizes.length - 1];
+}
+
+function extractVariantSizes(source: ImageSource, variantSizes?: number[]) {
+  const normalized = normalizeImageSource(source);
+  if (typeof normalized !== "object" || normalized == null) {
+    return normalizeVariantSizes(variantSizes);
+  }
+
+  const sizes = [
+    ...(typeof normalized.size === "number" && normalized.size > 0 ? [normalized.size] : []),
+    ...(normalized.variants ?? []).map((item) => item.size),
+    ...(variantSizes ?? []),
+  ];
+  return Array.from(new Set(sizes.filter((value) => Number.isFinite(value) && value > 0))).sort((left, right) => left - right);
+}
+
+export function buildImageVariantSource(source: ImageSource, variantSize: number | null, variantSizes?: number[]) {
+  const normalized = normalizeImageSource(source);
+  if (!normalized || !variantSize) {
+    return typeof normalized === "string" ? normalized : normalized?.path ?? "";
+  }
+
+  if (typeof normalized === "object") {
+    const matched = (normalized.variants ?? []).find((item) => item.size === variantSize);
+    if (matched?.path) {
+      return matched.path;
+    }
+    return normalized.path;
+  }
+
+  const sizes = extractVariantSizes(source, variantSizes);
+  const largest = sizes[sizes.length - 1];
+  if (!largest || variantSize >= largest) {
+    return normalized;
+  }
+
+  if (!isSameOriginSource(normalized)) {
+    return normalized;
+  }
+
+  const buildPath = (pathname: string) => {
+    const matched = pathname.match(/^(.*?)(@\d+)?(\.[^.\/]+)$/);
+    if (!matched) {
+      return pathname;
+    }
+    const [, basePath, , ext] = matched;
+    if (ext.toLowerCase() !== ".webp") {
+      return pathname;
+    }
+    return `${basePath}@${variantSize}${ext}`;
+  };
+
+  if (isAbsoluteHttpUrl(normalized)) {
+    try {
+      const url = new URL(normalized);
+      url.pathname = buildPath(url.pathname);
+      return url.toString();
+    } catch {
+      return normalized;
+    }
+  }
+
+  const [pathname, search = ""] = normalized.split("?");
+  return `${buildPath(pathname)}${search ? `?${search}` : ""}`;
+}
 
 function getAvatarInitials(name?: string) {
   if (!name) {
@@ -133,7 +261,7 @@ export function Card({ className, active, children, elevated = false, ...props }
 }
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col gap-1.5 border-b border-border/50 px-5 py-4", className)} {...props} />;
+  return <div className={cn("flex flex-col gap-1.5 border-b border-border/50 p-4", className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
@@ -145,11 +273,11 @@ export function CardDescription({ className, ...props }: HTMLAttributes<HTMLPara
 }
 
 export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("px-5 py-5", className)} {...props} />;
+  return <div className={cn("p-4", className)} {...props} />;
 }
 
 export function CardFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex items-center gap-3 border-t border-border/50 px-5 py-4", className)} {...props} />;
+  return <div className={cn("flex items-center gap-3 border-t border-border/50 p-4", className)} {...props} />;
 }
 
 export function Badge({
@@ -410,7 +538,7 @@ export function Avatar({
   name?: string;
   shape?: "circle" | "square";
   size?: "default" | "large" | "small" | number;
-  src?: string;
+  src?: ImageSource;
   status?: "away" | "busy" | "offline" | "online" | "warning";
 }) {
   const [broken, setBroken] = useState(false);
@@ -443,7 +571,7 @@ export function Avatar({
         style={{ height: resolvedSize, width: resolvedSize, ...style }}
       >
         {src && !broken ? (
-          <img
+          <Image
             alt={alt ?? name ?? "avatar"}
             className="h-full w-full object-cover"
             onError={() => setBroken(true)}
@@ -466,6 +594,84 @@ export function Avatar({
     </span>
   );
 }
+
+export const Image = forwardRef<
+  HTMLImageElement,
+  Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & {
+    src?: ImageSource;
+    variantSizes?: number[];
+  }
+>(function Image({ onError, src, variantSizes, ...props }, forwardedRef) {
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const [displaySize, setDisplaySize] = useState(0);
+  const [fallbackToOriginal, setFallbackToOriginal] = useState(false);
+  const normalizedSource = normalizeImageSource(src);
+  const resolvedVariantSize = resolveImageVariantSize(
+    displaySize,
+    typeof window === "undefined" ? 1 : window.devicePixelRatio || 1,
+    extractVariantSizes(src, variantSizes),
+  );
+  const preferredSource = useMemo(
+    () => buildImageVariantSource(normalizedSource, resolvedVariantSize, variantSizes),
+    [normalizedSource, resolvedVariantSize, variantSizes],
+  );
+  const originSource = typeof normalizedSource === "string" ? normalizedSource : normalizedSource?.path ?? "";
+  const resolvedSource = fallbackToOriginal ? originSource : (preferredSource || originSource);
+
+  useEffect(() => {
+    setFallbackToOriginal(false);
+  }, [normalizedSource, preferredSource]);
+
+  useEffect(() => {
+    const node = imageRef.current;
+    if (!node) {
+      return;
+    }
+
+    const updateSize = () => {
+      const nextSize = Math.max(node.clientWidth, node.clientHeight);
+      setDisplaySize((current) => (current === nextSize ? current : nextSize));
+    };
+
+    updateSize();
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => updateSize());
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [normalizedSource]);
+
+  if (!resolvedSource) {
+    return null;
+  }
+
+  return (
+    <img
+      {...props}
+      onError={(event) => {
+        if (!fallbackToOriginal && preferredSource && preferredSource !== originSource) {
+          setFallbackToOriginal(true);
+          return;
+        }
+        onError?.(event);
+      }}
+      ref={(node) => {
+        imageRef.current = node;
+        if (!forwardedRef) {
+          return;
+        }
+        if (typeof forwardedRef === "function") {
+          forwardedRef(node);
+          return;
+        }
+        forwardedRef.current = node;
+      }}
+      src={resolvedSource}
+    />
+  );
+});
 
 export function Icon({
   bordered = false,

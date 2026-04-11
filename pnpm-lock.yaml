@@ -182,6 +182,9 @@ importers:
       '@go-admin/types':
         specifier: workspace:*
         version: link:../types
+      react:
+        specifier: ^19.2.0
+        version: 19.2.4
 
   frontend/packages/core:
     dependencies:
@@ -205,6 +208,9 @@ importers:
 
   frontend/packages/ui-admin:
     dependencies:
+      '@go-admin/auth':
+        specifier: workspace:*
+        version: link:../auth
       '@go-admin/design-tokens':
         specifier: workspace:*
         version: link:../design-tokens
@@ -274,6 +280,12 @@ importers:
 
   frontend/packages/ui-mobile:
     dependencies:
+      '@go-admin/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@go-admin/types':
+        specifier: workspace:*
+        version: link:../types
       react:
         specifier: ^19.2.0
         version: 19.2.4

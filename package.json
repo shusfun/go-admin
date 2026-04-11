@@ -13,6 +13,7 @@
     "repo:status": "pnpm run repo -- status",
     "repo:setup": "pnpm run repo -- setup",
     "repo:setup-status": "pnpm run repo -- setup-status",
+    "repo:db:reset": "pnpm run repo -- db reset",
     "repo:deps": "pnpm run repo -- deps",
     "repo:deps:backend": "pnpm run repo -- deps backend",
     "repo:deps:frontend": "pnpm run repo -- deps frontend",

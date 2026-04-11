@@ -5,8 +5,12 @@ import {
   AdminPageStack,
   AdminTwoColumn,
   AppScrollbar,
+  AppVirtualList,
   AsyncActionButton,
+  Badge,
   Button,
+  Card,
+  CardContent,
   ConfirmDialog,
   DataTableSection,
   FilterPanel,
@@ -31,7 +35,7 @@ import {
   TreeSelectorPanel,
   toast,
 } from "@go-admin/ui-admin";
-import { createApiClient } from "@go-admin/api";
+import { createApiClient, toUserFacingErrorMessage } from "@go-admin/api";
 import type { SysRoleRecord, TreeOptionNode } from "@go-admin/types";
 
 type RoleDraft = {
@@ -148,7 +152,7 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
 
       const roleId = await api.admin.createRole(nextPayload);
       if (!roleId) {
-        throw new Error("角色已创建，但未返回 roleId");
+        throw new Error("角色已创建，请刷新列表确认结果");
       }
       await api.admin.updateRoleDataScope({
         roleId,
@@ -163,7 +167,7 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "roles"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "角色保存失败");
+      toast.error(toUserFacingErrorMessage(error, "角色保存失败"));
     },
   });
 
@@ -174,7 +178,7 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "roles"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "角色状态更新失败");
+      toast.error(toUserFacingErrorMessage(error, "角色状态更新失败"));
     },
   });
 
@@ -185,7 +189,7 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       await queryClient.invalidateQueries({ queryKey: ["admin-page", "roles"] });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "角色删除失败");
+      toast.error(toUserFacingErrorMessage(error, "角色删除失败"));
     },
   });
 
@@ -227,7 +231,7 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
     try {
       await loadPermissionTrees(0);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "角色权限树加载失败");
+      toast.error(toUserFacingErrorMessage(error, "角色权限树加载失败"));
       closeDialog();
       return;
     }
@@ -243,7 +247,7 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
       setDraft(createRoleDraft(detail));
       setOriginalRoleKey(detail.roleKey);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "角色详情加载失败");
+      toast.error(toUserFacingErrorMessage(error, "角色详情加载失败"));
       closeDialog();
       return;
     }
@@ -264,87 +268,141 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
           </Button>
         }
         description="管理角色及其菜单权限与数据权限。"
-        kicker="Admin Module"
+        kicker="管理台"
         title="角色管理"
       />
 
-      <AdminTwoColumn>
-        <FilterPanel description="角色保存时会按正确顺序提交角色主信息、菜单权限和数据权限，避免更新时丢失关联。">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <FormField label="角色名称">
-              <Input
-                onChange={(event) => {
-                  setPageIndex(1);
-                  setRoleNameFilter(event.target.value);
-                }}
-                placeholder="按角色名称过滤"
-                value={roleNameFilter}
-              />
-            </FormField>
-            <FormField label="角色编码">
-              <Input
-                onChange={(event) => {
-                  setPageIndex(1);
-                  setRoleKeyFilter(event.target.value);
-                }}
-                placeholder="按 roleKey 过滤"
-                value={roleKeyFilter}
-              />
-            </FormField>
-            <FormField label="状态">
-              <Select onValueChange={(value) => {
+      <FilterPanel>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <FormField label="角色名称">
+            <Input
+              onChange={(event) => {
                 setPageIndex(1);
-                setStatusFilter(value);
-              }} options={statusOptions} placeholder="选择状态" value={statusFilter} />
-            </FormField>
-          </div>
-          <Toolbar>
-            <Button onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", "roles"] })} type="button" variant="outline">
-              刷新数据
-            </Button>
-          </Toolbar>
-        </FilterPanel>
-
-        <FilterPanel description="角色权限管理注意事项" title="操作说明">
-          <div className="space-y-2 text-sm leading-7 text-muted-foreground">
-            <p>编辑角色时会同时拉取角色详情、菜单树和部门树，确保提交总是带完整权限集合。</p>
-            <p>`admin` 角色的菜单权限保持锁定，只展示当前已绑定结果，避免误清空核心权限。</p>
-            <p>仅在"自定数据权限"下展示部门树选择，其他权限范围不再渲染多余结构。</p>
-          </div>
-        </FilterPanel>
-      </AdminTwoColumn>
+                setRoleNameFilter(event.target.value);
+              }}
+              placeholder="按角色名称过滤"
+              value={roleNameFilter}
+            />
+          </FormField>
+          <FormField label="角色编码">
+            <Input
+              onChange={(event) => {
+                setPageIndex(1);
+                setRoleKeyFilter(event.target.value);
+              }}
+              placeholder="按 roleKey 过滤"
+              value={roleKeyFilter}
+            />
+          </FormField>
+          <FormField label="状态">
+            <Select onValueChange={(value) => {
+              setPageIndex(1);
+              setStatusFilter(value);
+            }} options={statusOptions} placeholder="选择状态" value={statusFilter} />
+          </FormField>
+        </div>
+        <Toolbar>
+          <Button onClick={() => void queryClient.invalidateQueries({ queryKey: ["admin-page", "roles"] })} type="button" variant="outline">
+            刷新数据
+          </Button>
+        </Toolbar>
+      </FilterPanel>
 
       <DataTableSection description={`当前共 ${total} 条角色记录。`} title="角色列表">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>角色名称</TableHead>
-              <TableHead>角色编码</TableHead>
-              <TableHead>排序</TableHead>
-              <TableHead>数据权限</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead>备注</TableHead>
-              <TableHead>操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.roleId}>
-                <TableCell>
-                  <div className="space-y-1">
-                    <div className="font-medium text-foreground">{row.roleName}</div>
-                    <div className="text-xs text-muted-foreground">{row.admin ? "系统管理员角色" : `角色 ID: ${row.roleId}`}</div>
+        <div className="flex flex-wrap items-center gap-2 rounded-[1.25rem] border border-border/70 bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
+          <Badge tone="muted">共 {total} 条</Badge>
+          <Badge tone="primary">角色主信息前置</Badge>
+          <Badge tone="info">中小屏自动换成卡片列表</Badge>
+        </div>
+
+        <div className="hidden xl:block">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>角色名称</TableHead>
+                <TableHead>角色编码</TableHead>
+                <TableHead>排序</TableHead>
+                <TableHead>数据权限</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead>备注</TableHead>
+                <TableHead>操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.roleId}>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="font-medium text-foreground">{row.roleName}</div>
+                      <div className="text-xs text-muted-foreground">{row.admin ? "系统管理员角色" : `角色 ID: ${row.roleId}`}</div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{row.roleKey}</TableCell>
+                  <TableCell>{row.roleSort}</TableCell>
+                  <TableCell>{dataScopeLabels[row.dataScope] || row.dataScope || "-"}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={statusLabels[row.status] || row.status} />
+                  </TableCell>
+                  <TableCell>{row.remark || "-"}</TableCell>
+                  <TableCell>
+                    <RowActions>
+                      <Button onClick={() => void openEditDialog(row)} size="sm" type="button" variant="outline">
+                        编辑
+                      </Button>
+                      <Button onClick={() => setStatusTarget(row)} size="sm" type="button" variant="outline">
+                        {row.status === "2" ? "停用" : "启用"}
+                      </Button>
+                      {row.roleKey !== "admin" ? (
+                        <Button onClick={() => setDeleteTarget(row)} size="sm" type="button" variant="destructive">
+                          删除
+                        </Button>
+                      ) : null}
+                    </RowActions>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="xl:hidden">
+          <AppVirtualList
+            className="max-h-[34rem]"
+            contentClassName="grid"
+            empty={<div className="px-4 py-8 text-sm text-muted-foreground">暂无角色记录。</div>}
+            estimatedItemSize={172}
+            getItemKey={(item) => item.roleId}
+            items={rows}
+            overscan={4}
+          >
+            {(row) => (
+              <Card className="rounded-none border-x-0 border-t-0 shadow-none first:rounded-t-[1.25rem] last:rounded-b-[1.25rem] last:border-b">
+                <CardContent className="grid gap-4 px-4 py-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="grid gap-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-base font-semibold text-foreground">{row.roleName}</span>
+                        {row.admin ? <Badge tone="primary">系统角色</Badge> : null}
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span>{row.roleKey}</span>
+                        <span>排序 {row.roleSort}</span>
+                        <span>ID {row.roleId}</span>
+                      </div>
+                    </div>
+                    <StatusBadge status={statusLabels[row.status] || row.status} />
                   </div>
-                </TableCell>
-                <TableCell>{row.roleKey}</TableCell>
-                <TableCell>{row.roleSort}</TableCell>
-                <TableCell>{dataScopeLabels[row.dataScope] || row.dataScope || "-"}</TableCell>
-                <TableCell>
-                  <StatusBadge status={statusLabels[row.status] || row.status} />
-                </TableCell>
-                <TableCell>{row.remark || "-"}</TableCell>
-                <TableCell>
-                  <RowActions>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-1">
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">数据权限</span>
+                      <span className="text-sm leading-6 text-foreground">{dataScopeLabels[row.dataScope] || row.dataScope || "-"}</span>
+                    </div>
+                    <div className="grid gap-1">
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">备注</span>
+                      <span className="text-sm leading-6 text-foreground">{row.remark || "-"}</span>
+                    </div>
+                  </div>
+                  <RowActions className="justify-end border-t border-border/70 pt-3">
                     <Button onClick={() => void openEditDialog(row)} size="sm" type="button" variant="outline">
                       编辑
                     </Button>
@@ -357,16 +415,15 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
                       </Button>
                     ) : null}
                   </RowActions>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                </CardContent>
+              </Card>
+            )}
+          </AppVirtualList>
+        </div>
         <Pagination onNext={() => setPageIndex((current) => current + 1)} onPrevious={() => setPageIndex((current) => current - 1)} page={pageIndex} totalPages={totalPages} />
       </DataTableSection>
 
       <FormDialog
-        description="角色弹层统一承载基础字段、菜单权限和部门权限，不再使用页面自带 modal 结构。"
         onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) {
@@ -382,7 +439,7 @@ export function RolesPage({ api }: { api: ReturnType<typeof createApiClient> }) 
           <div className="flex min-h-0 flex-1 flex-col">
             <AppScrollbar className="min-h-0 flex-1" viewportClassName="pr-1">
               <div className="grid gap-6">
-                <FormSection description="字段直接对应后端 DTO，不额外引入兼容层。" title="基础信息">
+                <FormSection title="基础信息">
                   <div className="grid gap-4 md:grid-cols-2">
                     <FormField label="角色名称">
                       <Input onChange={(event) => setDraft((current) => ({ ...current, roleName: event.target.value }))} value={draft.roleName} />

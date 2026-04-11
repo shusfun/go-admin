@@ -1,4 +1,4 @@
-import { ActionTile, MobileHero, SurfaceCard } from "@go-admin/ui-mobile";
+import { ActionTile, Image, MobileHero } from "@go-admin/ui-mobile";
 import type { InfoResponse, ProfileResponse } from "@go-admin/types";
 
 export function HomePage({
@@ -10,11 +10,23 @@ export function HomePage({
   profile: ProfileResponse;
   tenantCode: string;
 }) {
+  const displayName = info.name || profile.user.nickName || info.userName;
+  const avatar = profile.user.avatar ?? info.avatar;
+
   return (
     <div className="mobile-stack">
       <MobileHero
         description={`租户：${tenantCode}`}
-        eyebrow="Mobile Home"
+        eyebrow="移动首页"
+        media={
+          <div aria-label={`${displayName} 的头像`} className="mobile-home-avatar">
+            {avatar ? (
+              <Image alt={displayName} className="mobile-home-avatar__image" src={avatar} />
+            ) : (
+              <span className="mobile-home-avatar__fallback">{displayName.slice(0, 1)}</span>
+            )}
+          </div>
+        }
         title={`你好，${info.name || info.userName}`}
       />
 

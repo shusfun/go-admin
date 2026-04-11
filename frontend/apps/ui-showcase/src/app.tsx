@@ -125,6 +125,8 @@ export function App() {
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // scroll-rule: allow-page-content-overflow UI Showcase 主内容区保留原生滚动，供锚点与 Backtop 使用。
+  const pageContentClassName = "showcase-content-scroll-root px-4 py-6 md:px-8 md:py-8 xl:min-h-0 xl:overflow-y-auto";
   const searchItems = useMemo(
     () =>
       showcaseCategories.flatMap((category) =>
@@ -162,7 +164,7 @@ export function App() {
       <ScrollToTop />
       <DocsShell
         className="showcase-shell"
-        contentClassName="showcase-content-scroll-root px-4 py-6 md:px-8 md:py-8 xl:min-h-0 xl:overflow-y-auto"
+        contentClassName={pageContentClassName}
         contentInnerClassName="max-w-[1120px] gap-8 xl:pb-12"
         header={<ShowcaseHeader onSearchOpen={() => handleSearchOpenChange(true)} />}
         mobileBar={({ openSidebar }) => (
